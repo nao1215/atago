@@ -15,7 +15,7 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool, snapsUpdated int) {
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
@@ -36,19 +36,14 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	if total == 1 {
 		plural = "scenario"
 	}
-	// Spec-load failures are not scenarios, so they get their own count in the
-	// tally line — otherwise the totals silently omit the dropped files (#120).
-	loadFail := ""
-	if loadFailures > 0 {
-		specPlural := "specs"
-		if loadFailures == 1 {
-			specPlural = "spec"
-		}
-		loadFail = fmt.Sprintf(", %d %s failed to load", loadFailures, specPlural)
-	}
-	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s (%s)\n",
+	loadFail := loadFailureSuffix(loadFailures)
+	// A snapshot rewrite is the one passing outcome worth naming: --update-snapshots
+	// replaces the committed expected results, and a run that did so must not read
+	// like an ordinary green run.
+	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail, d.Round(time.Millisecond))
+		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail,
+		snapshotSuffix(snapsUpdated), d.Round(time.Millisecond))
 }
 
 // writeDetail prints the failure/error block for a scenario, or nothing if it
@@ -74,6 +69,12 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, false)))
 	case engine.StatusError:
 		writeErroredSteps(b, color, suite, where, sc)
+	case engine.StatusPassed, engine.StatusSkipped:
+		// No failure block: there is nothing to explain about a green scenario,
+		// and a gated one is already named in the summary counts.
+	case engine.StatusFlaky:
+		// writeFlaky and writeRepeatRates own the flaky narrative, with the
+		// attempt count or the flake rate a bare failure block cannot carry.
 	}
 	// A failed teardown never flips the verdict — the steps decide that — but
 	// incomplete cleanup of external resources must stay loud.
@@ -171,12 +172,17 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 		if len(sc.Iterations) == 0 {
 			continue
 		}
-		passed := 0
-		for _, st := range sc.Iterations {
-			if st == engine.StatusPassed {
-				passed++
-			}
+		// A scenario an OS/env gate skipped every time ran nothing, so it has no
+		// rate: the summary already counts it as skipped, and a line here could
+		// only say "N/N passed" about executions that never happened.
+		if sc.Status == engine.StatusSkipped {
+			continue
 		}
+		// PassedIterations, not a second tally: it is what the fold classifies
+		// the repeat by and what the flake rate every machine format prints is
+		// built from, and it counts a gate skip as clean. Counting only
+		// StatusPassed here made the console line disagree with all of them.
+		passed := sc.PassedIterations()
 		// Color by the fold's verdict: all clean is green, a partial failure is
 		// flaky (yellow, green for the exit code), and an all-failed repeat is a
 		// deterministic red failure (#138).
@@ -186,6 +192,9 @@ func writeRepeatRates(b *strings.Builder, color bool, res *engine.SuiteResult) {
 			code = cYellow
 		case engine.StatusFailed, engine.StatusError:
 			code = cRed
+		case engine.StatusPassed, engine.StatusSkipped, engine.StatusXFail, engine.StatusXPass:
+			// Green: every iteration that mattered came out the way the scenario
+			// declared it would. The skipped case never reaches here.
 		}
 		fmt.Fprintf(b, "\n%s %s: %d/%d passed\n",
 			colorize(color, code+cBold, "REPEAT:"), sc.Name, passed, len(sc.Iterations))

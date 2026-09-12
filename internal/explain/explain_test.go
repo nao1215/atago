@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/spectest"
@@ -183,11 +184,19 @@ scenarios:
             - navigate: http://localhost:8080
             - screenshot: {path: home.png}
       - assert:
+          pdf:
+            path: report.pdf
+            min_pages: 1
+      - assert:
           value:
             contains: ok
+    teardown:
+      - run:
+          command: audit
+          stdout_to: logs/audit.log
 `
 	out := mustExplain(t, src)
-	for _, w := range []string{"Generates", "thumb.png", "out.txt", "home.png"} {
+	for _, w := range []string{"Generates", "thumb.png", "out.txt", "home.png", "report.pdf", "logs/audit.log"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("explain output missing generated artifact %q\n--- got ---\n%s", w, out)
 		}
@@ -634,6 +643,165 @@ scenarios:
 	}
 }
 
+// TestExplain_SuiteSecurityNotes is a regression: security notes existed only
+// per scenario, so a suite whose setup curls through the shell and starts an
+// ssh-tunnel service — and whose teardown curls a purge endpoint — showed the
+// steps but flagged none of them, while the same steps inside a scenario are
+// all called out.
+func TestExplain_SuiteSecurityNotes(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: egress
+  setup:
+    - run:
+        command: curl https://seed.example/data
+        shell: true
+    - service:
+        name: relay
+        command: ssh -N -L 8080:internal.example:80 jump.example
+  teardown:
+    - run:
+        command: curl https://api.example/purge
+        shell: true
+scenarios:
+  - name: quiet
+    steps:
+      - run: {command: echo hi}
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"Suite security notes:",
+		"shell execution enabled: curl https://seed.example/data",
+		"network access: curl https://seed.example/data",
+		"network access (service relay): ssh -N -L 8080:internal.example:80 jump.example",
+		"network access: curl https://api.example/purge",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain suite security notes missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_HTTPNamesItsRunnerAndRetry is a regression on two counts: an
+// http step was the one runner-backed kind that never named the runner
+// carrying it, so two requests to different hosts read identically; and a
+// retry — which changes how many times a step's side effects happen, the very
+// fact deterministic: earned a note for — was invisible.
+func TestExplain_HTTPNamesItsRunnerAndRetry(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: httpretry
+runners:
+  internal: {type: http, base_url: "http://127.0.0.1:8080"}
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: talks to two hosts and polls one
+    steps:
+      - http: {runner: internal, method: GET, path: /health}
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry:
+            times: 3
+            interval: 200ms
+            until:
+              status: 200
+      - run:
+          command: probe
+          retry:
+            times: 5
+            interval: 1s
+            until:
+              exit_code: 0
+      - assert: {exit_code: 0}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"HTTP GET /health via internal",
+		"HTTP POST /charge via billing",
+		"network access: HTTP request via internal",
+		"network access: HTTP request via billing",
+		"retried up to 3 times every 200ms until HTTP status is 200",
+		"retried up to 5 times every 1s until exit code is 0",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_NamesEveryGate is a regression: the scenario heading rendered OS
+// gates only, so an env- or command-gated scenario — including one gated by
+// defaults.scenario — read as unconditional, while `atago doc` names all three
+// and `atago list` shows them in its GATES column.
+func TestExplain_NamesEveryGate(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: gates
+defaults:
+  scenario:
+    only:
+      command: "jq --version"
+scenarios:
+  - name: gated by the suite default
+    steps:
+      - run: {shell: true, command: "echo hi"}
+  - name: gated on an environment variable
+    skip: {env: CI}
+    steps:
+      - run: {shell: true, command: "echo hi"}
+  - name: gated on the os
+    only: {os: linux}
+    steps:
+      - run: {shell: true, command: "echo hi"}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		`[only command="jq --version"]`,
+		"[skip env=CI]",
+		"[only os=linux]",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain heading missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
+// TestExplain_RunnerEnvReads is a regression: a ${env:} in a runner's own
+// fields is expanded when a step uses the runner, and neither the security
+// notes nor the variables summary walked the runner table.
+func TestExplain_RunnerEnvReads(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: runnerenv
+runners:
+  pg: {type: db, dsn: "postgres://u:${env:DB_PASSWORD}@db.example:5432/app"}
+scenarios:
+  - name: queries through the runner
+    steps:
+      - query: {runner: pg, sql: "SELECT 1"}
+`
+	out := mustExplain(t, src)
+	for _, want := range []string{
+		"host environment read: ${env:DB_PASSWORD}",
+		"Variables used: env:DB_PASSWORD",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("explain output missing %q\n--- got ---\n%s", want, out)
+		}
+	}
+}
+
 // TestExplain_SignalStep covers describeSignal for both the fire-and-forget form
 // and the wait form. The default wait timeout rendered here (5s) must match the
 // engine's defaultSignalWait constant; a drift would mislead a reviewer about how
@@ -1004,6 +1172,11 @@ scenarios:
       - signal:
           service: worker
           signal: TERM
+      - pty:
+          command: ./shutdown-wizard
+          session:
+            - expect: "Really quit"
+            - send: {key: enter}
 `
 	out := mustExplain(t, src)
 	for _, want := range []string{
@@ -1018,6 +1191,11 @@ scenarios:
 		"marker.txt (inline content)",
 		"store final",
 		"send SIGTERM to service worker",
+		// A pty session in teardown executes exactly like one in the steps, so
+		// explain has to show it. It did not: describeTeardownStep had no pty
+		// branch, and the reviewer reading `atago explain` saw a cleanup block
+		// that quietly drove an interactive program.
+		"interactive (pty): ./shutdown-wizard",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("explain teardown missing %q\n--- got ---\n%s", want, out)
@@ -1098,7 +1276,7 @@ scenarios:
 func TestDescribeTarget_CoversEveryAssertTarget(t *testing.T) {
 	t.Parallel()
 	for _, target := range spec.AllAssertTargets() {
-		got := describeTarget(spectest.AssertForTarget(target), target)
+		got := assertdesc.DescribeTarget(spectest.AssertForTarget(target), target)
 		if got == "" {
 			t.Errorf("target %q renders as an empty line", target)
 		}

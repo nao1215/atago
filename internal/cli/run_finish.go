@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/report"
 )
@@ -22,12 +23,14 @@ func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.Sui
 		progress.Done()
 	}
 
-	exit = worseExit(exit, settleRerunLedger(ctx, opts, results))
+	exit = worseExit(exit, settleRerunLedger(ctx, opts, results, unreachedSpecs(opts.paths, suiteResults, loadErrs)))
 
-	// Every spec failed to load, or an interrupt skipped every suite before it
-	// produced a result. Don't print a misleading "0 scenarios" report — but a run
-	// that was interrupted before completing must never exit 0.
-	if len(results) == 0 {
+	// Nothing ran and nothing failed to load — an interrupt landed before any
+	// suite produced a result. There is no report to write, only a verdict: a run
+	// cut short never exits 0. A run whose specs all failed to LOAD does have
+	// something to report, and falls through so every format names the files it
+	// could not read (#120).
+	if len(results) == 0 && len(loadFailures) == 0 {
 		if ctx.Err() != nil {
 			fmt.Fprintln(opts.stderr, opts.label+": interrupted")
 			return worseExit(exit, ExitExec)
@@ -37,7 +40,7 @@ func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.Sui
 
 	exit = worseExit(exit, emptySelectionExit(ctx, opts, results))
 
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass)); err != nil {
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures...), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass), report.WithSnapshotsUpdated(opts.snapshotsUpdated)); err != nil {
 		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
@@ -62,28 +65,30 @@ func failIncomplete(opts *runOptions, progress *report.Progress) int {
 }
 
 // collectSuiteExits pairs each spec path with its load error or suite result,
-// printing load failures and folding every outcome into one exit code. ok is
-// false when the slices run dry early (a bookkeeping bug the caller reports).
-func collectSuiteExits(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error) (results []*engine.SuiteResult, exit, loadFailures int, ok bool) {
+// printing load failures and folding every outcome into one exit code. The
+// load failures are returned rather than counted, because a report has to name
+// the file it could not read (#120). ok is false when the slices run dry early
+// (a bookkeeping bug the caller reports).
+func collectSuiteExits(opts *runOptions, suiteResults []*engine.SuiteResult, loadErrs []error) (results []*engine.SuiteResult, exit int, loadFailures []report.LoadFailure, ok bool) {
 	results = make([]*engine.SuiteResult, 0, len(opts.paths))
 	exit = ExitOK
 	remainingResults := suiteResults
 	remainingLoadErrs := loadErrs
-	for range opts.paths {
+	for _, path := range opts.paths {
 		loadErr, nextLoadErrs, ok := shiftSlice(remainingLoadErrs)
 		if !ok {
-			return nil, 0, 0, false
+			return nil, 0, nil, false
 		}
 		suiteResult, nextResults, ok := shiftSlice(remainingResults)
 		if !ok {
-			return nil, 0, 0, false
+			return nil, 0, nil, false
 		}
 		remainingLoadErrs = nextLoadErrs
 		remainingResults = nextResults
 		if loadErr != nil {
 			fmt.Fprintf(opts.stderr, "%v\n", loadErr)
 			exit = worseExit(exit, exitForLoadError(loadErr))
-			loadFailures++
+			loadFailures = append(loadFailures, report.LoadFailure{SpecPath: path, Message: loadErr.Error()})
 			continue
 		}
 		// A nil result with no load error is a spec fail-fast (or an interrupt)
@@ -97,11 +102,25 @@ func collectSuiteExits(opts *runOptions, suiteResults []*engine.SuiteResult, loa
 	return results, exit, loadFailures, true
 }
 
+// unreachedSpecs are the spec paths the run never loaded: --fail-fast stopped
+// scheduling after an earlier spec turned the run red, or an interrupt ended the
+// run first. They produced neither a suite result nor a load error, so the run
+// has nothing to say about the scenarios inside them.
+func unreachedSpecs(paths []string, suiteResults []*engine.SuiteResult, loadErrs []error) []string {
+	var out []string
+	for i, p := range paths {
+		if loadErrs[i] == nil && suiteResults[i] == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // settleRerunLedger updates the last-failed ledger for a later `--rerun-failed`
 // (#64) and returns the exit contribution of a --rerun-failed that matched
 // nothing. The preservation invariants live with the ledger primitives in
 // rerun.go.
-func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) int {
+func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.SuiteResult, unreached []string) int {
 	// Scenarios that actually executed. A Select can exclude every scenario in a
 	// loaded suite — most importantly a --rerun-failed whose recorded scenario
 	// names no longer exist in the specs (renamed or removed while still broken).
@@ -120,7 +139,7 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 	// contradicts the empty-selection warning). The excluded failures are still
 	// preserved into the ledger via rerunPreserved, so no work is lost.
 	if opts.rerunFailed && !opts.selectionActive() && len(results) > 0 && ranScenarios == 0 && ctx.Err() == nil {
-		fmt.Fprintln(opts.stderr, opts.label+": warning: no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared")
+		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, diag.RerunNothingMatched.Annotate("no recorded failing scenarios matched the current specs (renamed or removed?); the recorded failures were kept, not cleared"))
 		return ExitConfig
 	}
 
@@ -133,7 +152,7 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 		// were recorded, which reads as "the others are fixed". Say so before the
 		// ledger is rewritten, while the prior entries are still readable.
 		if opts.rerunFailed && !opts.selectionActive() {
-			warnUnmatchedRerunEntries(opts.label, opts.stderr, results)
+			warnUnmatchedRerunEntries(opts.label, opts.stderr, results, unreached, opts.rerunTargets)
 		}
 		updateRerunLedger(opts.label, opts.stderr, results, opts.allowXPass)
 	}
@@ -177,7 +196,7 @@ func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine
 	// users fixing the wrong thing, so name each selector's real rule.
 	note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
 	if opts.ci {
-		fmt.Fprintf(opts.stderr, opts.label+": no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.\n", strings.Join(sel, " "), note)
+		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, diag.EmptySelection.Annotate(fmt.Sprintf("no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.", strings.Join(sel, " "), note)))
 		return ExitConfig
 	}
 	hint := note

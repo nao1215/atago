@@ -9,6 +9,7 @@
   - [validate rejects a broken Caddyfile](#scenario-validate-rejects-a-broken-caddyfile)
   - [a config-driven server boots from an authored Caddyfile](#scenario-a-config-driven-server-boots-from-an-authored-caddyfile)
   - [the file server serves fixtures over real HTTP](#scenario-the-file-server-serves-fixtures-over-real-http)
+
 ## caddy (self-hosted web server)
 [Caddy](https://caddyserver.com/) has two faces, and both are covered here.
 
@@ -22,7 +23,9 @@ so what is asserted is the response a browser would get, not a log line
 claiming the server came up.
 
 Source: `test/e2e/thirdparty/caddy/caddy.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`, `localhost`.
 ### Scenario: the standard module set is compiled in
+_only when `caddy version` succeeds_
 #### When
 ```shell
 caddy list-modules
@@ -30,9 +33,12 @@ caddy list-modules
 #### Then
 - exit code is `0`
 - stdout contains `http.handlers.file_server`, `http.handlers.static_response`
+
 ### Scenario: adapt turns a Caddyfile into canonical JSON
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
+
 #### Inputs
 _Fixture `Caddyfile`:_
 ```text
@@ -46,9 +52,12 @@ caddy adapt --config Caddyfile
 #### Then
 - exit code is `0`
 - stdout at `$.apps.http.servers.srv0.listen[0]` equals `:18080`
+
 ### Scenario: fmt normalizes a messy Caddyfile in place
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
+
 #### Inputs
 _Fixture `Caddyfile`:_
 ```text
@@ -63,9 +72,12 @@ caddy fmt --overwrite Caddyfile
 #### Then
 - exit code is `0`
 - file `Caddyfile` contains `respond "ok"`
+
 ### Scenario: validate rejects a broken Caddyfile
+_only when `caddy version` succeeds_
 #### Given
 - Fixture file `Caddyfile` is created.
+
 #### Inputs
 _Fixture `Caddyfile`:_
 ```text
@@ -79,10 +91,13 @@ caddy validate --config Caddyfile --adapter caddyfile
 #### Then
 - exit code is not `0`
 - stderr contains `no_such_directive_xyz`
+
 ### Scenario: a config-driven server boots from an authored Caddyfile
+_only when `caddy version` succeeds_
 #### Given
 - Background service `caddy` is started: `caddy run --config Caddyfile --adapter caddyfile`.
 - Fixture file `Caddyfile` is created.
+
 #### Inputs
 _Fixture `Caddyfile`:_
 ```text
@@ -95,16 +110,19 @@ respond "configured response" 200
 ```
 #### When
 ```shell
-# HTTP GET /
+# HTTP GET / via web2
 ```
 #### Then
 - HTTP status is `200`
 - body contains `configured response`
+
 ### Scenario: the file server serves fixtures over real HTTP
+_only when `caddy version` succeeds_
 #### Given
 - Background service `caddy` is started: `caddy file-server --listen 127.0.0.1:18080 --root site`.
 - Fixture file `site/index.html` is created.
 - Fixture file `site/api/status.json` is created.
+
 #### Inputs
 _Fixture `site/index.html`:_
 ```text
@@ -116,9 +134,9 @@ _Fixture `site/api/status.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /index.html
-# HTTP GET /api/status.json
-# HTTP GET /no-such-file
+# HTTP GET /index.html via web
+# HTTP GET /api/status.json via web
+# HTTP GET /no-such-file via web
 ```
 #### Then
 - after `HTTP GET /index.html`:

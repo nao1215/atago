@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -19,6 +20,21 @@ const jsonSchemaVersion = "1"
 type jsonDocument struct {
 	SchemaVersion string       `json:"schema_version"`
 	Suites        []jsonReport `json:"suites"`
+	// LoadFailures are the spec files the run could not read (#120). They ran no
+	// scenario, so they appear in no suite above. Omitted when there are none, so
+	// an ordinary run's document is unchanged.
+	LoadFailures []jsonLoadFailure `json:"load_failures,omitempty"`
+	// SnapshotsUpdated counts the snapshots this run WROTE (--update-snapshots)
+	// instead of comparing against. Rewriting the committed expected results is
+	// the one passing outcome a consumer has to be able to notice; omitted when
+	// zero, so an ordinary verify run's document is unchanged.
+	SnapshotsUpdated int `json:"snapshots_updated,omitempty"`
+}
+
+// jsonLoadFailure names one unreadable spec and why it could not be read.
+type jsonLoadFailure struct {
+	SpecPath string `json:"spec_path"`
+	Error    string `json:"error"`
 }
 
 // A machine-readable report carrying enough failure context
@@ -72,9 +88,13 @@ type jsonFailure struct {
 	Actual   string `json:"actual,omitempty"`
 	// Diff is the uncolored unified diff for multi-line equals/snapshot
 	// failures (#28) — additive, so schema_version stays "1".
-	Diff      string         `json:"diff,omitempty"`
-	Hint      string         `json:"hint,omitempty"`
-	Error     string         `json:"error,omitempty"`
+	Diff  string `json:"diff,omitempty"`
+	Hint  string `json:"hint,omitempty"`
+	Error string `json:"error,omitempty"`
+	// Code is the diagnostic code carried by Error, when it has one. It lets a
+	// consumer group failures by cause without matching on prose that is free
+	// to be reworded. An assertion failing carries none by design.
+	Code      string         `json:"code,omitempty"`
 	Artifacts []jsonArtifact `json:"artifacts,omitempty"`
 }
 
@@ -140,7 +160,10 @@ func buildJSON(res *engine.SuiteResult, allowXPass bool) jsonReport {
 			if !allowXPass {
 				out.Failures = append(out.Failures, jsonFailure{Scenario: sc.Name, Error: xpassMessage(sc)})
 			}
-		default:
+		case engine.StatusPassed, engine.StatusFailed, engine.StatusSkipped, engine.StatusError, engine.StatusFlaky:
+			// Every ordinary verdict: the failing checks are what the bucket
+			// describes. A passed or skipped scenario has none, so it contributes
+			// nothing here; a flaky one contributes the attempt that failed.
 			out.Failures = append(out.Failures, failuresOf(sc)...)
 		}
 	}
@@ -197,6 +220,7 @@ func suiteStepFailures(suite string, steps []engine.StepResult) []jsonFailure {
 				Scenario: suite,
 				Step:     stepPhase(step),
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -228,6 +252,7 @@ func teardownFailuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Scenario: sc.Name,
 				Step:     stepPhase(step),
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -265,6 +290,7 @@ func failuresOf(sc *engine.ScenarioResult) []jsonFailure {
 				Step:     stepPhase(step),
 				Command:  cmd,
 				Error:    step.ErrMsg,
+				Code:     firstCode(step.ErrMsg),
 			})
 		}
 	}
@@ -282,4 +308,15 @@ func jsonExpectFailOf(ef *spec.ExpectFail) *jsonExpectFail {
 		return nil
 	}
 	return &jsonExpectFail{Reason: ef.Reason, Issue: ef.Issue}
+}
+
+// firstCode returns the diagnostic code a message carries, or "" when it has
+// none. Assertion failures deliberately carry none: exit 1 is a spec doing its
+// job, so there is nothing for a consumer to branch on beyond the verdict.
+func firstCode(msg string) string {
+	codes := diag.Codes(msg)
+	if len(codes) == 0 {
+		return ""
+	}
+	return codes[0].String()
 }

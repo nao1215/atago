@@ -40,6 +40,10 @@ type junitTestsuite struct {
 	Skipped   int             `xml:"skipped,attr"`
 	Time      junitSeconds    `xml:"time,attr"`
 	Testcases []junitTestcase `xml:"testcase"`
+	// SystemErr carries a failed suite.teardown. It never changes the counts —
+	// teardown outcomes never change a verdict — but a junit consumer used to
+	// see a clean document with zero trace that cleanup failed.
+	SystemErr string `xml:"system-err,omitempty"`
 }
 
 type junitTestcase struct {
@@ -52,6 +56,12 @@ type junitTestcase struct {
 	// and then passed on retry (#29): the testcase itself counts as passed,
 	// the element preserves the evidence.
 	FlakyFailure *junitMessage `xml:"flakyFailure,omitempty"`
+	// SystemErr carries the scenario's failed teardown, junit's slot for
+	// output that accompanies a result without deciding it (the flakyFailure
+	// pattern one severity down): the verdict is decided by the steps alone,
+	// so a failed cleanup must not add a <failure>, but staying silent hid it
+	// from every junit consumer.
+	SystemErr string `xml:"system-err,omitempty"`
 }
 
 type junitMessage struct {
@@ -63,8 +73,22 @@ type junitSkipped struct {
 	Message string `xml:"message,attr"`
 }
 
-func buildJUnit(results []*engine.SuiteResult, allowXPass bool) junitTestsuites {
+func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) junitTestsuites {
 	root := junitTestsuites{}
+	// A spec that never parsed belongs to no suite, so it gets one of its own
+	// carrying a single errored testcase — the shape a collection error takes in
+	// every other tool that produces JUnit XML.
+	for _, lf := range loadFailures {
+		root.Suites = append(root.Suites, junitTestsuite{
+			Name: lf.SpecPath, Tests: 1, Errors: 1,
+			Testcases: []junitTestcase{{
+				Name:  "load",
+				Error: &junitMessage{Message: "spec failed to load", Body: lf.Message},
+			}},
+		})
+		root.Tests++
+		root.Errors++
+	}
 	for _, res := range results {
 		ts := junitTestsuite{Name: res.Suite, Time: junitSeconds(res.Duration.Seconds())}
 		for i := range res.Scenarios {
@@ -103,6 +127,12 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool) junitTestsuites 
 				}
 				tc.Failure = &junitMessage{Message: xpassMessage(sc), Body: detailText(sc)}
 				ts.Failures++
+			case engine.StatusPassed:
+				// A bare <testcase> with no child element: JUnit's way of saying
+				// it passed.
+			}
+			if td := stepsDetailText(sc.Teardown); td != "" {
+				tc.SystemErr = "teardown failed (the verdict is decided by the steps alone):\n" + td
 			}
 			ts.Testcases = append(ts.Testcases, tc)
 			ts.Tests++
@@ -120,6 +150,9 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool) junitTestsuites 
 				ts.Errors++
 				ts.Tests++
 			}
+		}
+		if td := stepsDetailText(res.Teardown); td != "" {
+			ts.SystemErr = "suite teardown failed (teardown outcomes never change the suite status):\n" + td
 		}
 		root.Suites = append(root.Suites, ts)
 		root.Tests += ts.Tests
@@ -155,6 +188,24 @@ func firstFailureMessage(sc *engine.ScenarioResult) string {
 	return "assertion failed"
 }
 
+// firstStepFailureMessage returns the first failing check's description or the
+// first errored step's message across a step list, or "" when it is clean. It
+// names a teardown failure in the one-line slots (a tap comment, a gha warning
+// title) the way firstFailureMessage names a scenario failure.
+func firstStepFailureMessage(steps []engine.StepResult) string {
+	for _, step := range steps {
+		for _, ck := range step.Checks {
+			if ck != nil && !ck.OK {
+				return ck.Desc
+			}
+		}
+		if step.ErrMsg != "" {
+			return step.ErrMsg
+		}
+	}
+	return ""
+}
+
 func firstErrorMessage(sc *engine.ScenarioResult) string {
 	for _, step := range sc.Steps {
 		if step.ErrMsg != "" {
@@ -164,10 +215,32 @@ func firstErrorMessage(sc *engine.ScenarioResult) string {
 	return "execution error"
 }
 
-// detailText renders the human failure block as plain text for the XML body.
+// detailText renders the human failure block as plain text for the XML body,
+// closing with any preserved background-service logs (#51) — evidence the run
+// wrote for whoever reads the failure, which only the console and the json
+// report used to reference.
 func detailText(sc *engine.ScenarioResult) string {
+	body := stepsDetailText(sc.Steps)
+	if len(sc.ServiceLogs) == 0 {
+		return body
+	}
 	var b strings.Builder
-	for _, step := range sc.Steps {
+	b.WriteString(body)
+	if body != "" {
+		b.WriteByte('\n')
+	}
+	for _, sl := range sc.ServiceLogs {
+		fmt.Fprintf(&b, "Service log (%s): %s\n", sl.Name, sl.Path)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// stepsDetailText renders the failed checks and errored steps of any step list
+// — a scenario's steps, its teardown, or the suite lifecycle — as plain text,
+// or "" when the list is clean.
+func stepsDetailText(steps []engine.StepResult) string {
+	var b strings.Builder
+	for _, step := range steps {
 		for _, ck := range step.Checks {
 			if ck == nil || ck.OK {
 				continue
@@ -189,6 +262,12 @@ func detailText(sc *engine.ScenarioResult) string {
 			}
 			if ck.Hint != "" {
 				fmt.Fprintf(&b, "Hint: %s\n", ck.Hint)
+			}
+			// Reference the durable sidecars by path (#48). The console and the
+			// json report carried them and these formats did not, so the CI
+			// systems they exist for could not reach the files the run wrote.
+			for _, a := range ck.ArtifactFiles {
+				fmt.Fprintf(&b, "Artifact (%s): %s\n", a.Role, a.Path)
 			}
 		}
 		if step.ErrMsg != "" {

@@ -32,6 +32,12 @@ type Spec struct {
 	// (#394), absolute. Set by the loader from atago.project.yaml, never
 	// authored in a spec, and exposed to every scenario as ${fixtures}.
 	FixturesDir string `yaml:"-"`
+	// Subject is the binary under test declared by that manifest (#393), when
+	// it declares one. It is recorded here — rather than staying inside the
+	// loader — because the build is a command that runs on the host before any
+	// scenario, with the invoking environment and optionally through the shell,
+	// and the spec summaries have to be able to describe and flag it.
+	Subject *Subject `yaml:"-"`
 	// ProjectPath is the manifest that applied to this spec, if any (#392). Set
 	// by the loader, never authored; the read-only commands print it, because
 	// configuration that applies to a file without appearing in it has to be
@@ -71,11 +77,23 @@ type Defaults struct {
 	Service  *Service          `yaml:"service,omitempty"`
 }
 
-// ScenarioDefaults holds the scenario-level default fragments. Only `env` is
-// supported — the highest-value duplication — and it shallow-merges beneath each
-// scenario's own `env`.
+// ScenarioDefaults holds the scenario-level default fragments: the env every
+// scenario shares, and the gate every scenario is selected by.
+//
+// Env shallow-merges beneath each scenario's own `env`. Only and Skip are taken
+// whole by a scenario that does not state its own, which is what a probe-first
+// suite needs: "these scenarios exist only where the tool is installed" is a
+// property of the file, not of each scenario in it, and repeating it on every
+// scenario is how a suite ends up with some scenarios gated and some not — the
+// ungated ones then error on a machine without the tool instead of skipping.
 type ScenarioDefaults struct {
 	Env map[string]string `yaml:"env,omitempty"`
+	// Only is the default selection gate: a scenario without its own `only:`
+	// runs only when this condition holds.
+	Only *Condition `yaml:"only,omitempty"`
+	// Skip is the default exclusion gate: a scenario without its own `skip:` is
+	// skipped when this condition holds.
+	Skip *Condition `yaml:"skip,omitempty"`
 }
 
 // Suite groups scenarios under a name.
@@ -247,8 +265,24 @@ type Scenario struct {
 	Teardown []Step `yaml:"teardown,omitempty"`
 }
 
+// Subject is the binary under test a directory manifest declares (#393),
+// reduced to what a spec summary needs: the name specs invoke it by, and the
+// command that builds it before any scenario runs.
+//
+// The build command is the reason this reaches the spec model at all. It runs
+// on the host with the invoking environment, optionally through the shell, and
+// nothing described or flagged it — a `curl … > ${artifact}` build was as
+// invisible to review as an empty manifest.
+type Subject struct {
+	Name    string
+	Command string
+	Shell   bool
+}
+
 // Condition gates a scenario by platform, environment, or a probe command
-// . For OS, skip/only compare against the host. For Env, the
+// . For OS, skip/only compare against the host as runtime.GOOS names it, so
+// each BSD is named on its own (freebsd, openbsd, netbsd) rather than as a
+// family. For Env, the
 // condition is true when the named environment variable is non-empty:
 // `skip: { env: X }` skips when X is set; `only: { env: X }` runs only when X is
 // set. For Command, the condition is true when the probe command succeeds (exits

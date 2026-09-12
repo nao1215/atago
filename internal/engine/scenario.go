@@ -32,6 +32,11 @@ type scenarioRun struct {
 	// separates artifact directories, so one attempt's evidence cannot overwrite
 	// another's while a report still references it.
 	attempt int
+	// phase is which block of the scenario is executing: empty for the numbered
+	// steps, artifact.PhaseTeardown while the teardown block runs. Both blocks
+	// number their steps from zero, so it is what keeps a teardown failure from
+	// writing over the evidence for the step the verdict is about.
+	phase   string
 	sc      *spec.Scenario
 	rc      runConfig
 	specDir string
@@ -62,6 +67,17 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 	if reason, skip := e.skipReason(ctx, sc); skip {
 		return ScenarioResult{Name: sc.Name, Status: StatusSkipped, SkipReason: reason}
 	}
+
+	// rc is this scenario's own copy, so neither of these can leak into the
+	// scenarios running beside it. Naming the writer — with the same identity
+	// the rerun ledger uses, so the two notions cannot drift — is what lets a
+	// snapshot clash tell a second scenario apart from this scenario's own
+	// earlier attempt; matrix rows are distinct scenarios with distinct names,
+	// which keeps a genuine shared-golden clash reported as one. Freezing the
+	// goldens is what keeps an expect_fail scenario's recorded expectation from
+	// being rewritten with the output it documents as wrong (#395).
+	rc.snapshotWriter = ScenarioID(rc.specPath, sc.Name)
+	rc.keepSnapshots = sc.ExpectFail != nil
 
 	x := &scenarioRun{
 		e:            e,
@@ -131,9 +147,11 @@ func (e *Engine) runScenario(ctx context.Context, scenarioIdx int, sc *spec.Scen
 }
 
 // artifactScope names where this execution's artifact files belong: the suite,
-// the scenario, and which attempt wrote them.
+// the scenario, which attempt wrote them, and which phase of the scenario was
+// running. Every artifact path is composed from here, so a phase cannot be
+// forgotten at one call site while the others carry it.
 func (x *scenarioRun) artifactScope() artifact.Scenario {
-	return artifact.Scenario{SpecPath: x.rc.specPath, Name: x.sc.Name, Index: x.idx, Attempt: x.attempt}
+	return artifact.Scenario{SpecPath: x.rc.specPath, Name: x.sc.Name, Index: x.idx, Attempt: x.attempt, Phase: x.phase}
 }
 
 // skipReason reports whether a scenario should be skipped given its skip/only

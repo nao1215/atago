@@ -98,7 +98,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 func TestWalkJSONValueStrings(t *testing.T) {
 	t.Parallel()
 	in := map[string]any{"s": "${x}", "n": 1, "arr": []any{"${y}", 2}}
-	out, ok := WalkJSONValueStrings(in, func(s string) string { return strings.ToUpper(s) }).(map[string]any)
+	out, ok := WalkJSONValueStrings(in, strings.ToUpper).(map[string]any)
 	if !ok {
 		t.Fatalf("result is not a map")
 	}
@@ -118,12 +118,13 @@ func TestWalkJSONValueStrings(t *testing.T) {
 	}
 }
 
-// collectStep is a small helper: it runs CollectStepVars over one step and
-// returns the referenced variable names, sorted, so a test can assert the exact
-// set a step kind contributes.
+// collectStep is a small helper: it runs CollectStepVars over one step with no
+// runner table and returns the referenced variable names, sorted, so a test can
+// assert the exact set a step kind's own fields contribute. Runner-definition
+// references are covered separately by TestCollectStepVars_RunnerDefinition.
 func collectStep(step *Step) []string {
 	set := map[string]bool{}
-	CollectStepVars(set, step)
+	CollectStepVars(set, step, nil)
 	return SortedKeys(set)
 }
 
@@ -232,16 +233,109 @@ func TestCollectStepVars_KnownFields(t *testing.T) {
 			t.Errorf("run field %q not collected; got %v", want, got)
 		}
 	}
+	// paste and exec.command are expanded by the engine (expandPTYAction), so a
+	// ${name} in either is a real variable use; both used to go uncounted.
 	pty := &Step{PTY: &PTY{Command: "${pcmd}", Cwd: "${pcwd}", Env: map[string]string{"K": "${penv}"}, Session: []PTYAction{
 		{Expect: "${pexp}"},
 		{Send: SendText("${psend}")},
+		{Send: &PTYSend{Paste: strp("${ppaste}")}},
+		{Exec: &PTYExec{Command: "notify ${pexec}"}},
 		{ExpectScreen: &PTYExpectScreen{ScreenAssert: ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${pscreen}"}}}}},
 	}}}
 	got = collectStep(pty)
-	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "pscreen"} {
+	for _, want := range []string{"pcmd", "pcwd", "penv", "pexp", "psend", "ppaste", "pexec", "pscreen"} {
 		if !hasVar(got, want) {
 			t.Errorf("pty field %q not collected; got %v", want, got)
 		}
+	}
+}
+
+// TestCollectStepVars_RetryUntil is a regression: the engine expands a retry's
+// until assertion before evaluating it (pollUntil -> expandAssert), so a
+// ${name} inside it is a live reference — and the run and http cases walked
+// every other field of the step but not Retry.Until.
+func TestCollectStepVars_RetryUntil(t *testing.T) {
+	t.Parallel()
+	run := &Step{Run: &Run{Command: "probe", Retry: &Retry{Times: 3, Until: &Assert{
+		Stdout: &StreamAssert{Contains: StringList{"${run_until_ref}"}},
+	}}}}
+	if got := collectStep(run); !hasVar(got, "run_until_ref") {
+		t.Errorf("run retry.until vars = %v, want it to include run_until_ref", got)
+	}
+	httpStep := &Step{HTTP: &HTTP{Method: "GET", Path: "/x", Retry: &Retry{Times: 3, Until: &Assert{
+		Body: &StreamAssert{Contains: StringList{"${http_until_ref}"}},
+	}}}}
+	if got := collectStep(httpStep); !hasVar(got, "http_until_ref") {
+		t.Errorf("http retry.until vars = %v, want it to include http_until_ref", got)
+	}
+}
+
+// TestCollectRunnerVars covers the runner fields the engine ${name}-expands, so
+// a reference in a runner definition counts toward the variables a scenario
+// using it depends on.
+func TestCollectRunnerVars(t *testing.T) {
+	t.Parallel()
+	set := map[string]bool{}
+	CollectRunnerVars(set, Runner{
+		Type: "ssh", Cwd: "${rcwd}", BaseURL: "${rbase}", DSN: "${rdsn}", Target: "${rtarget}",
+		Host: "${rhost}", User: "${ruser}", Password: "${rpass}", KeyFile: "${rkey}", KnownHosts: "${rknown}",
+	})
+	got := SortedKeys(set)
+	for _, want := range []string{"rcwd", "rbase", "rdsn", "rtarget", "rhost", "ruser", "rpass", "rkey", "rknown"} {
+		if !hasVar(got, want) {
+			t.Errorf("runner field %q not collected; got %v", want, got)
+		}
+	}
+}
+
+// TestCollectStepVars_RunnerDefinition proves a step's referenced variables
+// include those in the runner it names: the engine expands the runner's fields
+// at use time, so a ${env:} in a dsn is a dependency of the scenario querying
+// through it. A step naming no runner, or one the table does not define, adds
+// nothing.
+func TestCollectStepVars_RunnerDefinition(t *testing.T) {
+	t.Parallel()
+	runners := map[string]Runner{"pg": {Type: "db", DSN: "postgres://u:${dbpass}@h/app"}}
+	set := map[string]bool{}
+	CollectStepVars(set, &Step{Query: &Query{Runner: "pg", SQL: "SELECT ${col}"}}, runners)
+	got := SortedKeys(set)
+	for _, want := range []string{"dbpass", "col"} {
+		if !hasVar(got, want) {
+			t.Errorf("vars = %v, want it to include %q", got, want)
+		}
+	}
+
+	unknown := map[string]bool{}
+	CollectStepVars(unknown, &Step{Query: &Query{Runner: "gone", SQL: "SELECT 1"}}, runners)
+	if len(SortedKeys(unknown)) != 0 {
+		t.Errorf("an undefined runner contributed vars: %v", SortedKeys(unknown))
+	}
+}
+
+// TestStepRunner covers the one mapping from a step to the runner it names.
+func TestStepRunner(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		step *Step
+		want string
+	}{
+		{"run", &Step{Run: &Run{Runner: "box", Command: "uptime"}}, "box"},
+		{"http", &Step{HTTP: &HTTP{Runner: "api", Method: "GET", Path: "/"}}, "api"},
+		{"query", &Step{Query: &Query{Runner: "pg", SQL: "SELECT 1"}}, "pg"},
+		{"grpc", &Step{GRPC: &GRPC{Runner: "rpc", Method: "pkg.S/M"}}, "rpc"},
+		{"cdp", &Step{CDP: &CDP{Runner: "web"}}, "web"},
+		{"run without a runner", &Step{Run: &Run{Command: "echo hi"}}, ""},
+		{"pty carries none", &Step{PTY: &PTY{Command: "sh"}}, ""},
+		{"assert carries none", &Step{Assert: &Assert{Stdout: &StreamAssert{Empty: Bool(true)}}}, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := StepRunner(c.step); got != c.want {
+				t.Errorf("StepRunner = %q, want %q", got, c.want)
+			}
+		})
 	}
 }
 
@@ -316,16 +410,19 @@ func TestCollectStepVars_NoActionStep(t *testing.T) {
 	}
 }
 
-// TestCollectJSONVars_NilAndScalar guards the helper's non-map/array inputs: a
-// nil body or a bare scalar contributes nothing and never panics.
+// TestCollectJSONVars_NilAndScalar guards json-body collection for non-map
+// inputs: a nil body or a bare scalar contributes nothing and never panics.
+// The walk rides WalkJSONValueStrings through the http walker, the same path
+// the engine expands with.
 func TestCollectJSONVars_NilAndScalar(t *testing.T) {
 	t.Parallel()
 	set := map[string]bool{}
-	collectJSONVars(set, nil)
-	collectJSONVars(set, 42)
-	collectJSONVars(set, "${top_ref}") // a bare string leaf is still scanned
+	visit := collecting(set)
+	WalkJSONValueStrings(nil, visit)
+	WalkJSONValueStrings(42, visit)
+	WalkJSONValueStrings("${top_ref}", visit) // a bare string leaf is still scanned
 	if len(set) != 1 || !set["top_ref"] {
-		t.Errorf("collectJSONVars scalar handling = %v, want {top_ref}", SortedKeys(set))
+		t.Errorf("json scalar handling = %v, want {top_ref}", SortedKeys(set))
 	}
 }
 

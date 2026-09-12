@@ -3,6 +3,7 @@ package assert
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/plural"
@@ -265,10 +266,10 @@ func equalsNormalized(got, want string) bool {
 }
 
 // foldCRLF collapses Windows CRLF line endings to LF so text comparison treats
-// line endings as an OS artifact. A lone CR (an old-Mac line ending) stays
-// observable, matching equalsNormalized — only the CR that precedes an LF is
-// dropped.
-func foldCRLF(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+// line endings as an OS artifact. The rule itself lives in spec.FoldCRLF,
+// because the loader folds the same text when it decides whether two matchers
+// of one assert contradict each other.
+func foldCRLF(s string) string { return spec.FoldCRLF(s) }
 
 // foldCRLFList folds CRLF in every element so a needle authored with CRLF
 // compares equal to LF-folded output.
@@ -342,6 +343,17 @@ func excerpt(s string) string {
 	switch {
 	case s == "":
 		return EmptyExcerpt
+	case strings.TrimSpace(s) == "":
+		// A whitespace-only payload prints as a blank block — MORE
+		// empty-looking than the "(empty)" a truly empty one gets — exactly
+		// where the difference decides a verdict: `empty: false` fails on
+		// "  \n\n" because whitespace counts as empty, and the evidence has to
+		// show the bytes that made it so. Quote to reveal them; the truncation
+		// below never applies, because the quoted form only grows.
+		if len(s) > excerptLimit {
+			s = s[:excerptLimit]
+		}
+		return strconv.Quote(s)
 	case len(s) <= excerptLimit:
 		return s
 	default:

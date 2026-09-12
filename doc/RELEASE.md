@@ -34,7 +34,6 @@ The release workflow then:
 - signs the checksums with cosign (keyless) and attaches SBOMs
 - attests build provenance via GitHub OIDC
 - publishes a Homebrew cask to [nao1215/homebrew-tap](https://github.com/nao1215/homebrew-tap)
-- pushes the winget manifests to `nao1215/winget-pkgs` and opens the pull request against [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs), on a stable tag only
 
 ## Required secrets
 - `GITHUB_TOKEN`: provided automatically; used to create the GitHub Release.
@@ -42,14 +41,6 @@ The release workflow then:
   GoReleaser to push the Homebrew cask on a tagged release. The push-time
   release smoke skips publishing (`--skip=publish`), so only real tag releases
   need it.
-- `WINGET_GITHUB_TOKEN`: a **classic** personal access token with the `public_repo` scope. GoReleaser v2.16.0 uses this one token for both writes: committing the manifests to a branch on `nao1215/winget-pkgs` and opening the pull request against microsoft/winget-pkgs. A fine-grained token cannot do the second — it can only be scoped to repositories you own, and microsoft/winget-pkgs is not one of them, so the push succeeds and the pull request fails with 403. Same publish-time-only rule as the tap token.
-
-## The winget pull request
-A **stable** tagged release opens a pull request on microsoft/winget-pkgs; a moderator merges it, usually within a day, once their validation pipeline passes. A pre-release tag opens nothing: `skip_upload: auto` skips the winget pipe whenever the tag carries a pre-release suffix, because the community repository takes stable versions only.
-
-Nothing in the release depends on that pull request, so a rejected or delayed one never blocks a version — GoReleaser logs the failure and finishes the release. Watch the [pull requests authored by nao1215](https://github.com/microsoft/winget-pkgs/pulls/nao1215) after the first submission of a new package, which gets more review than an update to an existing one.
-
-If a release finishes but no pull request appears, the manifests were still generated and the recovery is manual: `dist/winget/manifests/n/nao1215/atago/<version>/` holds the three files, and they can be committed to a `atago-<version>` branch on the fork and submitted by hand. A failure at the push step points at the token's scope; a failure only at the pull-request step points at a fine-grained token.
 
 ## After releasing
 - Check the [Releases page](https://github.com/nao1215/atago/releases) for the

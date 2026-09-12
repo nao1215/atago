@@ -1,0 +1,321 @@
+version: "1"
+
+suite:
+  name: rbenv (shims, exec, and shell integration)
+  description: |
+    The half of [rbenv](https://github.com/rbenv/rbenv) that actually runs
+    something: the shims it generates, the dispatch that makes `ruby` mean a
+    different program in a different directory without PATH ever changing,
+    `rbenv exec`, the hooks a plugin installs, and the shell integration
+    `rbenv init` writes into the user's home.
+
+    The dispatch is the whole point of the tool, so it is asserted the way a
+    user meets it — by running `ruby` with the shim directory on PATH and
+    reading what came back, before and after the directory's version changes.
+    `rbenv init` is asserted against a sandboxed home, which is what proves the
+    file it edits is the one it claims and that a second run edits nothing.
+
+defaults:
+  scenario:
+    only:
+      command: rbenv --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      RBENV_ROOT: ${workdir}/root
+
+scenarios:
+  - name: rehash generates one shim per executable across every version
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: root/versions/3.2.0/bin/gem
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "gem 3.2.0"
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - run:
+          command: rbenv rehash
+      - assert:
+          # One shim per distinct executable name, not per version: the shim is
+          # what decides which version to hand the call to.
+          exit_code: 0
+          changes:
+            created:
+              - root/shims/ruby
+              - root/shims/gem
+            modified: []
+            deleted: []
+      - assert:
+          dir:
+            path: root/shims
+            count: 2
+      - assert:
+          file:
+            path: root/shims/ruby
+            executable: true
+      - run:
+          command: rbenv shims --short
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              gem
+              ruby
+
+  - name: the shim answers to the directory, with PATH never changing
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1"
+      - run:
+          command: rbenv global 3.2.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: rbenv rehash
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: PATH="${workdir}/root/shims:$PATH" ruby
+      - assert:
+          # This is the promise: `ruby` is on PATH once, and it is the shim.
+          exit_code: 0
+          stdout:
+            equals: |
+              ruby 3.2.0
+      - run:
+          command: rbenv local 3.3.1
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: PATH="${workdir}/root/shims:$PATH" ruby
+      - assert:
+          # Same command, same PATH, same shim — a different program, because a
+          # file in the directory says so.
+          exit_code: 0
+          stdout:
+            equals: |
+              ruby 3.3.1
+      - run:
+          shell: true
+          command: PATH="${workdir}/root/shims:$PATH" ruby
+          env:
+            RBENV_VERSION: 3.2.0
+      - assert:
+          # And the environment variable outranks the file here too, so the same
+          # precedence governs what runs and what `rbenv version` reports.
+          exit_code: 0
+          stdout:
+            equals: |
+              ruby 3.2.0
+
+  - name: a version added after the last rehash has no shim until the next one
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - run:
+          command: rbenv rehash
+      - assert:
+          exit_code: 0
+          changes:
+            created: [root/shims/ruby]
+            modified: []
+            deleted: []
+      - fixture:
+          file: root/versions/3.3.1/bin/irb
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "irb 3.3.1"
+      - run:
+          command: rbenv rehash
+      - assert:
+          # rehash is the step people forget after installing something; it is
+          # also the only step, and it adds exactly what is new.
+          exit_code: 0
+          changes:
+            created: [root/shims/irb]
+            modified: []
+            deleted: []
+
+  - name: exec runs the selected version, and a command that is not there is 127
+    steps:
+      - fixture:
+          file: root/versions/3.3.1/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.3.1, argv: $*"
+      - fixture:
+          file: .ruby-version
+          content: |
+            3.3.1
+      - run:
+          command: rbenv exec ruby --flag argument
+      - assert:
+          # Arguments are passed through untouched, which is what makes exec
+          # usable as a prefix in a script.
+          exit_code: 0
+          stdout:
+            equals: |
+              ruby 3.3.1, argv: --flag argument
+      - run:
+          command: rbenv exec rake
+      - assert:
+          # 127 is the shell's own "command not found", so a caller that already
+          # handles that code needs no special case for rbenv.
+          exit_code: 127
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              rbenv: rake: command not found
+      - run:
+          command: rbenv which rake
+      - assert:
+          exit_code: 127
+          stderr:
+            equals: |
+              rbenv: rake: command not found
+
+  - name: a hook script runs before exec and sees the resolved version
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - fixture:
+          file: .ruby-version
+          content: |
+            3.2.0
+      - fixture:
+          file: hooks/exec/record.bash
+          content: |
+            echo "hook saw $RBENV_VERSION" >> "$RBENV_ROOT/hook.log"
+      - run:
+          command: rbenv hooks exec
+          env:
+            RBENV_HOOK_PATH: ${workdir}/hooks
+      - assert:
+          # A plugin is a file in a directory on the hook path; listing them is
+          # how you find out what is about to run.
+          exit_code: 0
+          stdout:
+            matches: "/hooks/exec/record\\.bash"
+      - run:
+          command: rbenv exec ruby
+          env:
+            RBENV_HOOK_PATH: ${workdir}/hooks
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ruby 3.2.0
+          changes:
+            created: [root/hook.log]
+            modified: []
+            deleted: []
+      - assert:
+          # The hook ran with the version already resolved, which is the whole
+          # reason a plugin can be useful there.
+          file:
+            path: root/hook.log
+            equals: |
+              hook saw 3.2.0
+
+  - name: shell integration is printed on request and refused without it
+    steps:
+      - fixture:
+          file: root/versions/3.2.0/bin/ruby
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "ruby 3.2.0"
+      - run:
+          command: rbenv shell 3.2.0
+      - assert:
+          # Setting the version for one shell session needs a function in that
+          # shell, and rbenv says so instead of pretending it worked.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              rbenv: shell integration not enabled. Run `rbenv init' for instructions.
+      - run:
+          command: rbenv init - bash
+      - assert:
+          # What the integration is: the shims on PATH, the shell recorded, and a
+          # function that intercepts the commands needing to change the session.
+          exit_code: 0
+          stdout:
+            contains:
+              - "export RBENV_SHELL=bash"
+              - "command rbenv rehash 2>/dev/null"
+              - "rbenv() {"
+            matches: "export PATH=\"[^\"]*/root/shims:\\$\\{PATH\\}\""
+
+  - name: init edits the profile in the home it was given, once
+    steps:
+      - run:
+          # The shell is named rather than detected: what runs the scenario is
+          # atago, and rbenv rightly refuses to guess a profile for a shell it
+          # does not know.
+          command: rbenv init bash
+      - assert:
+          # The only file it touches is under the sandboxed home — asserted, not
+          # trusted, which is the point of running it with one.
+          exit_code: 0
+          stdout:
+            matches: "^writing ~/\\.bash_profile: now configured for rbenv\\.\\n$"
+          changes:
+            created: [.atago-home/.bash_profile]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .atago-home/.bash_profile
+            contains: 'eval "$(rbenv init - --no-rehash bash)"'
+      - run:
+          command: rbenv init bash
+      - assert:
+          # Run twice, it says what it skipped and writes nothing: safe to put in
+          # a setup script that runs on every machine, every time.
+          exit_code: 0
+          stdout:
+            matches: "^skipping ~/\\.bash_profile: already configured for rbenv\\.\\n$"
+          changes:
+            created: []
+            modified: []
+            deleted: []

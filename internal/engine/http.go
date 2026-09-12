@@ -2,12 +2,11 @@ package engine
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	httprunner "github.com/nao1215/atago/internal/runner/http"
 	"github.com/nao1215/atago/internal/spec"
@@ -28,8 +27,7 @@ func (e *Engine) runHTTPStep(ctx context.Context, h *spec.HTTP, st *store.Store,
 	// The policy-violation flag only matters alongside an error, so the shared
 	// poll loop carries it inside the closure.
 	secViolation := false
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-	last, checks, err := pollUntil(ctx, h.Retry, st, env, func(ctx context.Context) (*runner.Result, error) {
+	last, checks, err := pollUntil(ctx, h.Retry, st, e.assertEnv(rc, workdir, specDir), func(ctx context.Context) (*runner.Result, error) {
 		r, sv, rerr := e.runHTTP(ctx, h, st, rc, workdir)
 		secViolation = sv
 		return r, rerr
@@ -53,11 +51,10 @@ func (e *Engine) runHTTP(ctx context.Context, h *spec.HTTP, st *store.Store, rc 
 	cfg.Workdir = workdir
 	res, err := httprunner.New(cfg).Do(ctx, h)
 	if err != nil {
-		var pe *httprunner.PolicyError
-		if errors.As(err, &pe) {
-			return nil, true, err
-		}
-		return nil, false, err
+		// One detector for every runner: the http runner raises the same
+		// security.PolicyError the grpc and ssh paths do, so isPolicyViolation
+		// is what decides exit 6 for all of them.
+		return nil, isPolicyViolation(err), err
 	}
 	return res, false, nil
 }
@@ -71,10 +68,10 @@ func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.
 	if h.Runner != "" {
 		r, ok := rc.runners[h.Runner]
 		if !ok {
-			return cfg, fmt.Errorf("http step references unknown runner %q", h.Runner)
+			return cfg, diag.InternalError.Errorf("http step references unknown runner %q", h.Runner)
 		}
 		if r.Type != "http" {
-			return cfg, fmt.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
+			return cfg, diag.InternalError.Errorf("runner %q is not an http runner (type %q)", h.Runner, r.Type)
 		}
 		cfg.BaseURL = st.Expand(r.BaseURL)
 		runnerTimeout = r.Timeout
@@ -85,7 +82,7 @@ func resolveHTTPConfig(h *spec.HTTP, st *store.Store, rc runConfig) (httprunner.
 	timeoutStr, _ := resolveTimeout("", runnerTimeout, rc.defaultsRunTimeout, rc.suiteTimeout)
 	d, err := time.ParseDuration(timeoutStr)
 	if err != nil {
-		return cfg, fmt.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
+		return cfg, diag.InternalError.Errorf("runner %q has invalid timeout %q: %w", h.Runner, timeoutStr, err)
 	}
 	cfg.Timeout = d
 	return cfg, nil

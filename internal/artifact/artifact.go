@@ -109,23 +109,40 @@ type Scenario struct {
 	// sharing a path lets a later attempt overwrite evidence the report still
 	// references, leaving the file disagreeing with the diff printed beside it.
 	Attempt int
+	// Phase names which block of the scenario produced the artifact. The empty
+	// value is the scenario's own numbered steps and keeps the path a plain run
+	// has always written; PhaseTeardown gets a segment of its own for the same
+	// reason Attempt does — a teardown step's index counts from zero again, so a
+	// teardown failure at index N would otherwise overwrite the evidence for the
+	// scenario step at index N, under a filename still naming step N.
+	Phase string
 }
+
+// PhaseTeardown is the Scenario.Phase value for a scenario's teardown block.
+// Suite-level lifecycle blocks need no phase: they already run under their own
+// pseudo-scenario directory.
+const PhaseTeardown = "teardown"
 
 // Dir is the directory every artifact of this execution lives in:
 // <suite-token>/<scenario-token>, plus an attempt-<N> segment from the second
-// attempt on. The first attempt keeps the plain path, so a run with neither
-// --repeat nor --retry-failed writes exactly where it always has.
+// attempt on and a phase segment for anything but the scenario's own steps. The
+// first attempt of the steps phase keeps the plain path, so a run with neither
+// --repeat nor --retry-failed nor a teardown failure writes exactly where it
+// always has.
 func (s Scenario) Dir() string {
 	dir := path.Join(SuiteToken(s.SpecPath), ScenarioToken(s.Name, s.Index))
 	if s.Attempt > 1 {
 		dir = path.Join(dir, fmt.Sprintf("attempt-%d", s.Attempt))
+	}
+	if s.Phase != "" {
+		dir = path.Join(dir, Slug(s.Phase))
 	}
 	return dir
 }
 
 // FailurePath composes the relative path for a failed assertion's sidecar file:
 // <dir>/<step-file>. It is deterministic and collision-free across suites,
-// scenarios, attempts, steps, and parallel runs.
+// scenarios, attempts, phases, steps, and parallel runs.
 func (s Scenario) FailurePath(stepIdx int, kind, role, ext string) string {
 	return path.Join(s.Dir(), StepFile(stepIdx, kind, role, ext))
 }

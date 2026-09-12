@@ -3,15 +3,35 @@ package loader
 import (
 	"fmt"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/spec"
 )
 
-var validOS = map[string]bool{"linux": true, "darwin": true, "windows": true}
+// validOS is the set a skip/only gate may name. platform.Matches compares the
+// value against runtime.GOOS, so what belongs here is every system atago
+// builds for. The BSDs are named one by one rather than as a family: they are
+// separate values of GOOS, and a scenario gated on one of them is making a
+// claim about that system's commands, not about BSD in general. DragonFly is
+// left out because atago does not build there at all: modernc.org/libc, which
+// the database runner reaches through modernc.org/sqlite, has no files for it,
+// so a gate naming it could never fire.
+var validOS = map[string]bool{
+	"linux":   true,
+	"darwin":  true,
+	"windows": true,
+	"freebsd": true,
+	"openbsd": true,
+	"netbsd":  true,
+}
+
+// validOSList names the values in the order the diagnostic lists them.
+var validOSList = []string{"linux", "darwin", "windows", "freebsd", "openbsd", "netbsd"}
 
 // firstControlChar returns a readable label for the first control character in
 // name (a newline, tab, or other C0/DEL byte), or "" when there is none. A name
@@ -36,26 +56,41 @@ func firstControlChar(name string) string {
 	return ""
 }
 
+// addFunc records one validation problem under the diagnostic code that names
+// it. Taking the code as the first argument is what keeps the published error
+// reference honest: a check added later cannot report a problem without
+// deciding which diagnostic it is, because omitting the code does not compile.
+type addFunc func(code diag.Code, format string, args ...any)
+
+// errorList is how every validation phase collects its problems. Its only
+// writer demands a diagnostic code, so a phase cannot hand a raw string back to
+// the caller — which is how the matrix validator ended up emitting five
+// uncoded messages beside coded ones in the same error list.
+type errorList struct{ msgs []string }
+
+// add records one problem under the code that names it.
+func (e *errorList) add(code diag.Code, format string, args ...any) {
+	e.msgs = append(e.msgs, code.Annotate(fmt.Sprintf(format, args...)))
+}
+
 // validate runs schema and semantic checks and
 // returns all problems found so the user can fix them in one pass.
 func validate(s *spec.Spec) []string {
-	var errs []string
-	add := func(format string, args ...any) {
-		errs = append(errs, fmt.Sprintf(format, args...))
-	}
+	var errs errorList
+	add := errs.add
 
 	if s.Version != "1" {
-		add("version must be \"1\" (got %q)", s.Version)
+		add(diag.SpecVersion, "version must be \"1\" (got %q)", s.Version)
 	}
 	if s.Suite.Name == "" {
-		add("suite.name is required")
+		add(diag.RequiredKey, "suite.name is required")
 	} else if c := firstControlChar(s.Suite.Name); c != "" {
-		add("suite.name must not contain the control character %s (it breaks list output and generated docs)", c)
+		add(diag.ControlCharacter, "suite.name must not contain the control character %s (it breaks list output and generated docs)", c)
 	}
 	validateSuiteTimeout(add, &s.Suite)
 	validateScrub(add, s.Scrub)
 	if len(s.Scenarios) == 0 {
-		add("scenarios must contain at least one scenario")
+		add(diag.EmptyList, "scenarios must contain at least one scenario")
 	}
 	validateRunners(add, s.Runners)
 	validateDefaults(add, s.Defaults)
@@ -70,7 +105,7 @@ func validate(s *spec.Spec) []string {
 	for i := range s.Scenarios {
 		validateScenario(add, s, i, seen, suiteServiceNames, suiteMockNames)
 	}
-	return errs
+	return errs.msgs
 }
 
 // suiteResourceNames collects the names of services and mock servers declared
@@ -92,101 +127,252 @@ func suiteResourceNames(s *spec.Spec) (services, mocks map[string]bool) {
 // validateScenario checks one scenario: its identity, gates, services, and
 // every step and teardown step. seen tracks scenario names across the suite
 // for the duplicate check.
-func validateScenario(add func(string, ...any), s *spec.Spec, i int, seen, suiteServiceNames, suiteMockNames map[string]bool) {
+func validateScenario(add addFunc, s *spec.Spec, i int, seen, suiteServiceNames, suiteMockNames map[string]bool) {
 	sc := &s.Scenarios[i]
 	where := fmt.Sprintf("scenarios[%d]", i)
 	if sc.Name == "" {
-		add("%s.name is required", where)
+		add(diag.RequiredKey, "%s.name is required", where)
 	} else {
 		if c := firstControlChar(sc.Name); c != "" {
-			add("%s.name must not contain the control character %s (it breaks list output and generated docs)", where, c)
+			add(diag.ControlCharacter, "%s.name must not contain the control character %s (it breaks list output and generated docs)", where, c)
 		}
 		if seen[sc.Name] {
-			add("duplicate scenario name %q", sc.Name)
+			add(diag.DuplicateName, "duplicate scenario name %q", sc.Name)
 		}
 		seen[sc.Name] = true
 		where = fmt.Sprintf("scenario %q", sc.Name)
 	}
+	// A tag list is a set: --tag and --skip-tag ask whether a scenario carries
+	// one, so repeating an entry selects nothing extra. It is not harmless
+	// though — the generated docs count tag occurrences, so a scenario listing
+	// `smoke` twice made the summary claim two scenarios carry it.
+	tags := map[string]bool{}
+	for _, tag := range sc.Tags {
+		// An empty tag selects nothing — no --tag invocation names it — while
+		// still counting in the indexes: `atago list` rendered ",smoke" and the
+		// generated docs summarized "Tags: `` (1)".
+		if strings.TrimSpace(tag) == "" {
+			add(diag.EmptyValue, "%s: tag must not be empty; a tag names a group to select with --tag/--skip-tag", where)
+			continue
+		}
+		if tags[tag] {
+			add(diag.DuplicateName, "%s: duplicate tag %q; a tag list is a set, and the generated docs count it twice", where, tag)
+		}
+		tags[tag] = true
+	}
 	validateCondition(add, where, "skip", sc.Skip)
 	validateCondition(add, where, "only", sc.Only)
+	// The gates are compared on the EFFECTIVE conditions, after defaults have
+	// merged, so an inherited gate that cancels a scenario's own is caught and a
+	// scenario that overrides one side of an inherited pair is not blamed for it.
+	validateGates(add, where, sc.Skip, sc.Only)
 	validateExpectFail(add, where, sc.ExpectFail)
-	validateServices(add, where, sc.Services)
+	// Both name sets start from the suite-wide declarations, so the validators
+	// catch a scenario resource that shadows a suite one and end up holding the
+	// full set a `signal:` or `mock:` target may name.
 	serviceNames := maps.Clone(suiteServiceNames)
-	for j := range sc.Services {
-		if sc.Services[j].Name != "" {
-			serviceNames[sc.Services[j].Name] = true
-		}
-	}
+	validateServices(add, where, sc.Services, serviceNames)
 	mockNames := maps.Clone(suiteMockNames)
 	validateMockServers(add, where, sc.MockServers, mockNames)
 	if len(sc.Steps) == 0 {
-		add("%s: steps must contain at least one step", where)
+		add(diag.EmptyList, "%s: steps must contain at least one step", where)
 		return
 	}
-	ptySeen := validateScenarioSteps(add, where, sc, s.Runners, serviceNames, mockNames)
-	validateScenarioTeardown(add, where, sc, s.Runners, serviceNames, mockNames, ptySeen)
+	produced := validateScenarioSteps(add, where, sc, s.Runners, serviceNames, mockNames)
+	validateScenarioTeardown(add, where, sc, s.Runners, serviceNames, mockNames, produced)
+}
+
+// producedKinds is the set of step kinds that have run so far in a scenario, so
+// an assert can be checked against the step that would feed it.
+type producedKinds map[spec.StepKind]bool
+
+// producer names the step kinds that can feed one observable. It is the one
+// place that says which step produces what, so the rules cannot drift apart the
+// way they had: a screen assert with no pty step was refused at load, a status
+// assert with no http step merely FAILED at run time (exit 1 — a spec doing its
+// job, per the exit contract), and a store reading a header errored (exit 4).
+// All three are the same authoring mistake, knowable without running anything.
+type producer []spec.StepKind
+
+// The observables an assertion target or a store source can read, named once so
+// an assert and the store spelling of the same read cannot disagree.
+var (
+	fromRunOrPTY = producer{spec.StepRun, spec.StepPTY}
+	fromHTTP     = producer{spec.StepHTTP}
+	fromQuery    = producer{spec.StepQuery}
+	fromGRPC     = producer{spec.StepGRPC}
+	fromPTY      = producer{spec.StepPTY}
+	fromCDP      = producer{spec.StepCDP}
+)
+
+// phrase names the producing kinds in a diagnostic ("run/pty", "http").
+func (p producer) phrase() string {
+	parts := make([]string, 0, len(p))
+	for _, k := range p {
+		parts = append(parts, string(k))
+	}
+	return strings.Join(parts, "/")
+}
+
+// feasible narrows the producing kinds to those a block admits at all. allowed
+// is nil in a scenario, where every kind may appear.
+func (p producer) feasible(allowed map[spec.StepKind]bool) producer {
+	if allowed == nil {
+		return p
+	}
+	out := make(producer, 0, len(p))
+	for _, k := range p {
+		if allowed[k] {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// assertProducers maps an assertion target to the step kinds that can feed it.
+//
+// Only targets with an unambiguous producer are listed. file/dir/image/pdf read
+// the filesystem, which a fixture may have written, and mock reads a server's
+// log. Those stay out rather than guess.
+var assertProducers = []struct {
+	target spec.AssertTarget
+	set    func(*spec.Assert) bool
+	from   producer
+}{
+	{spec.AssertExitCode, func(a *spec.Assert) bool { return a.ExitCode != nil }, fromRunOrPTY},
+	{spec.AssertStdout, func(a *spec.Assert) bool { return a.Stdout != nil }, fromRunOrPTY},
+	{spec.AssertStderr, func(a *spec.Assert) bool { return a.Stderr != nil }, fromRunOrPTY},
+	{spec.AssertStatus, func(a *spec.Assert) bool { return a.Status != nil }, fromHTTP},
+	{spec.AssertHeader, func(a *spec.Assert) bool { return a.Header != nil }, fromHTTP},
+	{spec.AssertBody, func(a *spec.Assert) bool { return a.Body != nil }, fromHTTP},
+	{spec.AssertRows, func(a *spec.Assert) bool { return a.Rows != nil }, fromQuery},
+	{spec.AssertGRPCStatus, func(a *spec.Assert) bool { return a.GRPCStatus != nil }, fromGRPC},
+	{spec.AssertMessage, func(a *spec.Assert) bool { return a.Message != nil }, fromGRPC},
+	{spec.AssertScreen, func(a *spec.Assert) bool { return a.Screen != nil }, fromPTY},
+	{spec.AssertValue, func(a *spec.Assert) bool { return a.Value != nil }, fromCDP},
+}
+
+// storeProducers maps a store source to the step kinds that can feed it, from
+// the same producers the assertions use. A store reads the step result an
+// assertion reads, so `store: {from: {header: …}}` with no http step is the
+// mistake `assert: {header: …}` already names at load time. from.file reads the
+// filesystem and is unaffected.
+var storeProducers = []struct {
+	source string
+	set    func(*spec.StoreFrom) bool
+	from   producer
+}{
+	{"stdout", func(f *spec.StoreFrom) bool { return f.Stdout != nil }, fromRunOrPTY},
+	{"body", func(f *spec.StoreFrom) bool { return f.Body != nil }, fromHTTP},
+	{"header", func(f *spec.StoreFrom) bool { return f.Header != "" }, fromHTTP},
+	{"rows", func(f *spec.StoreFrom) bool { return f.Rows != nil }, fromQuery},
+	{"message", func(f *spec.StoreFrom) bool { return f.Message != nil }, fromGRPC},
+	{"value", func(f *spec.StoreFrom) bool { return f.Value != nil }, fromCDP},
+}
+
+// checkProducerContext refuses a read whose producing step has not run. produced
+// is the set of kinds seen so far, so a read fed by an earlier step — or, in a
+// scenario's teardown, by the scenario's steps — is accepted. allowed is the set
+// of kinds the enclosing block admits, or nil in a scenario: when a block admits
+// no producer for this read at all, no ordering can ever feed it, so the message
+// says that instead of asking for a step the block would reject.
+func checkProducerContext(add addFunc, what string, p producer, produced producedKinds, allowed map[spec.StepKind]bool) {
+	for _, k := range p {
+		if produced[k] {
+			return
+		}
+	}
+	if fit := p.feasible(allowed); len(fit) == 0 {
+		add(diag.AssertNeedsStep, "%s can never be fed here: %s steps are not allowed in a suite block; move it into a scenario", what, p.phrase())
+	} else {
+		add(diag.AssertNeedsStep, "%s requires a preceding %s step (the step that produces what it inspects)", what, fit.phrase())
+	}
+}
+
+// checkAssertContext refuses an assertion whose producing step has not run.
+func checkAssertContext(add addFunc, where string, a *spec.Assert, produced producedKinds, allowed map[spec.StepKind]bool) {
+	if a == nil {
+		return
+	}
+	for _, p := range assertProducers {
+		if p.set(a) {
+			checkProducerContext(add, fmt.Sprintf("%s.assert.%s", where, p.target), p.from, produced, allowed)
+		}
+	}
+}
+
+// checkStoreContext refuses a store whose source no preceding step produced.
+func checkStoreContext(add addFunc, where string, s *spec.Store, produced producedKinds, allowed map[spec.StepKind]bool) {
+	if s == nil || s.From == nil {
+		return
+	}
+	for _, p := range storeProducers {
+		if p.set(s.From) {
+			checkProducerContext(add, fmt.Sprintf("%s.store.from.%s", where, p.source), p.from, produced, allowed)
+		}
+	}
 }
 
 // validateScenarioSteps checks the scenario's steps in order, enforcing the
-// placement rules that tie an assert to the step that feeds it. It reports
-// whether the scenario contains a pty step, which teardown asserts may render.
-func validateScenarioSteps(add func(string, ...any), where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) (ptySeen bool) {
+// placement rules that tie an assert to the step that feeds it. It returns the
+// set of step kinds the scenario ran, which teardown asserts are fed by too.
+func validateScenarioSteps(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) (produced producedKinds) {
 	// A screen assert renders a pty step's terminal (#27) and a duration
 	// assert bounds the immediately preceding measurable step (#31):
 	// reject placements no step could feed.
+	produced = producedKinds{}
 	prevMeasurable := false
 	prevRunOrPTY := false
 	for j := range sc.Steps {
 		sw := fmt.Sprintf("%s.steps[%d]", where, j)
 		st := &sc.Steps[j]
-		if st.Kind() == spec.StepPTY {
-			ptySeen = true
-		}
-		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-			add("%s.assert.screen requires a preceding pty step (the screen is the pty step's rendered terminal)", sw)
-		}
+		produced[st.Kind()] = true
+		checkAssertContext(add, sw, st.Assert, produced, nil)
+		checkStoreContext(add, sw, st.Store, produced, nil)
 		if st.Assert != nil && st.Assert.Duration != nil && !prevMeasurable {
-			add("%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
+			add(diag.AssertNeedsStep, "%s.assert.duration requires an immediately preceding run/http/query/grpc/pty step (the step whose wall-clock time it bounds)", sw)
 		}
 		// changes bounds the workdir delta of the immediately preceding
 		// run/pty step (#70): reject a placement no such step feeds.
 		if st.Assert != nil && st.Assert.Changes != nil && !prevRunOrPTY {
-			add("%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins); combine it with the assert block directly after the step (one assert may set exit_code, stdout, and changes together)", sw)
+			add(diag.AssertNeedsStep, "%s.assert.changes requires an immediately preceding run/pty step (the step whose workdir delta it pins); combine it with the assert block directly after the step (one assert may set exit_code, stdout, and changes together)", sw)
 		}
 		validateStep(add, sw, st, runners, serviceNames, mockNames)
 		prevMeasurable = measurableStep(st.Kind())
 		prevRunOrPTY = st.Kind() == spec.StepRun || st.Kind() == spec.StepPTY
 	}
-	return ptySeen
+	return produced
 }
 
 // validateScenarioTeardown checks the scenario's teardown steps, whose asserts
 // may render a pty screen but can never be fed a workdir delta.
-func validateScenarioTeardown(add func(string, ...any), where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool, ptySeen bool) {
+func validateScenarioTeardown(add addFunc, where string, sc *spec.Scenario, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool, produced producedKinds) {
 	for j := range sc.Teardown {
 		tw := fmt.Sprintf("%s.teardown[%d]", where, j)
 		st := &sc.Teardown[j]
-		if st.Assert != nil && st.Assert.Screen != nil && !ptySeen {
-			add("%s.assert.screen requires a pty step in the scenario", tw)
-		}
+		// Teardown shares the scenario's result: a read here is fed by the
+		// scenario's steps, or by an earlier teardown step of the right kind.
+		produced[st.Kind()] = true
+		checkAssertContext(add, tw, st.Assert, produced, nil)
+		checkStoreContext(add, tw, st.Store, produced, nil)
 		// The workdir delta is only tracked around Steps, so a changes assert
 		// in teardown could never be fed (#70).
 		if st.Assert != nil && st.Assert.Changes != nil {
-			add("%s.assert.changes is not supported in teardown (the workdir delta is tracked only around the scenario's steps)", tw)
+			add(diag.BlockNotHere, "%s.assert.changes is not supported in teardown (the workdir delta is tracked only around the scenario's steps)", tw)
 		}
 		validateStep(add, tw, st, runners, serviceNames, mockNames)
 	}
 }
 
 // validateSuiteTimeout checks the suite-level default step timeout (#17).
-func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
+func validateSuiteTimeout(add addFunc, s *spec.Suite) {
 	if s.Timeout == "" {
 		return
 	}
 	if d, err := time.ParseDuration(s.Timeout); err != nil {
-		add("suite.timeout %q is not a valid duration (e.g. \"2m\"); use \"0\" to disable the built-in default", s.Timeout)
+		add(diag.BadDuration, "suite.timeout %q is not a valid duration (e.g. \"2m\"); use \"0\" to disable the built-in default", s.Timeout)
 	} else if d < 0 {
-		add("suite.timeout must not be negative (got %q); a wall-clock bound is never below zero", s.Timeout)
+		add(diag.NegativeValue, "suite.timeout must not be negative (got %q); a wall-clock bound is never below zero", s.Timeout)
 	}
 }
 
@@ -195,14 +381,23 @@ func validateSuiteTimeout(add func(string, ...any), s *spec.Suite) {
 // than silently normalizing nothing (or, for an empty pattern, matching between
 // every byte). The compile check reuses scrub.New so validation and runtime
 // agree on what a valid rule is.
-func validateScrub(add func(string, ...any), rules []spec.ScrubRule) {
+func validateScrub(add addFunc, rules []spec.ScrubRule) {
 	for i, r := range rules {
 		if r.Pattern == "" {
-			add("scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\d+\")", i)
+			add(diag.RequiredKey, "scrub[%d].pattern is required (a regex to normalize; e.g. \"req-\\d+\")", i)
+			continue
+		}
+		// A rule whose pattern matches the empty string matches between every
+		// byte, so it inserts the placeholder throughout the snapshot — and,
+		// because normalization applies the rules twice by design, shreds the
+		// placeholder it just wrote. The run stays green and the golden it
+		// commits no longer resembles anything a reviewer can read.
+		if matchesEmpty(r.Pattern) {
+			add(diag.VacuousMatcher, "scrub[%d].pattern %q matches the empty string, so it matches between every byte and replaces the whole snapshot with placeholders; require at least one character (e.g. \"[0-9]+\")", i, r.Pattern)
 		}
 	}
 	if _, err := scrub.New(rules); err != nil {
-		add("%v", err)
+		add(diag.BadRegexp, "%v", err)
 	}
 }
 
@@ -211,41 +406,84 @@ func validateScrub(add func(string, ...any), rules []spec.ScrubRule) {
 // ignore is reported here instead. Fields the loader does merge are validated on
 // the concrete elements after applyDefaults (and, for a shared readiness probe,
 // here too, so a wrong probe fails even when no scenario declares a service).
-func validateDefaults(add func(string, ...any), d *spec.Defaults) {
+func validateDefaults(add addFunc, d *spec.Defaults) {
 	if d == nil {
 		return
 	}
 	if r := d.Run; r != nil {
 		if r.Command != "" {
-			add("defaults.run.command is not supported (command is per-step)")
+			add(diag.KeyNotHere, "defaults.run.command is not supported (command is per-step)")
 		}
 		if r.Retry != nil {
-			add("defaults.run.retry is not supported (retry is per-step)")
+			add(diag.KeyNotHere, "defaults.run.retry is not supported (retry is per-step)")
 		}
 		if !r.Stdin.IsZero() {
-			add("defaults.run.stdin is not supported (stdin is per-step input data, like command)")
+			add(diag.KeyNotHere, "defaults.run.stdin is not supported (stdin is per-step input data, like command)")
 		}
 		nonNegativeDuration(add, "defaults.run.timeout", r.Timeout, "30s")
 		validateHermeticEnv(add, "defaults.run", r.ClearEnv, r.PassEnv)
 	}
+	if scn := d.Scenario; scn != nil {
+		// The gates are validated here as well as on each scenario, so a
+		// malformed default fails even when every scenario states its own and
+		// the default is therefore never applied.
+		validateCondition(add, "defaults.scenario", "only", scn.Only)
+		validateCondition(add, "defaults.scenario", "skip", scn.Skip)
+		validateGates(add, "defaults.scenario", scn.Skip, scn.Only)
+	}
 	if sv := d.Service; sv != nil {
 		if sv.Name != "" {
-			add("defaults.service.name is not supported (each service names itself)")
+			add(diag.KeyNotHere, "defaults.service.name is not supported (each service names itself)")
 		}
 		if sv.Command != "" {
-			add("defaults.service.command is not supported (each service sets its own command)")
+			add(diag.KeyNotHere, "defaults.service.command is not supported (each service sets its own command)")
 		}
 		validateHermeticEnv(add, "defaults.service", sv.ClearEnv, sv.PassEnv)
 		validateReady(add, "defaults.service", sv.Ready)
 	}
 }
 
-func validateCondition(add func(string, ...any), where, key string, c *spec.Condition) {
+func validateCondition(add addFunc, where, key string, c *spec.Condition) {
 	if c == nil {
 		return
 	}
+	// A gate written with no condition restricts nothing while reading as if it
+	// does — the shape someone leaves behind on the way to a gate they have not
+	// finished, or after deleting the condition. `only: {}` is the worse half:
+	// it says the scenario is restricted and the scenario runs everywhere.
+	if c.OS == "" && c.Env == "" && c.Command == "" {
+		add(diag.EmptyValue, "%s.%s must name a condition (os, env, or command); an empty gate restricts nothing", where, key)
+	}
 	if c.OS != "" && !validOS[c.OS] {
-		add("%s.%s.os %q is invalid (want linux, darwin, or windows)", where, key, c.OS)
+		add(diag.NotAllowedValue, "%s.%s.os %q is invalid (want one of: %s)", where, key, c.OS, strings.Join(validOSList, ", "))
+	}
+}
+
+// validateGates refuses a skip/only pair that cancels each other out. A scenario
+// gated by the same condition in both directions can never run on any machine:
+// the condition holds and `skip` excludes it, or it does not hold and `only`
+// excludes it. Nothing in a run says so — the scenario reports as an ordinary
+// skip with exit 0, on every OS and in every CI job, and only the skip REASON
+// changes between hosts.
+//
+// The comparison is per FIELD and literal on purpose. `skip: {os: windows}` with
+// `only: {command: fzf}` is an ordinary spec, and two different probe commands
+// may or may not disagree in practice, which is not something a loader can
+// prove. Only a field set on both sides with an equal value is refused.
+func validateGates(add addFunc, where string, skip, only *spec.Condition) {
+	if skip == nil || only == nil {
+		return
+	}
+	for _, f := range []struct{ field, skipVal, onlyVal string }{
+		{"os", skip.OS, only.OS},
+		{"env", skip.Env, only.Env},
+		{"command", skip.Command, only.Command},
+	} {
+		if f.skipVal == "" || f.skipVal != f.onlyVal {
+			continue
+		}
+		add(diag.ExclusiveKeys, "%s: skip.%s and only.%s both name %q, so the scenario is skipped whether the condition holds or not and can never run anywhere",
+			where, f.field, f.field, f.skipVal)
 	}
 }
 
@@ -263,7 +501,7 @@ var stepRunnerTypes = map[string][]string{
 // validateRunnerRef checks that a step's named runner exists and has a type the
 // step can drive. An empty name is fine here: steps that require a runner
 // enforce that separately.
-func validateRunnerRef(add func(string, ...any), where, stepKind, name string, runners map[string]spec.Runner) {
+func validateRunnerRef(add addFunc, where, stepKind, name string, runners map[string]spec.Runner) {
 	if name == "" {
 		return
 	}
@@ -271,17 +509,29 @@ func validateRunnerRef(add func(string, ...any), where, stepKind, name string, r
 	if !ok {
 		declared := slices.Sorted(maps.Keys(runners))
 		if len(declared) == 0 {
-			add("%s.%s.runner %q is not declared (the spec has no runners: block)", where, stepKind, name)
+			add(diag.RunnerNotDeclared, "%s.%s.runner %q is not declared (the spec has no runners: block)", where, stepKind, name)
 			return
 		}
-		add("%s.%s.runner %q is not declared under runners: (declared: %s)", where, stepKind, name, strings.Join(declared, ", "))
+		add(diag.RunnerNotDeclared, "%s.%s.runner %q is not declared under runners: (declared: %s)", where, stepKind, name, strings.Join(declared, ", "))
 		return
 	}
 	want := stepRunnerTypes[stepKind]
 	// An unknown/empty type is reported by validateRunners already.
 	if r.Type != "" && validRunnerType[r.Type] && !slices.Contains(want, r.Type) {
-		add("%s: runner %q is a %s runner; a %s step needs a %s runner", where, name, r.Type, stepKind, strings.Join(want, " or "))
+		add(diag.RunnerTypeMismatch, "%s: runner %q is a %s runner; a %s step needs a %s runner", where, name, r.Type, stepKind, strings.Join(want, " or "))
 	}
+}
+
+// suiteBlockKinds is the set of step kinds a suite.setup / suite.teardown block
+// admits. It bounds what those blocks can ever produce, so a read they could
+// never be fed is knowable from the block alone.
+var suiteBlockKinds = map[spec.StepKind]bool{
+	spec.StepFixture:    true,
+	spec.StepRun:        true,
+	spec.StepStore:      true,
+	spec.StepAssert:     true,
+	spec.StepService:    true,
+	spec.StepMockServer: true,
 }
 
 // validateSuiteBlock checks suite.setup / suite.teardown (#7): steps run once
@@ -289,17 +539,23 @@ func validateRunnerRef(add func(string, ...any), where, stepKind, name string, r
 // allowed — fixture, run, store, assert, and (setup only) `service:`. The
 // runner-backed kinds (http/query/grpc/cdp) are per-scenario machinery and are
 // rejected with a pointer to where they belong.
-func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Step, runners map[string]spec.Runner, allowService bool) {
+//
+// Each block feeds its own reads: a teardown assertion does not see what the
+// setup block ran, which is what the engine does, so the two blocks track their
+// produced kinds separately.
+func validateSuiteBlock(add addFunc, where string, steps []spec.Step, runners map[string]spec.Runner, allowService bool) {
 	seenService := map[string]bool{}
 	seenMock := map[string]bool{}
+	produced := producedKinds{}
 	for i := range steps {
 		st := &steps[i]
 		sw := fmt.Sprintf("%s[%d]", where, i)
 		keys := st.SetKeys()
 		if len(keys) != 1 {
-			add("%s: step must set exactly one action (got %v)", sw, keys)
+			add(diag.StepManyActions, "%s: step must set exactly one action (got %v)", sw, keys)
 			continue
 		}
+		produced[st.Kind()] = true
 		switch st.Kind() {
 		case spec.StepFixture:
 			validateFixture(add, sw, st.Fixture)
@@ -307,23 +563,26 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 			validateRunStep(add, sw, st.Run, runners, false)
 		case spec.StepStore:
 			validateStore(add, sw, st.Store)
+			checkStoreContext(add, sw, st.Store, produced, suiteBlockKinds)
 		case spec.StepAssert:
 			validateAssert(add, sw, st.Assert, nil)
+			checkAssertContext(add, sw, st.Assert, produced, suiteBlockKinds)
 		case spec.StepService:
 			if !allowService {
-				add("%s: service steps are only allowed in suite.setup", sw)
+				add(diag.BlockNotHere, "%s: service steps are only allowed in suite.setup", sw)
 				continue
 			}
 			svc := st.Service
-			if svc.Name == "" {
-				add("%s.service.name is required", sw)
-			} else if seenService[svc.Name] {
-				add("%s: duplicate suite service name %q", where, svc.Name)
-			} else {
+			switch {
+			case svc.Name == "":
+				add(diag.RequiredKey, "%s.service.name is required", sw)
+			case seenService[svc.Name]:
+				add(diag.DuplicateName, "%s: duplicate suite service name %q", where, svc.Name)
+			default:
 				seenService[svc.Name] = true
 			}
 			if svc.Command == "" {
-				add("%s.service.command is required", sw)
+				add(diag.RequiredKey, "%s.service.command is required", sw)
 			}
 			validateHermeticEnv(add, sw+".service", svc.ClearEnv, svc.PassEnv)
 			validateReady(add, sw+".service", svc.Ready)
@@ -331,33 +590,39 @@ func validateSuiteBlock(add func(string, ...any), where string, steps []spec.Ste
 			// Mock servers follow the service rule (#24): setup-only, so the
 			// position in the sequence controls ordering.
 			if !allowService {
-				add("%s: mock_server steps are only allowed in suite.setup", sw)
+				add(diag.BlockNotHere, "%s: mock_server steps are only allowed in suite.setup", sw)
 				continue
 			}
 			ms := st.MockServer
-			if ms.Name == "" {
-				add("%s.mock_server.name is required", sw)
-			} else if seenMock[ms.Name] {
-				add("%s: duplicate suite mock server name %q", where, ms.Name)
-			} else {
+			switch {
+			case ms.Name == "":
+				add(diag.RequiredKey, "%s.mock_server.name is required", sw)
+			case seenMock[ms.Name]:
+				add(diag.DuplicateName, "%s: duplicate suite mock server name %q", where, ms.Name)
+			default:
 				seenMock[ms.Name] = true
 			}
 			validateMockRoutes(add, sw+".mock_server", ms.Routes)
-		default:
-			add("%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// The six per-scenario kinds, named rather than defaulted so a new step
+			// kind has to answer "does suite level allow this?" instead of
+			// inheriting "no" in silence. The one-action check above guarantees
+			// Kind() is one of the twelve, so these are exactly what the old
+			// default saw.
+			add(diag.BlockNotHere, "%s: %s steps are per-scenario (they need a scenario workdir and runners); move it into a scenario", sw, st.Kind())
 		}
 	}
 }
 
-func validateStep(add func(string, ...any), where string, st *spec.Step, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) {
+func validateStep(add addFunc, where string, st *spec.Step, runners map[string]spec.Runner, serviceNames, mockNames map[string]bool) {
 	keys := st.SetKeys()
 	switch len(keys) {
 	case 0:
-		add("%s: step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)", where)
+		add(diag.StepNoAction, "%s: step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)", where)
 		return
 	case 1:
 	default:
-		add("%s: step must set exactly one action, but set %v", where, keys)
+		add(diag.StepManyActions, "%s: step must set exactly one action, but set %v", where, keys)
 		return
 	}
 
@@ -371,49 +636,49 @@ func validateStep(add func(string, ...any), where string, st *spec.Step, runners
 	case spec.StepHTTP:
 		validateRunnerRef(add, where, "http", st.HTTP.Runner, runners)
 		if st.HTTP.Method == "" {
-			add("%s.http.method is required", where)
+			add(diag.RequiredKey, "%s.http.method is required", where)
 		}
 		validateHTTPPayload(add, where, st.HTTP)
 		for i, f := range st.HTTP.Files {
 			if f.Field == "" {
-				add("%s.http.files[%d].field is required (the multipart form field name)", where, i)
+				add(diag.RequiredKey, "%s.http.files[%d].field is required (the multipart form field name)", where, i)
 			}
 			if f.Path == "" {
-				add("%s.http.files[%d].path is required (the workdir-relative file to attach)", where, i)
+				add(diag.RequiredKey, "%s.http.files[%d].path is required (the workdir-relative file to attach)", where, i)
 			}
 		}
 		validateRetry(add, where+".http", st.HTTP.Retry)
 	case spec.StepQuery:
 		if st.Query.Runner == "" {
-			add("%s.query.runner is required", where)
+			add(diag.RequiredKey, "%s.query.runner is required", where)
 		}
 		validateRunnerRef(add, where, "query", st.Query.Runner, runners)
 		if st.Query.SQL == "" {
-			add("%s.query.sql is required", where)
+			add(diag.RequiredKey, "%s.query.sql is required", where)
 		}
 	case spec.StepGRPC:
 		if st.GRPC.Runner == "" {
-			add("%s.grpc.runner is required", where)
+			add(diag.RequiredKey, "%s.grpc.runner is required", where)
 		}
 		validateRunnerRef(add, where, "grpc", st.GRPC.Runner, runners)
 		if st.GRPC.Method == "" {
-			add("%s.grpc.method is required", where)
+			add(diag.RequiredKey, "%s.grpc.method is required", where)
 		}
 	case spec.StepCDP:
 		if st.CDP.Runner == "" {
-			add("%s.cdp.runner is required", where)
+			add(diag.RequiredKey, "%s.cdp.runner is required", where)
 		}
 		validateRunnerRef(add, where, "cdp", st.CDP.Runner, runners)
 		if len(st.CDP.Actions) == 0 {
-			add("%s.cdp.actions must contain at least one action", where)
+			add(diag.EmptyList, "%s.cdp.actions must contain at least one action", where)
 		}
 		validateCDPActions(add, where, st.CDP.Actions)
 	case spec.StepStore:
 		validateStore(add, where, st.Store)
 	case spec.StepService:
-		add("%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
+		add(diag.BlockNotHere, "%s: service steps are only allowed in suite.setup (scenario-scoped peers go under the scenario's services: list)", where)
 	case spec.StepMockServer:
-		add("%s: mock_server steps are only allowed in suite.setup (a scenario-scoped stub goes under the scenario's mock_servers: list)", where)
+		add(diag.BlockNotHere, "%s: mock_server steps are only allowed in suite.setup (a scenario-scoped stub goes under the scenario's mock_servers: list)", where)
 	case spec.StepPTY:
 		validatePTY(add, where, st.PTY)
 	case spec.StepSignal:
@@ -427,9 +692,11 @@ func measurableStep(k spec.StepKind) bool {
 	switch k {
 	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY:
 		return true
-	default:
+	case spec.StepFixture, spec.StepCDP, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepSignal, spec.StepMockServer:
+		// Not timed: none of these produces the result a duration assert reads.
 		return false
 	}
+	return false
 }
 
 // nonNegativeDuration validates a wall-clock duration field that may be zero
@@ -438,34 +705,59 @@ func measurableStep(k spec.StepKind) bool {
 // they already had: retry.interval accepted negatives that every timeout field
 // rejected. key is the fully-qualified field ("scenario X.steps[0].run.timeout"),
 // example the hint value shown for an unparsable string.
-func nonNegativeDuration(add func(string, ...any), key, val, example string) {
+func nonNegativeDuration(add addFunc, key, val, example string) {
 	if val == "" {
 		return
 	}
 	d, err := time.ParseDuration(val)
 	if err != nil {
-		add("%s %q is not a valid duration (e.g. %q)", key, val, example)
+		add(diag.BadDuration, "%s %q is not a valid duration (e.g. %q)", key, val, example)
 		return
 	}
 	if d < 0 {
-		add("%s must not be negative (got %q); a wall-clock bound is never below zero", key, val)
+		add(diag.NegativeValue, "%s must not be negative (got %q); a wall-clock bound is never below zero", key, val)
+	}
+}
+
+// workdirRelativeDir checks a `cwd:` — the one path field a step hands to the
+// OS as a directory rather than opening as a file.
+//
+// A `../` one used to walk straight out of the scenario workdir: `cwd: ../../..`
+// ran the command wherever that landed, up to the filesystem root. The isolation
+// every scenario is built on assumes the command runs in its own temp
+// directory — `changes:` diffs it, and `dir:` and `file:` read it — so a step
+// running outside acted on the host while its assertions examined an untouched
+// sandbox, and passed having done none of what it claimed. Every other
+// workdir-relative field has rejected the same traversal all along.
+//
+// An absolute cwd is left alone. It is explicit in a way `../..` is not: the
+// author wrote a full path, the way a spec pointing a step at a checked-out
+// tree does. key is the fully-qualified field.
+func workdirRelativeDir(add addFunc, key, cwd string) {
+	// A leading "/" is absolute on every platform a spec is written for, and
+	// filepath.IsAbs additionally catches the Windows drive form.
+	if cwd == "" || strings.HasPrefix(cwd, "/") || filepath.IsAbs(cwd) {
+		return
+	}
+	if pathEscapesWorkdir(filepath.ToSlash(cwd)) {
+		add(diag.PathEscapesWorkdir, "%s %q escapes the scenario workdir (no ../ traversal)", key, cwd)
 	}
 }
 
 // positiveDuration validates a duration knob whose zero value is meaningless
 // because omitting the key already selects a documented default; def names
 // that default in the failure message.
-func positiveDuration(add func(string, ...any), key, val, example, def string) {
+func positiveDuration(add addFunc, key, val, example, def string) {
 	if val == "" {
 		return
 	}
 	d, err := time.ParseDuration(val)
 	if err != nil {
-		add("%s %q is not a valid duration (e.g. %q)", key, val, example)
+		add(diag.BadDuration, "%s %q is not a valid duration (e.g. %q)", key, val, example)
 		return
 	}
 	if d <= 0 {
-		add("%s must be positive (got %q); omit it for the %s default", key, val, def)
+		add(diag.NonPositiveValue, "%s must be positive (got %q); omit it for the %s default", key, val, def)
 	}
 }
 
@@ -476,11 +768,11 @@ func positiveDuration(add func(string, ...any), key, val, example, def string) {
 // next reader has no way to tell whether the scenario documents a real defect
 // or is dead weight. An `issue` URL is optional but is what makes an XPASS
 // actionable, so its absence is worth nothing more than the missing link.
-func validateExpectFail(add func(string, ...any), where string, ef *spec.ExpectFail) {
+func validateExpectFail(add addFunc, where string, ef *spec.ExpectFail) {
 	if ef == nil {
 		return
 	}
 	if strings.TrimSpace(ef.Reason) == "" {
-		add("%s.expect_fail.reason is required: say what is broken, or a reader cannot tell a documented known bug from a test that was given up on", where)
+		add(diag.RequiredKey, "%s.expect_fail.reason is required: say what is broken, or a reader cannot tell a documented known bug from a test that was given up on", where)
 	}
 }

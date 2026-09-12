@@ -1,0 +1,309 @@
+version: "1"
+
+suite:
+  name: git-open (turning a remote into a web address)
+  description: |
+    [git-open](https://github.com/paulirish/git-open) works out the web page for
+    the repository you are standing in and opens it. It keeps its own test suite
+    in Bats; what those tests check is pinned here from outside.
+
+    Underneath the browser it is a pure translation — remote URL plus branch in,
+    web address out — so most of this file is that translation asserted over a
+    matrix of remote spellings with `--print`, which prints the address instead
+    of opening it. One scenario goes further and names a script as the browser,
+    so what the tool actually invokes, and with which argument, is proven by the
+    file that script writes rather than by what appeared on stdout.
+
+    Nothing here reaches the network: every repository is created in the
+    scenario's workdir with a remote that is never contacted.
+
+defaults:
+  scenario:
+    only:
+      command: command -v git-open
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: every spelling of a remote lands on the same web address
+    matrix:
+      - name: ssh
+        remote: "git@github.com:example/repo.git"
+        want: "https://github.com/example/repo/tree/topic"
+      - name: https
+        remote: "https://github.com/example/repo.git"
+        want: "https://github.com/example/repo/tree/topic"
+      - name: git protocol
+        remote: "git://github.com/example/repo.git"
+        want: "https://github.com/example/repo/tree/topic"
+      - name: ssh with a port
+        remote: "ssh://git@github.com:2222/example/repo.git"
+        want: "https://github.com/example/repo/tree/topic"
+      - name: no .git suffix
+        remote: "git@github.com:example/repo"
+        want: "https://github.com/example/repo/tree/topic"
+      - name: gitlab subgroup
+        remote: "git@gitlab.com:group/subgroup/proj.git"
+        want: "https://gitlab.com/group/subgroup/proj/tree/topic"
+      - name: bitbucket uses src instead of tree
+        remote: "git@bitbucket.org:example/repo.git"
+        want: "https://bitbucket.org/example/repo/src/topic"
+      - name: a gist
+        remote: "https://gist.github.com/abc123.git"
+        want: "https://gist.github.com/abc123/tree/topic"
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git checkout -q -b topic && git remote add origin '${remote}'
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # The protocol, the credentials, a port, the .git suffix: all of it is
+          # scaffolding around one repository, and all of it comes out as the
+          # same page. Bitbucket is the one that differs on purpose — its branch
+          # pages live under /src rather than /tree.
+          exit_code: 0
+          stdout:
+            equals: |
+              ${want}
+
+  - name: the branch decides whether the page is the repository or the branch
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git remote add origin git@github.com:example/repo.git
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # On the repository's default branch there is nothing to say beyond
+          # the repository itself.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo
+      - run:
+          shell: true
+          command: git checkout -q -b feature/some-work
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # A branch name with a slash in it stays a path, because that is what
+          # the hosting service expects.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo/tree/feature/some-work
+      - run:
+          shell: true
+          command: git checkout -q -b 'issue#42'
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # A character that means something in a URL is escaped rather than
+          # passed through, which is the difference between a link and a link to
+          # a fragment of one.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo/tree/issue%2342
+
+  - name: a detached head opens the commit it is standing on
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git remote add origin git@github.com:example/repo.git && git checkout -q --detach
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # There is no branch to name, so the revision takes its place.
+          exit_code: 0
+          stdout:
+            matches: "^https://github\\.com/example/repo/tree/[0-9a-f]{40}\\n$"
+
+  - name: the flags each choose a different page of the same repository
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && echo hello > README.md && git add README.md && git commit -q -m first && git remote add origin git@github.com:example/repo.git
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print --issue
+      - assert:
+          # Pinned as observed: on the default branch --issue is ignored and the
+          # repository page comes back. The flag reads the issue number out of
+          # the branch name, and a branch that is not about an issue has none —
+          # so the request for an issue page is answered with a page that is not
+          # one, at exit 0.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo
+      - run:
+          shell: true
+          command: git checkout -q -b 42-fix-the-thing
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print --issue
+      - assert:
+          # On a branch named after an issue, which is the workflow the flag is
+          # for, the number is taken out of the branch name.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo/issues/42
+      - run:
+          shell: true
+          command: git checkout -q master
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print --commit
+      - assert:
+          # The commit, in full: a short revision would be ambiguous in a URL
+          # that outlives the checkout that produced it.
+          exit_code: 0
+          stdout:
+            matches: "^https://github\\.com/example/repo/commit/[0-9a-f]{40}\\n$"
+      - run:
+          command: git-open --print --file README.md
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/repo/tree/master/README.md
+      - run:
+          command: git-open --print --file missing.md
+      - assert:
+          # A path that is not in the repository would produce a link to a page
+          # that does not exist, so it is refused instead.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              File missing.md is not in repository
+
+  - name: another remote, and another branch, can be named on the command line
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git remote add origin git@github.com:example/fork.git && git remote add upstream git@gitlab.com:group/proj.git
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              https://github.com/example/fork
+      - run:
+          command: git-open --print upstream
+      - assert:
+          # Which is how you open the project you forked from rather than your
+          # own copy of it.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://gitlab.com/group/proj
+      - run:
+          command: git-open --print upstream develop
+      - assert:
+          # And a branch that is not the one checked out, without checking it out.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://gitlab.com/group/proj/tree/develop
+
+  - name: the browser is a program, and it is handed the address as an argument
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git remote add origin git@github.com:example/repo.git
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: fake-browser.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            printf '%s\n' "argc=$#" "argv1=$1" >> opened.log
+      - run:
+          command: git-open
+          env:
+            BROWSER: ./fake-browser.sh
+      - assert:
+          # Without --print the address goes nowhere near stdout: it is handed
+          # to the program named by BROWSER. The log the fake browser writes is
+          # the proof of what was invoked and with what.
+          exit_code: 0
+          stdout:
+            empty: true
+          changes:
+            created: [opened.log]
+            modified: []
+            deleted: []
+      - assert:
+          # One argument, and it is the address — not a shell string that a
+          # browser would have to re-parse.
+          file:
+            path: opened.log
+            equals: |
+              argc=1
+              argv1=https://github.com/example/repo
+
+  - name: a repository with no such remote still produces an address
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --print
+      - assert:
+          # Pinned as observed rather than as anyone would want it: with no
+          # remote configured, the remote's name is used as if it were a host,
+          # and the result is a link to nowhere reported as success. A script
+          # that trusts the exit code opens a browser on `https://origin/...`.
+          exit_code: 0
+          stdout:
+            equals: |
+              https://origin/origin
+
+  - name: an option it does not know is git's own usage error
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email atago@example.com && git config user.name atago && git commit -q --allow-empty -m first && git remote add origin git@github.com:example/repo.git
+      - assert:
+          exit_code: 0
+      - run:
+          command: git-open --bogus
+      - assert:
+          # 129 is what git returns for a command line it cannot use, and
+          # git-open parses its own with git's parser.
+          exit_code: 129
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "error: unknown option `bogus'"
+              - "usage: git open [options]"
+              - "-p, --print           just print the url"

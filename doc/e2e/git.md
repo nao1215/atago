@@ -26,6 +26,7 @@
   - [a duplicate tag is refused and the original is untouched](#scenario-a-duplicate-tag-is-refused-and-the-original-is-untouched)
   - [git outside a repository fails with its own exit code](#scenario-git-outside-a-repository-fails-with-its-own-exit-code)
   - [identical commits made twice hash the same](#scenario-identical-commits-made-twice-hash-the-same)
+
 ## git + changes (a staged blob touches exactly index + one object)
 `git add` is documented as writing a blob and updating the index. This suite
 holds git to that literally: after initializing a repository, staging one
@@ -41,6 +42,7 @@ Source: `test/e2e/thirdparty/git/changes.atago.yaml`
 _skipped on Windows_
 #### Given
 - Fixture file `repo/f.txt` is created.
+
 #### Inputs
 _Fixture `repo/f.txt`:_
 ```text
@@ -57,6 +59,7 @@ git -C repo add f.txt
 - after `git -C repo add f.txt`:
   - exit code is `0`
   - the step changed exactly created `repo/.git/index`, `repo/.git/objects/*/*`, modified nothing, deleted nothing
+
 ### Scenario: git init's whole .git tree is pinned by one recursive glob (POSIX)
 _skipped on Windows_
 #### When
@@ -66,6 +69,7 @@ git init -q repo
 #### Then
 - exit code is `0`
 - the step changed exactly created `repo/.git/**`, modified nothing, deleted nothing
+
 ## git (third-party CLI, no build required)
 The proof that testing someone else's CLI takes no cooperation from it. git
 was not written with this test suite in mind, ships no hooks for it, and
@@ -92,9 +96,11 @@ git -C repo rev-parse HEAD
   - file `repo/.git/HEAD` contains `ref`
 - after `git -C repo rev-parse HEAD`:
   - exit code is not `0`
+
 ### Scenario: add and commit make the working tree clean
 #### Given
 - Fixture file `repo-src/hello.txt` is created.
+
 #### Inputs
 _Fixture `repo-src/hello.txt`:_
 ```text
@@ -116,9 +122,11 @@ git -C repo-src log --oneline
   - stdout is empty
 - after `git -C repo-src log --oneline`:
   - stdout contains `add hello`
+
 ### Scenario: a captured commit hash flows into a later command
 #### Given
 - Fixture file `r/f.txt` is created.
+
 #### Inputs
 _Fixture `r/f.txt`:_
 ```text
@@ -137,6 +145,7 @@ git -C r show --no-patch --format=%s ${head}
 - after `git -C r show --no-patch --format=%s ${head}`:
   - exit code is `0`
   - stdout contains `first`
+
 ### Scenario: checking out a missing ref fails with an explanation (no-such-branch)
 #### When
 ```shell
@@ -147,6 +156,7 @@ git -C repo checkout no-such-branch
 - after `git -C repo checkout no-such-branch`:
   - exit code is not `0`
   - stderr contains `no-such-branch`
+
 ### Scenario: checking out a missing ref fails with an explanation (v9.9.9)
 #### When
 ```shell
@@ -157,6 +167,7 @@ git -C repo checkout v9.9.9
 - after `git -C repo checkout v9.9.9`:
   - exit code is not `0`
   - stderr contains `v9.9.9`
+
 ## git + sandbox_home (global config in an isolated HOME)
 `git config --global` writes to the user's home directory — the one thing a
 test must never do to the machine running it. This suite shows the
@@ -174,6 +185,7 @@ _skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 git config --global user.name atago-sandbox-user
@@ -186,6 +198,7 @@ git config --global user.name
 - after `git config --global user.name`:
   - exit code is `0`
   - stdout equals an exact value
+
 ## git (branching, diffs, and failure contracts)
 The second half of the git suite: the parts of git a script actually leans
 on, driven as state transitions rather than single commands.
@@ -204,6 +217,7 @@ Source: `test/e2e/thirdparty/git/workflow.atago.yaml`
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -231,12 +245,14 @@ git -C repo diff --exit-code
 - after `git -C repo diff --exit-code`:
   - exit code is `1`
   - stdout contains `diff --git a/a.txt b/a.txt`, `+two`
+
 ### Scenario: status --porcelain spells each state exactly
 #### Given
 - Fixture file `repo/tracked.txt` is created.
 - Fixture file `repo/tracked.txt` is created.
 - Fixture file `repo/untracked.txt` is created.
 - Fixture file `repo/staged.txt` is created.
+
 #### Inputs
 _Fixture `repo/tracked.txt`:_
 ```text
@@ -272,10 +288,12 @@ git -C repo status --porcelain
   - stdout line `1` equals an exact value
   - stdout line `2` equals an exact value
   - stdout line `3` equals an exact value
+
 ### Scenario: a diverged branch fast-forwards into the base
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/b.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -308,11 +326,13 @@ git -C repo rev-parse feature
   - exit code is `0`
   - stdout contains `${main_head}`
   - file `repo/b.txt` contains `feature`
+
 ### Scenario: a conflicting merge stops with markers and a non-zero status
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -347,11 +367,13 @@ git -C repo status --porcelain
   - file `repo/a.txt` contains `<<<<<<<`, `from main`, `from other`, `>>>>>>>`
 - after `git -C repo status --porcelain`:
   - stdout contains `UU a.txt`
+
 ### Scenario: stash and pop restore the working tree byte for byte
 _skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -380,11 +402,13 @@ git -C repo stash pop
 - after `git -C repo stash pop`:
   - exit code is `0`
   - file `repo/a.txt` is byte-identical to `expected.txt`
+
 ### Scenario: a diff applied back restores the discarded change
 _skipped on Windows_
 #### Given
 - Fixture file `repo/a.txt` is created.
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -415,12 +439,14 @@ git -C repo apply ../change.patch
 - after `git -C repo apply ../change.patch`:
   - exit code is `0`
   - file `repo/a.txt` is byte-identical to `expected.txt`
+
 ### Scenario: an ignored file is never staged
 #### Given
 - Fixture file `repo/.gitignore` is created.
 - Fixture file `repo/keep.txt` is created.
 - Fixture file `repo/debug.log` is created.
 - Fixture file `repo/build/out.bin` is created.
+
 #### Inputs
 _Fixture `repo/.gitignore`:_
 ```text
@@ -456,9 +482,11 @@ git -C repo check-ignore -v debug.log
 - after `git -C repo check-ignore -v debug.log`:
   - exit code is `0`
   - stdout contains `*.log`
+
 ### Scenario: a local clone reproduces the same commit
 #### Given
 - Fixture file `origin/a.txt` is created.
+
 #### Inputs
 _Fixture `origin/a.txt`:_
 ```text
@@ -481,9 +509,11 @@ git -C copy rev-parse HEAD
   - exit code is `0`
   - stdout contains `${origin_head}`
   - file `copy/a.txt` equals exact bytes
+
 ### Scenario: committing with nothing staged fails and creates no commit
 #### Given
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -508,9 +538,11 @@ git -C repo rev-parse HEAD
 - after `git -C repo rev-parse HEAD`:
   - exit code is `0`
   - stdout contains `${head_before}`
+
 ### Scenario: a duplicate tag is refused and the original is untouched
 #### Given
 - Fixture file `repo/a.txt` is created.
+
 #### Inputs
 _Fixture `repo/a.txt`:_
 ```text
@@ -534,6 +566,7 @@ git -C repo tag --list
 - after `git -C repo tag --list`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -548,12 +581,14 @@ git status
 - exit code is `128`
 - stdout is empty
 - stderr contains `not a git repository`
+
 ### Scenario: identical commits made twice hash the same
 #### Given
 - Fixture file `one/a.txt` is created.
 - Fixture file `two/a.txt` is created.
 - Environment variables are set: GIT_AUTHOR_DATE, GIT_COMMITTER_DATE.
 - Environment variables are set: GIT_AUTHOR_DATE, GIT_COMMITTER_DATE.
+
 #### Inputs
 _Fixture `one/a.txt`:_
 ```text

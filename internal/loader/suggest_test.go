@@ -70,6 +70,76 @@ func TestLoadBytes_BareScalarMatcherHint(t *testing.T) {
 
 // TestSuggest_NoWildGuess proves a token far from every field name gets no
 // suggestion — a wrong hint is worse than none.
+// TestLoadBytes_CollectionShapeHint pins the hint for a list or a mapping
+// written where one value belongs. The decoder's own message names a Go type
+// and the outermost struct field ("Spec.Scenarios of type string"), which is
+// true and useless: it names neither the key the author wrote nor the shape it
+// wants, so `matches: [a, b]` — the natural mistake next to `contains:`, which
+// does take a list — read as a problem with `scenarios`.
+func TestLoadBytes_CollectionShapeHint(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		src       string
+		wantHints []string
+	}{
+		{
+			name:      "block list on a single-pattern matcher",
+			src:       "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert:\n          stdout:\n            matches:\n              - \"^h\"\n              - \"i$\"\n",
+			wantHints: []string{`"matches" takes a single value, not a list`, "one assert per pattern", `"contains"`},
+		},
+		{
+			name:      "flow list on a single-pattern matcher",
+			src:       "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert: {stdout: {matches: [\"^h\", \"i$\"]}}\n",
+			wantHints: []string{`"matches" takes a single value, not a list`},
+		},
+		{
+			name:      "mapping under a key that takes text",
+			src:       "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command:\n            bin: echo\n",
+			wantHints: []string{`"command" takes a single value, not a mapping`},
+		},
+		{
+			name:      "a list where a duration belongs",
+			src:       "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo\n          timeout:\n            - 1s\n            - 2s\n",
+			wantHints: []string{`"timeout" takes a single value, not a list`},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("t.atago.yaml", []byte(tt.src))
+			if err == nil {
+				t.Fatal("LoadBytes() error = nil, want a decode error")
+			}
+			for _, want := range tt.wantHints {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error = %v, want it to contain %q", err, want)
+				}
+			}
+			// The Go type name is the decoder's, and it stays in the message;
+			// what must not happen is the hint blaming the outer field.
+			if strings.Contains(err.Error(), `hint: "scenarios"`) {
+				t.Errorf("hint blames the outermost field instead of the key at the marker: %v", err)
+			}
+		})
+	}
+}
+
+// TestSuggestCollectionShape_Passthrough proves the hint is attached only to
+// the error it explains: an unrelated message, and one whose excerpt carries no
+// readable key, come back untouched rather than gaining a guess.
+func TestSuggestCollectionShape_Passthrough(t *testing.T) {
+	t.Parallel()
+	for _, msg := range []string{
+		"some other decode failure",
+		"cannot unmarshal []interface {} into Go struct field Spec.Scenarios of type string",
+	} {
+		if got := suggestCollectionShape(msg); got != msg {
+			t.Errorf("suggestCollectionShape(%q) = %q, want it unchanged", msg, got)
+		}
+	}
+}
+
 func TestSuggest_NoWildGuess(t *testing.T) {
 	t.Parallel()
 	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - zzqqxx:\n          exit_code: 0"

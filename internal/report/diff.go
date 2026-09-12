@@ -155,11 +155,12 @@ func diffOps(a, b []string) []diffOp {
 	}
 	for i := n - 1; i >= 0; i-- {
 		for j := m - 1; j >= 0; j-- {
-			if a[i] == b[j] {
+			switch {
+			case a[i] == b[j]:
 				lcs[i][j] = lcs[i+1][j+1] + 1
-			} else if lcs[i+1][j] >= lcs[i][j+1] {
+			case lcs[i+1][j] >= lcs[i][j+1]:
 				lcs[i][j] = lcs[i+1][j]
-			} else {
+			default:
 				lcs[i][j] = lcs[i][j+1]
 			}
 		}
@@ -261,9 +262,13 @@ func colorizeDiff(on bool, diff string) string {
 	lines := strings.Split(diff, "\n")
 	for i, l := range lines {
 		switch {
-		// The trailing space disambiguates structural lines from content
-		// lines that happen to start with --/++ (YAML document separators).
-		case strings.HasPrefix(l, "--- ") || strings.HasPrefix(l, "+++ ") || strings.HasPrefix(l, "@@ "):
+		// The file labels are structural only at their fixed positions, the
+		// first two lines: a removed content line "-- select" renders as
+		// "--- select" — the label prefix, trailing space included — and must
+		// keep its removal color. Hunk headers need no such guard: every
+		// content line carries a marker byte, so only a header starts with @@.
+		case i < 2 && (strings.HasPrefix(l, "--- ") || strings.HasPrefix(l, "+++ ")),
+			strings.HasPrefix(l, "@@ "):
 			lines[i] = colorize(true, cDim, l)
 		case strings.HasPrefix(l, "-"):
 			lines[i] = colorize(true, cRed, l)

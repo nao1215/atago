@@ -9,6 +9,7 @@
   - [destroy empties the state](#scenario-destroy-empties-the-state)
   - [fmt -check exits 3 on a misformatted file](#scenario-fmt--check-exits-3-on-a-misformatted-file)
   - [a broken configuration is rejected](#scenario-a-broken-configuration-is-rejected)
+
 ## terraform (offline via the builtin terraform_data resource)
 Terraform's exit codes are not a detail — they are the interface CI
 pipelines are built on. `terraform plan -detailed-exitcode` answers with 0
@@ -28,6 +29,7 @@ Source: `test/e2e/thirdparty/terraform/terraform.atago.yaml`
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
+
 #### Inputs
 _Fixture `main.tf`:_
 ```text
@@ -50,10 +52,12 @@ terraform validate -json
 - after `terraform validate -json`:
   - exit code is `0`
   - stdout at `$.valid` equals `true`
+
 ### Scenario: plan -detailed-exitcode reports the change contract
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
+
 #### Inputs
 _Fixture `main.tf`:_
 ```text
@@ -80,10 +84,12 @@ terraform plan -detailed-exitcode
   - exit code is `0`
 - after `terraform plan -detailed-exitcode`:
   - exit code is `0`
+
 ### Scenario: apply exposes state JSON and a captured output
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
+
 #### Inputs
 _Fixture `main.tf`:_
 ```text
@@ -114,10 +120,12 @@ echo captured: ${message}
 - after `echo captured: ${message}`:
   - exit code is `0`
   - stdout contains `captured: hello from atago`
+
 ### Scenario: destroy empties the state
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
+
 #### Inputs
 _Fixture `main.tf`:_
 ```text
@@ -142,10 +150,12 @@ terraform show -json
 - after `terraform show -json`:
   - exit code is `0`
   - stdout does not contain `terraform_data.greeting`
+
 ### Scenario: fmt -check exits 3 on a misformatted file
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `messy.tf` is created.
+
 #### Inputs
 _Fixture `messy.tf`:_
 ```text
@@ -159,10 +169,12 @@ terraform fmt -check messy.tf
 ```
 #### Then
 - exit code is one of `3`
+
 ### Scenario: a broken configuration is rejected
 _only when `terraform version` succeeds_
 #### Given
 - Fixture file `main.tf` is created.
+
 #### Inputs
 _Fixture `main.tf`:_
 ```text

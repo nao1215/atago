@@ -18,6 +18,7 @@
   - [an unknown option fails without producing output](#scenario-an-unknown-option-fails-without-producing-output)
   - [the stdin to stdout pipeline round trips](#scenario-the-stdin-to-stdout-pipeline-round-trips)
   - [-l reports one frame and the checksum algorithm](#scenario--l-reports-one-frame-and-the-checksum-algorithm)
+
 ## zstd (compression round trips and integrity)
 [zstd](https://facebook.github.io/zstd/) compresses and decompresses files.
 A compressor has exactly one promise worth testing: what comes back out is
@@ -38,6 +39,7 @@ _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -50,10 +52,12 @@ zstd -q payload.txt
 #### Then
 - exit code is `0`
 - the step changed exactly created `payload.txt.zst`, modified nothing, deleted nothing
+
 ### Scenario: a compress and decompress round trip restores the bytes exactly
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -71,10 +75,12 @@ zstd -dq payload.zst -o restored.txt
 - after `zstd -dq payload.zst -o restored.txt`:
   - exit code is `0`
   - file `restored.txt` is byte-identical to `payload.txt`
+
 ### Scenario: an empty file survives the round trip
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `empty.txt` is created.
+
 #### When
 ```shell
 zstd -q empty.txt -o empty.zst
@@ -86,10 +92,12 @@ zstd -dq empty.zst -o restored.txt
 - after `zstd -dq empty.zst -o restored.txt`:
   - exit code is `0`
   - file `restored.txt` is byte-identical to `empty.txt`
+
 ### Scenario: NUL bytes and high bytes survive the round trip
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `binary.dat` is created.
+
 #### When
 ```shell
 zstd -q binary.dat -o binary.zst
@@ -101,6 +109,7 @@ zstd -dq binary.zst -o restored.dat
 - after `zstd -dq binary.zst -o restored.dat`:
   - exit code is `0`
   - file `restored.dat` is byte-identical to `binary.dat`
+
 ### Scenario: the compression level changes the archive, never the content
 _only when `zstd --version` succeeds_
 #### When
@@ -127,10 +136,12 @@ zstd -dq small.zst -o from-small.txt
 - after `zstd -dq small.zst -o from-small.txt`:
   - exit code is `0`
   - file `from-small.txt` is byte-identical to `payload.txt`
+
 ### Scenario: --rm removes the input only after a successful compression
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -143,11 +154,13 @@ zstd -q --rm payload.txt -o payload.zst
 #### Then
 - exit code is `0`
 - the step changed exactly created `payload.zst`, modified nothing, deleted `payload.txt`
+
 ### Scenario: an existing archive is not overwritten
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - Fixture file `payload.zst` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -167,11 +180,13 @@ zstd -q --rm payload.txt -o payload.zst
 - stderr contains `already exists`
 - the step changed exactly created nothing, modified nothing, deleted nothing
 - file `payload.zst` contains `PRECIOUS EXISTING FILE`
+
 ### Scenario: -f overwrites the archive the refusal protected
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - Fixture file `payload.zst` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -193,11 +208,13 @@ zstd -dq payload.zst -o restored.txt
 - after `zstd -dq payload.zst -o restored.txt`:
   - exit code is `0`
   - file `restored.txt` is byte-identical to `payload.txt`
+
 ### Scenario: -t accepts a real archive and rejects a corrupt one
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
 - Fixture file `broken.zst` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -222,10 +239,12 @@ zstd -t broken.zst
   - exit code is `1`
   - stdout is empty
   - stderr contains `broken.zst`
+
 ### Scenario: decompressing a corrupt archive leaves no output behind
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `broken.zst` is created.
+
 #### Inputs
 _Fixture `broken.zst`:_
 ```text
@@ -239,6 +258,7 @@ zstd -dq broken.zst -o restored.txt
 - exit code is `1`
 - stdout is empty
 - file `restored.txt` does not exist
+
 ### Scenario: a truncated frame fails after decompression has started and leaves nothing
 _only when `zstd --version` succeeds_
 #### When
@@ -260,6 +280,7 @@ zstd -dq truncated.zst -o restored.txt
   - stdout is empty
   - stderr contains `truncated.zst`
   - file `restored.txt` does not exist
+
 ### Scenario: a missing input fails and names the file
 _only when `zstd --version` succeeds_
 #### When
@@ -270,10 +291,12 @@ zstd -q no-such-input.txt
 - exit code is `1`
 - stdout is empty
 - stderr contains `no-such-input.txt`
+
 ### Scenario: an unknown option fails without producing output
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text
@@ -287,6 +310,7 @@ zstd --not-a-real-option payload.txt
 - exit code is `1`
 - stderr contains `--not-a-real-option`
 - file `payload.txt.zst` does not exist
+
 ### Scenario: the stdin to stdout pipeline round trips
 _only when `zstd --version` succeeds_
 #### When
@@ -296,6 +320,7 @@ printf 'piped payload\n' | zstd -q | zstd -dq
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -305,6 +330,7 @@ piped payload
 _only when `zstd --version` succeeds_
 #### Given
 - Fixture file `payload.txt` is created.
+
 #### Inputs
 _Fixture `payload.txt`:_
 ```text

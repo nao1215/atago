@@ -1,0 +1,207 @@
+version: "1"
+
+suite:
+  name: nb (notebooks, targeting, and refusals)
+  description: |
+    How [nb](https://xwmx.github.io/nb/) keeps more than one set of notes: each
+    notebook is its own git repository, identifiers are scoped to the notebook
+    they belong to, a command can name a notebook without switching to it, and
+    `use` changes which one the bare commands mean.
+
+    The refusals are here too, because they are what a script meets first: an
+    identifier that does not exist and a subcommand that does not exist are the
+    same shape of answer, on stderr, at exit 1.
+
+defaults:
+  scenario:
+    only:
+      command: command -v nb
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: a new notebook is a new repository
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb notebooks add work
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Added notebook: work"
+      - assert:
+          # Not a directory inside the first notebook: a repository of its own,
+          # which is what lets one be synced somewhere the other is not.
+          dir:
+            path: .atago-home/.nb/work/.git
+            exists: true
+      - run:
+          command: git -C .atago-home/.nb/work log --oneline
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ \\[nb\\] Initialize\\n$"
+      - run:
+          command: nb notebooks
+      - assert:
+          # Both are listed, and the current one is the one that was there first.
+          exit_code: 0
+          stdout:
+            contains:
+              - "home"
+              - "work"
+
+  - name: a notebook can be named in the command instead of switched to
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb notebooks add work && nb add --content "a home note" --filename home1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb work:add --content "a work note" --filename work1.md
+      - assert:
+          # The identifier that comes back is qualified, because 1 means one
+          # thing in this notebook and another thing in the other one.
+          exit_code: 0
+          stdout:
+            contains: "Added: [work:1] work:work1.md"
+      - assert:
+          file:
+            path: .atago-home/.nb/work/work1.md
+            equals: "a work note\n\n"
+      - run:
+          command: nb list
+      - assert:
+          # The current notebook is still home, and its numbering is its own.
+          exit_code: 0
+          stdout:
+            contains: "[1] home1.md"
+            not_contains: "work1.md"
+      - run:
+          command: nb work:list
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "[work:1] work1.md"
+
+  - name: use changes what the bare commands mean
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb notebooks add work && nb add --content "a home note" --filename home1.md && nb work:add --content "a work note" --filename work1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb use work
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Now using: work"
+      - assert:
+          # The choice is a file, which is why it survives between commands.
+          file:
+            path: .atago-home/.nb/.current
+            equals: |
+              work
+      - run:
+          command: nb list
+      - assert:
+          # Same command as in the scenario above, different answer: the note
+          # that is listed is the one in the notebook now in use, and it is
+          # numbered without a prefix because there is nothing to disambiguate.
+          exit_code: 0
+          stdout:
+            contains: "[1] work1.md"
+            not_contains: "home1.md"
+
+  - name: the same refusal arrives on two different streams
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb add --content "the only note" --filename note1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb show 99
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "! Not found: 99"
+      - run:
+          command: nb nosuchcommand
+      - assert:
+          # The same sentence, the same exit code — and, pinned as observed, the
+          # other stream. A wrapper that captures stderr to report failures sees
+          # nothing here, and a wrapper that reads stdout for data sees an error
+          # message in it.
+          exit_code: 1
+          stdout:
+            contains: "! Not found: nosuchcommand"
+          stderr:
+            empty: true
+      - run:
+          command: nb delete 99 --force
+      - assert:
+          exit_code: 1
+          stderr:
+            contains: "! Not found: 99"
+      - assert:
+          # And nothing was deleted on the way to saying so.
+          file:
+            path: .atago-home/.nb/home/note1.md
+            exists: true
+
+  - name: the listing is uncolored through a pipe and still carries control sequences
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb add --content "a note" --filename note1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb list
+      - assert:
+          # No color, because stdout is a pipe — and, pinned as observed, the
+          # line-wrap control sequences are emitted anyway. Anything parsing this
+          # output has to strip them, or match around them the way this suite
+          # does.
+          exit_code: 0
+          stdout:
+            not_matches: "\\x1b\\[38;5;"
+      - assert:
+          stdout:
+            matches: "\\x1b\\[\\?7l"
+      - assert:
+          stdout:
+            contains: "[1] note1.md"
+      - pty:
+          command: nb list
+          cols: 100
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            - expect: "note1.md"
+      - assert:
+          # On a terminal the same listing is colored — the 256-color sequences
+          # a pipe does not get. Which color lands on which word is nb's
+          # business and is left alone here; that it colors at all is the
+          # difference being pinned.
+          stdout:
+            matches: "\\x1b\\[38;5;"
+      - assert:
+          screen:
+            contains: "[1] note1.md"

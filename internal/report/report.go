@@ -3,6 +3,7 @@
 package report
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/nao1215/atago/internal/engine"
@@ -121,13 +122,29 @@ const (
 	FormatTAP Format = "tap"
 )
 
-// Valid reports whether f is a known report format. Render is the single entry
-// point that dispatches on Format to the per-format build/write helpers.
-func (f Format) Valid() bool {
-	switch f {
-	case FormatConsole, FormatJSON, FormatJUnit, FormatGHA, FormatTAP:
-		return true
-	default:
-		return false
+// AllFormats returns every report format, in the order user-facing lists show
+// them. It is the one list: Valid derives from it, the CLI's flag help, usage
+// line, and unknown-format error render it, and the fact-matrix test iterates
+// it — the same list used to be spelled in four places (two switches and two
+// help strings), which is one place per opportunity to forget a new format.
+func AllFormats() []Format {
+	return []Format{FormatConsole, FormatJSON, FormatJUnit, FormatGHA, FormatTAP}
+}
+
+// FormatNames returns AllFormats as plain strings, for the CLI surfaces that
+// join them into help text.
+func FormatNames() []string {
+	all := AllFormats()
+	out := make([]string, len(all))
+	for i, f := range all {
+		out[i] = string(f)
 	}
+	return out
+}
+
+// Valid reports whether f is a known report format, against the one list.
+// Render is the single entry point that dispatches on Format to the per-format
+// build/write helpers.
+func (f Format) Valid() bool {
+	return slices.Contains(AllFormats(), f)
 }

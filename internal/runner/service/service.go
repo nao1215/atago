@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -26,7 +27,7 @@ import (
 // errExitedEarly is the readiness failure when the service process exits before
 // its probe (delay/file/port/log) succeeds. Shared so every wait path words it
 // identically; exitedEarly wraps it with how the process ended.
-var errExitedEarly = errors.New("service exited before it became ready")
+var errExitedEarly = diag.ServiceNotReady.Errorf("service exited before it became ready")
 
 // exitedEarly is the error a readiness wait returns when the process is gone. It
 // names the exit status, which is the first thing an author needs: a service that
@@ -107,7 +108,7 @@ func Start(ctx context.Context, svc *spec.Service, workdir string) (*Proc, strin
 	pc.cmd.Stderr = out
 
 	if err := pc.cmd.Start(); err != nil {
-		return nil, "", fmt.Errorf("service %q: failed to start %q: %w", svc.Name, svc.Command, err)
+		return nil, "", diag.CommandNotStarted.Errorf("service %q: failed to start %q: %w", svc.Name, svc.Command, err)
 	}
 	// Tie the process to its teardown mechanism now that it has a pid: a job
 	// object on Windows, a no-op on POSIX (the process group was set at spawn).
@@ -166,11 +167,11 @@ func (p *Proc) Stop() {
 // asserting against nothing.
 func (p *Proc) Signal(name string) error {
 	if p == nil || p.c == nil {
-		return fmt.Errorf("service is not running")
+		return diag.ServiceNotRunning.Errorf("service is not running")
 	}
 	select {
 	case <-p.done:
-		return fmt.Errorf("service %q already exited", p.name)
+		return diag.ServiceNotRunning.Errorf("service %q already exited", p.name)
 	default:
 	}
 	return p.c.signalByName(name)
@@ -201,7 +202,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 	if r.Timeout != "" {
 		d, err := time.ParseDuration(r.Timeout)
 		if err != nil {
-			return "", fmt.Errorf("invalid ready.timeout %q: %w", r.Timeout, err)
+			return "", diag.InternalError.Errorf("invalid ready.timeout %q: %w", r.Timeout, err)
 		}
 		timeout = d
 	}
@@ -210,7 +211,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 	case r.Delay != "":
 		d, err := time.ParseDuration(r.Delay)
 		if err != nil {
-			return "", fmt.Errorf("invalid ready.delay %q: %w", r.Delay, err)
+			return "", diag.InternalError.Errorf("invalid ready.delay %q: %w", r.Delay, err)
 		}
 		// Timeout is the ceiling on any readiness wait (documented on ready), so a
 		// delay longer than the timeout can never be reached — wait only up to the
@@ -231,7 +232,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 			return "", p.exitedEarly()
 		case <-time.After(wait):
 			if cappedByTimeout {
-				return "", fmt.Errorf("timed out after %s waiting for readiness (ready.delay %s exceeds ready.timeout)", timeout, r.Delay)
+				return "", diag.ReadinessTimeout.Errorf("timed out after %s waiting for readiness (ready.delay %s exceeds ready.timeout)", timeout, r.Delay)
 			}
 			// Delay elapsed with the process still running — unless it exited in the
 			// same instant; check once more so a crash at the boundary is not missed.
@@ -254,7 +255,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 		// a slow, misleading failure. Reject a host-less value up front with a
 		// clear message (":9997" for any host, "127.0.0.1:9997" for loopback).
 		if _, _, err := net.SplitHostPort(r.Port); err != nil {
-			return "", fmt.Errorf("invalid ready.port %q (use host:port, e.g. 127.0.0.1:8080 or :8080): %w", r.Port, err)
+			return "", diag.BadEndpoint.Errorf("invalid ready.port %q (use host:port, e.g. 127.0.0.1:8080 or :8080): %w", r.Port, err)
 		}
 		dialer := net.Dialer{Timeout: pollInterval}
 		return "", p.poll(ctx, timeout, func() bool {
@@ -268,7 +269,7 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 	case r.Log != "":
 		re, err := regexp.Compile(r.Log)
 		if err != nil {
-			return "", fmt.Errorf("invalid ready.log regexp %q: %w", r.Log, err)
+			return "", diag.InternalError.Errorf("invalid ready.log regexp %q: %w", r.Log, err)
 		}
 		// Rescan only when new bytes arrived: the probe polls every 20ms, and
 		// copying + re-matching the whole capture on every idle tick is
@@ -305,7 +306,7 @@ func (p *Proc) waitFile(ctx context.Context, path, store string, timeout time.Du
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // path is the user-declared ready file under the scenario workdir
 	if err != nil {
-		return "", fmt.Errorf("read ready file %q: %w", path, err)
+		return "", diag.StepFileUnusable.Errorf("read ready file %q: %w", path, err)
 	}
 	return strings.TrimSpace(string(data)), nil
 }
@@ -340,7 +341,7 @@ func (p *Proc) poll(ctx context.Context, timeout time.Duration, check func() boo
 			}
 			return p.exitedEarly()
 		case <-deadlineC:
-			return fmt.Errorf("timed out after %s waiting for readiness", timeout)
+			return diag.ReadinessTimeout.Errorf("timed out after %s waiting for readiness", timeout)
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-tick.C:

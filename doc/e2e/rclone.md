@@ -10,6 +10,7 @@
   - [sync makes the destination mirror the source, deletions included](#scenario-sync-makes-the-destination-mirror-the-source-deletions-included)
   - [obscure and reveal round-trip a secret](#scenario-obscure-and-reveal-round-trip-a-secret)
   - [serve http publishes the tree over real HTTP](#scenario-serve-http-publishes-the-tree-over-real-http)
+
 ## rclone (self-hosted file sync program)
 [rclone](https://rclone.org/) moves files between storage backends, and the
 distinction it must never blur is copy versus sync: one adds, the other
@@ -26,7 +27,9 @@ the serving half is proven from the outside too. Everything runs against the
 local backend, which keeps every scenario hermetic.
 
 Source: `test/e2e/thirdparty/rclone/rclone.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: version prints a semantic version
+_only when `rclone version` succeeds_
 #### When
 ```shell
 rclone version
@@ -34,11 +37,14 @@ rclone version
 #### Then
 - exit code is `0`
 - stdout matches `/rclone v[0-9]+\.[0-9]+\.[0-9]+/`
+
 ### Scenario: copy replicates a tree and check certifies the replica
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
 - Fixture file `src/sub/table.csv` is created.
+
 #### Inputs
 _Fixture `src/hello.txt`:_
 ```text
@@ -62,11 +68,14 @@ rclone check src dst
 - after `rclone check src dst`:
   - exit code is `0`
   - stderr contains `0 differences found`
+
 ### Scenario: check fails loudly once the replica is corrupted
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
 - Fixture file `dst/hello.txt` is created.
+
 #### Inputs
 _Fixture `src/hello.txt`:_
 ```text
@@ -85,11 +94,14 @@ rclone check src dst
 - after `rclone check src dst`:
   - exit code is not `0`
   - stderr contains `1 differences found`
+
 ### Scenario: lsjson emits a machine-readable listing
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
 - Fixture file `src/sub/table.csv` is created.
+
 #### Inputs
 _Fixture `src/hello.txt`:_
 ```text
@@ -115,11 +127,14 @@ rclone size --json src
 - after `rclone size --json src`:
   - exit code is `0`
   - stdout at `$.count` equals `2`
+
 ### Scenario: sync makes the destination mirror the source, deletions included
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/keep.txt` is created.
 - Fixture file `dst/extraneous.txt` is created.
+
 #### Inputs
 _Fixture `src/keep.txt`:_
 ```text
@@ -136,9 +151,12 @@ rclone sync src dst
 #### Then
 - exit code is `0`
 - dir `dst` contains `keep.txt`, does not contain `extraneous.txt`
+
 ### Scenario: obscure and reveal round-trip a secret
+_only when `rclone version` succeeds_
 #### Given
 - Fixture file `rclone.conf` is created.
+
 #### When
 ```shell
 rclone obscure atago-test-secret
@@ -151,12 +169,15 @@ rclone reveal ${obscured}
 - after `rclone reveal ${obscured}`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: serve http publishes the tree over real HTTP
+_only when `rclone version` succeeds_
 #### Given
 - Background service `rclone-http` is started: `rclone serve http src --addr 127.0.0.1:18110`.
 - Fixture file `rclone.conf` is created.
 - Fixture file `src/hello.txt` is created.
 - Fixture file `src/api/data.json` is created.
+
 #### Inputs
 _Fixture `src/hello.txt`:_
 ```text
@@ -168,9 +189,9 @@ _Fixture `src/api/data.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /hello.txt
-# HTTP GET /api/data.json
-# HTTP GET /no-such-file.txt
+# HTTP GET /hello.txt via files
+# HTTP GET /api/data.json via files
+# HTTP GET /no-such-file.txt via files
 ```
 #### Then
 - after `HTTP GET /hello.txt`:

@@ -20,6 +20,10 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
+// customShell is a path that exists on neither platform, used to prove the
+// ATAGO_SHELL override is read rather than that some real shell was found.
+var customShell = argvCommand("/custom/shell", `C:\custom\shell.exe`)
+
 // argvCommand returns a command string for the no-shell (argv-tokenized) path
 // that works on every OS: POSIX gets the bare utility, Windows spells out the
 // cmd.exe invocation explicitly (echo/exit are cmd builtins, not executables).
@@ -419,8 +423,8 @@ func TestRun_ParentCancelIsNotNormalExit(t *testing.T) {
 // TestRun_ShellCancelKillsChildPromptly is the regression for the pipe-orphan
 // hang: a cancelled `sh -c "sleep 30"` used to block cmd.Wait for the full 30s
 // because the orphaned sleep kept the captured stdout pipe open. Killing the
-// whole process group (POSIX) or force-closing the pipes after WaitDelay
-// (Windows) must let Run return in well under the sleep duration.
+// whole tree — the process group on POSIX, `taskkill /T` on Windows — must let
+// Run return in well under the sleep duration.
 func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -428,9 +432,10 @@ func TestRun_ShellCancelKillsChildPromptly(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
 	}()
-	// Not t.TempDir(): on Windows the orphaned child (no process groups) may
-	// briefly outlive the kill while holding the workdir open, and TempDir's
-	// cleanup would fail the test on that unrelated race. Best-effort cleanup.
+	// Not t.TempDir(): a child that outlives the kill holds the workdir open, and
+	// TempDir's cleanup would then fail the test on that instead of on the
+	// elapsed-time assertion below. Best-effort cleanup.
+	//nolint:usetesting // Deliberate, for the reason above: TempDir's cleanup is fatal.
 	wd, err := os.MkdirTemp("", "atago-cancel-")
 	if err != nil {
 		t.Fatal(err)
@@ -579,10 +584,10 @@ func TestWindowsFields_MatchesShellwords(t *testing.T) {
 // timeout/cancel is handled earlier and stays -1; a signal reaching here is the
 // program's own termination.
 func TestRun_SignalExitCode(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX signals only; Windows has no 128+signal convention")
 	}
-	t.Parallel()
 	cases := []struct {
 		name   string
 		signal string
@@ -621,17 +626,22 @@ func TestRun_CommandNotFound(t *testing.T) {
 	}
 }
 
-// TestRun_ShellNotShadowedByPath verifies that a `sh` placed first on PATH does
-// not hijack the harness shell. A sabotaged `sh` that always prints
-// HIJACKED and exits 0 sits in the workdir; with PATH pointing only at it, a
-// PATH-resolved shell would run it, but the absolute /bin/sh must be used.
+// TestRun_ShellNotShadowedByPath verifies that a shell placed first on PATH does
+// not hijack the harness shell — atago prepends the program-under-test's own
+// directory to PATH, so a CLI that ships an `sh` applet (mimixbox) or anything
+// Windows resolves for the name `cmd` would otherwise change redirect semantics
+// and exit codes for every `shell: true` step in the suite.
+//
+// The sabotaged shell always prints HIJACKED and exits 0. On Windows the
+// fixture is a `cmd.bat`, because PATHEXT makes that a hit for a bare `cmd`
+// lookup — which is exactly what the runner used to do there.
 func TestRun_ShellNotShadowedByPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shellPath applies only to POSIX; Windows runs shell steps via cmd.exe")
-	}
 	dir := t.TempDir()
-	fake := filepath.Join(dir, "sh")
-	if err := os.WriteFile(fake, []byte("#!/bin/sh\necho HIJACKED\nexit 0\n"), 0o755); err != nil {
+	name, body := "sh", "#!/bin/sh\necho HIJACKED\nexit 0\n"
+	if runtime.GOOS == "windows" {
+		name, body = "cmd.bat", "@echo HIJACKED\r\n"
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
@@ -642,18 +652,18 @@ func TestRun_ShellNotShadowedByPath(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if got := strings.TrimSpace(string(res.Stdout)); got != "real" {
-		t.Errorf("stdout = %q, want %q (the PATH-resident sh hijacked the harness shell)", got, "real")
+		t.Errorf("stdout = %q, want %q (the PATH-resident shell hijacked the harness shell)", got, "real")
 	}
 }
 
+// TestShellPath pins the resolution contract that holds on every platform: the
+// ATAGO_SHELL override wins, and with no override the answer is an absolute
+// path rather than a bare name os/exec would resolve through PATH.
 func TestShellPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("shellPath applies only to POSIX; Windows runs shell steps via cmd.exe")
-	}
 	t.Run("honors ATAGO_SHELL override", func(t *testing.T) {
-		t.Setenv("ATAGO_SHELL", "/custom/shell")
-		if got := shellPath(); got != "/custom/shell" {
-			t.Errorf("shellPath() = %q, want /custom/shell", got)
+		t.Setenv("ATAGO_SHELL", customShell)
+		if got := shellPath(); got != customShell {
+			t.Errorf("shellPath() = %q, want %q", got, customShell)
 		}
 	})
 	t.Run("defaults to an absolute path", func(t *testing.T) {
@@ -675,14 +685,15 @@ func TestCommandLine_ShellAndArgv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("shell CommandLine error: %v", err)
 	}
-	if runtime.GOOS == "windows" {
-		if name != "cmd" || len(args) != 2 || args[0] != "/c" {
-			t.Errorf("windows shell argv = %q %v, want cmd /c ...", name, args)
-		}
-	} else {
-		if len(args) != 2 || args[0] != "-c" || args[1] != "echo hi | wc -l" {
-			t.Errorf("posix shell argv = %q %v, want <sh> -c <command>", name, args)
-		}
+	// The interpreter is an ABSOLUTE path on both platforms — that is what keeps
+	// the program under test, whose directory atago puts on PATH, from supplying
+	// the harness shell. Only the flag that carries the command differs.
+	if !filepath.IsAbs(name) {
+		t.Errorf("shell program = %q, want an absolute path", name)
+	}
+	wantFlag := argvCommand("-c", "/c")
+	if len(args) != 2 || args[0] != wantFlag || args[1] != "echo hi | wc -l" {
+		t.Errorf("shell argv = %q %v, want <shell> %s <command>", name, args, wantFlag)
 	}
 
 	// Argv form: the first field is the program, the rest are arguments.
@@ -709,9 +720,9 @@ func TestCommandLine_ShellAndArgv(t *testing.T) {
 // TestShellPath_EnvOverride covers shellPath's ATAGO_SHELL override branch and
 // its default. It cannot be parallel because it mutates process env.
 func TestShellPath_EnvOverride(t *testing.T) {
-	t.Setenv("ATAGO_SHELL", "/custom/shell")
-	if got := shellPath(); got != "/custom/shell" {
-		t.Errorf("shellPath with ATAGO_SHELL = %q, want /custom/shell", got)
+	t.Setenv("ATAGO_SHELL", customShell)
+	if got := shellPath(); got != customShell {
+		t.Errorf("shellPath with ATAGO_SHELL = %q, want %q", got, customShell)
 	}
 	t.Setenv("ATAGO_SHELL", "")
 	// With no override, the default is an absolute path (never empty); on POSIX
@@ -899,6 +910,7 @@ func TestRun_CaptureFailureIsNotSilentEmptyOutput(t *testing.T) {
 	// Windows a process that still exists can keep a directory from being
 	// removed. TempDir's cleanup would fail the test on that, so clean up
 	// best-effort like TestRun_ShellCancelKillsChildPromptly does.
+	//nolint:usetesting // Deliberate, for the reason above: TempDir's cleanup is fatal.
 	wd, err := os.MkdirTemp("", "atago-capture-")
 	if err != nil {
 		t.Fatal(err)

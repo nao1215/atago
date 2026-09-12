@@ -16,6 +16,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -31,24 +32,34 @@ const (
 )
 
 // Error is a loader failure annotated with the source path and kind.
+//
+// Code names the diagnostic. A validation failure reports several problems at
+// once, each carrying its own code inside Msg, so Code is set only when the
+// whole failure is one diagnostic — which is every parse error, since parsing
+// stops at the first one.
 type Error struct {
 	Path string
 	Kind Kind
+	Code diag.Code
 	Msg  string
 }
 
 func (e *Error) Error() string {
-	if e.Path == "" {
-		return e.Msg
+	msg := e.Msg
+	if e.Code != 0 {
+		msg = e.Code.Annotate(msg)
 	}
-	return fmt.Sprintf("%s: %s", e.Path, e.Msg)
+	if e.Path == "" {
+		return msg
+	}
+	return fmt.Sprintf("%s: %s", e.Path, msg)
 }
 
 // Load reads and validates the spec file at path.
 func Load(path string) (*spec.Spec, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // path comes from user-specified spec args
 	if err != nil {
-		return nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
+		return nil, &Error{Path: path, Kind: KindValidation, Code: diag.SpecUnreadable, Msg: err.Error()}
 	}
 	// A directory-level manifest (#392) is configuration for a TREE of specs, so
 	// it is discovered from the spec's own location rather than passed in: every
@@ -173,7 +184,7 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 	// a single leading BOM transparently.
 	data = bytes.TrimPrefix(data, []byte("\ufeff"))
 	if msg := explicitTagError(data); msg != "" {
-		return nil, &Error{Path: path, Kind: KindParse, Msg: msg}
+		return nil, &Error{Path: path, Kind: KindParse, Code: diag.YAMLTag, Msg: msg}
 	}
 	var s spec.Spec
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
@@ -182,10 +193,17 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 		// io.EOF, whose bare "EOF" tells the user nothing. Name the problem and
 		// what a spec needs instead.
 		if errors.Is(err, io.EOF) {
-			return nil, &Error{Path: path, Kind: KindParse, Msg: "spec is empty: expected a YAML document with version, suite, and scenarios"}
+			return nil, &Error{Path: path, Kind: KindParse, Code: diag.SpecEmpty, Msg: "spec is empty: expected a YAML document with version, suite, and scenarios"}
 		}
-		return nil, &Error{Path: path, Kind: KindParse, Msg: formatYAMLError(err)}
+		msg := formatYAMLError(err)
+		return nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(data, msg), Msg: msg}
 	}
+	// Restore the source text of any plain scalar that landed in a text field
+	// before anything reads those values: YAML types an unquoted 1.20 as a float,
+	// and a spec that compares literals must mean the characters the author
+	// wrote. It runs while the model still mirrors the document one-to-one,
+	// which is what lets the two be walked together.
+	applyVerbatimScalars(&s, data)
 	// Record each scenario's authored index before matrix expansion, so every
 	// expanded instance can be traced back to its authored source location (#80).
 	for i := range s.Scenarios {
@@ -215,9 +233,29 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 func formatYAMLError(err error) string {
 	var yerr yaml.Error
 	if errors.As(err, &yerr) {
-		return suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true)))
+		return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true))))
 	}
-	return suggestScalarMatcher(suggestUnknownField(err.Error()))
+	return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(err.Error())))
+}
+
+// classifyYAMLError picks the diagnostic for a decode failure. goccy reports
+// all of them through one error type, but they are three different mistakes
+// with three different fixes: a document that is not YAML at all, a key the
+// schema does not define, and a value written in a shape its key cannot take.
+//
+// The first is separated structurally rather than by matching the message: if
+// the parser cannot build a document from the bytes, the problem is syntax; if
+// it can, the YAML was fine and the spec model is what rejected it. That keeps
+// the classification correct for the schema errors raised by the spec package's
+// own unmarshalers, whose wording this file has no business knowing.
+func classifyYAMLError(data []byte, msg string) diag.Code {
+	if _, err := parser.ParseBytes(data, 0); err != nil {
+		return diag.YAMLSyntax
+	}
+	if unknownFieldRe.MatchString(msg) {
+		return diag.UnknownKey
+	}
+	return diag.WrongValueShape
 }
 
 func joinErrors(errs []string) string {

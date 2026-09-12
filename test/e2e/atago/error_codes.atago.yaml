@@ -1,0 +1,1445 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / every diagnostic code
+
+# Diagnostic codes (#454, #455) are a published contract: ATG2103 has to keep
+# meaning the same thing across releases, or every bookmark, CI grep, and agent
+# prompt that matched on it breaks. A code documented in doc/errors.md but never
+# emitted would be worse than no code at all, so each scenario here provokes one
+# code from the real binary and asserts the code itself rather than the wording
+# around it — the message is free to improve, the code is not.
+#
+# The set is complete on purpose: TestE2E_EveryCodeIsProvoked fails when a
+# registered code has no scenario in this directory, so adding a code to the
+# registry without exercising it here cannot pass CI.
+#
+# Every scenario asserts the exit code as well, which is the other half of the
+# contract: the thousands digit of a code promises the exit status, so an
+# ATG2xxx exits 2 and an ATG3xxx exits 3.
+scenarios:
+  # --- ATG20xx: the document itself -----------------------------------------
+
+  - name: ATG2001 is a spec file that cannot be read
+    # A dangling symlink is the portable way to make the file exist for the
+    # directory walk and vanish for the read; a mode-000 file would not work
+    # for a run as root, which some CI images are.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: broken.atago.yaml
+          symlink: nowhere.yaml
+      - run: {command: "${atago} run ."}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2001"}
+
+  - name: ATG2002 is a spec file with no YAML document in it
+    steps:
+      - fixture: {file: bad.atago.yaml, content: "# only a comment\n"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2002"}
+
+  - name: ATG2003 is a document that is not valid YAML
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+              suite: {name: x}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2003"}
+
+  - name: ATG2004 is an explicit YAML tag
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: !!str x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2004"}
+
+  - name: ATG2005 is a key the schema does not define
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenariosss: []
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2005"
+              # The code is added to the message, never substituted for it.
+              - 'unknown field "scenariosss"'
+
+  - name: ATG2006 is a value written in a shape its key cannot take
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{assert: {stdout: hi}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2006"}
+
+  - name: ATG2010 is an unsupported spec format version
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "9"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2010"}
+
+  # --- ATG21xx: keys that should not be there, or contradict ----------------
+
+  - name: ATG2101 is a step that sets no action
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2101"}
+
+  - name: ATG2102 is a step that sets more than one action
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                    fixture: {file: f, content: c}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2102"}
+
+  - name: ATG2103 is a pair of keys that contradict each other
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: f, size: 1, snapshot: s}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2103"}
+
+  - name: ATG2104 is a group that takes exactly one member and got two
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: echo, session: [{expect: a, send: b}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2104"}
+
+  - name: ATG2105 is a real key in a position where it means nothing
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            defaults: {run: {command: echo}}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2105"}
+
+  - name: ATG2106 is a block at the wrong level of the spec
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - service: {name: s, command: "sleep 1"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2106"}
+
+  - name: ATG2107 is an assertion with no step to describe
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {screen: {contains: hi}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2107"}
+
+  - name: ATG2108 is a key whose companion key is not set
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {image: {path: f, max_diff: 0.5}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2108"}
+
+  # --- ATG22xx: something required is missing -------------------------------
+
+  - name: ATG2201 is a required key that is absent
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2201"}
+
+  - name: ATG2202 is a list that must hold an entry and holds none
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: []
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2202"}
+
+  - name: ATG2203 is a group that needs at least one member and got none
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {changes: {}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2203"}
+
+  - name: ATG2204 is a key present with an empty value
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: f, equals_file: ""}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2204"}
+
+  # --- ATG23xx: a value that is present but wrong ---------------------------
+
+  - name: ATG2301 is a duration atago cannot read
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x, timeout: "soon"}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2301"}
+
+  - name: ATG2302 is a negative value where a negative means nothing
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x, timeout: "-1s"}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2302"}
+
+  - name: ATG2303 is a value that must be positive and is not
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                services: [{name: s, command: "sleep 1", max_log_bytes: -1}]
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2303"}
+
+  - name: ATG2304 is a number outside the range its key accepts
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: echo, session: [{expect: a}]}
+                  - assert: {screen: {attrs: [{text: hi, bold: true, row: -1}]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2304"}
+
+  - name: ATG2305 is a regular expression that does not compile
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {matches: "["}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2305"}
+
+  - name: ATG2306 is a glob pattern that does not parse
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {dir: {path: ".", glob: "["}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2306"}
+
+  - name: ATG2307 is a value outside a closed vocabulary
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, skip: {os: macos}, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2307"}
+
+  - name: ATG2308 is a range nothing could satisfy
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: f, min_size: 10, max_size: 5}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2308"}
+
+  - name: ATG2309 is an absolute path where a relative one is required
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {changes: {created: ["/tmp/x"]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2309"}
+
+  - name: ATG2310 is a path that climbs out of the workdir
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {changes: {created: ["../x"]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2310"}
+
+  - name: ATG2311 is a control character in a name
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: "x\ty"}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2311"}
+
+  - name: ATG2312 is a matcher that could never fail
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {contains: ""}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2312"}
+
+  - name: ATG2313 is a value in the wrong notation
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - fixture: {file: f, content: c, mode: "99"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2313"}
+
+  # --- ATG24xx: a name that does not resolve --------------------------------
+
+  - name: ATG2401 is a runner the spec never declared
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: GET, path: /}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2401"}
+
+  - name: ATG2402 is a declared runner of the wrong type
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            runners: {api: {type: db, dsn: "sqlite://:memory:"}}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: GET, path: /}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2402"}
+
+  - name: ATG2403 is a reference to something the spec never declared
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - signal: {service: ghost, signal: TERM}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2403"}
+
+  - name: ATG2404 is a stored value shadowing a built-in
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - store: {name: workdir, from: {stdout: {matches: "x"}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2404"}
+
+  - name: ATG2405 is a manifest path that resolves to nothing
+    steps:
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            fixtures_dir: nowhere
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2405"}
+
+  # --- ATG25xx: identity ----------------------------------------------------
+
+  - name: ATG2501 is two scenarios sharing a name
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - {name: a, steps: [{run: {command: echo}}]}
+              - {name: a, steps: [{run: {command: echo}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2501"}
+
+  - name: ATG2502 is a set listing the same entry twice
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {exit_code: {in: [0, 0]}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "ATG2502"}
+
+  # --- the contract itself --------------------------------------------------
+
+  - name: a code is added to the message rather than replacing it
+    # The whole point of a code is that the prose stays free to improve, which
+    # only holds while both are printed. A change that replaced the sentence
+    # with its code would pass every scenario above.
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            matches: "ATG2201: suite\\.name is required"
+
+  - name: several problems each report their own code in one pass
+    # Validation collects every problem before failing, and each line carries
+    # the code for the problem on that line — not one code for the whole file.
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "9"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {matches: "["}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2010"
+              - "ATG2305"
+
+  # --- ATG30xx: the shape of the command ------------------------------------
+
+  - name: ATG3001 is a subcommand atago does not have
+    steps:
+      - run: {command: "${atago} frobnicate"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3001"}
+
+  - name: ATG3001 is also atago with no subcommand at all
+    steps:
+      - run: {command: "${atago}"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3001"}
+
+  - name: ATG3002 is a subcommand called in a shape it does not accept
+    steps:
+      - run: {command: "${atago} snapshot"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3002"}
+
+  # --- ATG31xx: options -----------------------------------------------------
+
+  - name: ATG3101 is an option atago does not define
+    steps:
+      - run: {command: "${atago} run --definitely-not-a-flag ."}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains:
+              - "ATG3101"
+              # The code goes in front of the message, and the usage the
+              # failure triggers still follows it.
+              - "flag provided but not defined"
+              - "Usage: atago run"
+
+  - name: ATG3102 is an option given a value it does not accept
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --report jnit ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3102"}
+
+  - name: ATG3103 is an option whose companion option is not set
+    steps:
+      - run: {command: "${atago} doc --split-by-spec ."}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3103"}
+
+  - name: ATG3104 is two options that contradict each other
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --repeat 2 --retry-failed 1 ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3104"}
+
+  - name: ATG3105 is a numeric option outside its range
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --parallel -1 ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3105"}
+
+  # --- ATG32xx: what the command was pointed at -----------------------------
+
+  - name: ATG3201 is a path that cannot be reached
+    steps:
+      - run: {command: "${atago} run ./nowhere"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3201"}
+
+  - name: ATG3202 is a directory holding no specs
+    steps:
+      - run: {command: "${atago} run ."}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3202"}
+
+  - name: ATG3203 is a selection that matched nothing under --ci
+    steps:
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --ci --tag no-such-tag ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3203"}
+
+  - name: ATG3204 is a rerun whose recorded failures no longer exist
+    steps:
+      # Record a real failure, then rename the scenario out from under it.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: before
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run ok.atago.yaml"}
+      - assert:
+          exit_code: 1
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: after
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run --rerun-failed ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3204"}
+
+  - name: ATG3205 is a write that would replace an existing file
+    steps:
+      - fixture: {file: taken.atago.yaml, content: "already here\n"}
+      - run: {command: "${atago} init taken.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3205"}
+
+  - name: ATG3206 is a destination that cannot be written
+    steps:
+      - fixture: {file: occupied, content: "not a directory\n"}
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --artifacts-dir occupied ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3206"}
+
+  - name: ATG3207 is atago's recorded state failing to load
+    steps:
+      - fixture: {file: .atago/last-failed.json, content: "not json at all\n"}
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios: [{name: a, steps: [{run: {command: echo}}]}]
+      - run: {command: "${atago} run --rerun-failed ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr: {contains: "ATG3207"}
+
+  # --- ATG60xx: security policy ---------------------------------------------
+
+  - name: ATG6001 is a request to a host the network policy denies
+    # A policy violation is reported inside the run's own report on stdout
+    # rather than as a startup diagnostic on stderr, because the run started
+    # and a scenario reached the refusal.
+    steps:
+      - fixture:
+          file: denied.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: denied}
+            permissions:
+              network:
+                allow:
+                  - allowed.example
+            runners:
+              api:
+                type: http
+                base_url: http://127.0.0.1:1
+            scenarios:
+              - name: reaches elsewhere
+                steps:
+                  - http: {runner: api, method: GET, path: /ping}
+      - run: {command: "${atago} run denied.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout: {contains: "ATG6001"}
+
+  # --- ATG4xxx: execution ---------------------------------------------------
+
+  - name: ATG4001 is a command line that cannot be split into arguments
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "echo 'unclosed"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4001"}
+
+  - name: ATG4002 is a program that could not be started
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: definitely-no-such-binary-xyz}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4002"}
+
+  - name: ATG4003 is an environment the step needs that could not be prepared
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: cat, stdin: {file: never-created.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4003"}
+
+  - name: ATG4004 is a file the step depends on that cannot be read
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+
+            suite:
+              name: x
+              setup:
+                - mock_server: {name: m, routes: [{method: POST, path: /p, status: 200}]}
+            runners: {api: {type: http, base_url: "${m.url}"}}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: POST, path: /p, body_file: never-created.bin}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4004"}
+
+  - name: ATG4005 is a command run beside a terminal session that failed
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{exec: {command: "false"}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4005"}
+
+  - name: ATG4101 is a step that outlasted its timeout
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{exec: {command: "sleep 5", timeout: 300ms}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4101"}
+
+  - name: ATG4102 is a service that never became ready
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59991", timeout: 1s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4102"}
+
+  - name: ATG4201 is a peer that could not be reached
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {api: {type: http, base_url: "http://127.0.0.1:1"}}
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: GET, path: /}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4201"}
+
+  - name: ATG4202 is a runner missing what it needs to connect
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {r: {type: ssh, host: "127.0.0.1:22", user: u, password: p}}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {runner: r, command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4202"}
+
+  - name: ATG4203 is a peer that was reached and refused the request
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {db: {type: db, dsn: "sqlite://:memory:"}}
+            scenarios:
+              - name: a
+                steps:
+                  - query: {runner: db, sql: "SELECT * FROM no_such_table"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4203"}
+
+  - name: ATG4204 is an address atago cannot make sense of
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            runners: {db: {type: db, dsn: "weird://x"}}
+            scenarios:
+              - name: a
+                steps:
+                  - query: {runner: db, sql: "SELECT 1"}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4204"}
+
+  - name: ATG4301 is a service that failed before it became ready
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "true", ready: {port: "127.0.0.1:59992", timeout: 5s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4301"}
+
+  - name: ATG4302 is a service addressed after it exited
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 1", ready: {delay: 100ms}}
+                steps:
+                  - run: {command: "sleep 2"}
+                  - signal: {service: s, signal: TERM}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4302"}
+
+  - name: ATG4403 is output that could not be captured
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "sleep 4 &", shell: true, timeout: 30s}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4403"}
+
+  - name: ATG4406 is input the program is not set up to receive
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty: {command: cat, timeout: 20s, session: [{send: {mouse: {row: 1, col: 1}}}]}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4406"}
+
+  # The loader refuses a store whose producing KIND never appears (ATG2107), so
+  # what is left at run time is the ordering it cannot decide: an http step did
+  # run, but a later step replaced the result the store would have read.
+  - name: ATG4501 is a store step with no result behind it
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/ok
+            body: ok
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+
+            scenarios:
+              - name: a
+                steps:
+                  - http: {runner: api, method: GET, path: /v1/ok}
+                  - run: {command: echo}
+                  - store: {name: v, from: {body: {trim: true}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4501"}
+
+  - name: ATG4502 is a store selector that found nothing
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - store: {name: v, from: {stdout: {matches: "no-such-text-anywhere"}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4502"}
+
+  - name: ATG4505 is a variable the step expands that is not defined
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+
+            scenarios:
+              - name: a
+                steps:
+                  - pty:
+                      command: cat
+                      timeout: 20s
+                      session:
+                        - send: "${env:ATAGO_DEFINITELY_UNSET_XYZ}"
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout: {contains: "ATG4505"}
+
+  # --- looking a code up, and reporting it ----------------------------------
+
+  - name: atago explain prints what a code means, offline
+    steps:
+      - run: {command: "${atago} explain ATG2201"}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "ATG2201"
+              - "a required key is missing"
+              # The entry says what to change, not only what went wrong.
+              - "Fix"
+              - "Exits 2."
+
+  - name: atago explain refuses a code nobody assigned, and suggests one
+    steps:
+      - run: {command: "${atago} explain ATG2999"}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains:
+              - "ATG3102"
+              - "unknown diagnostic code"
+              - "did you mean"
+
+  - name: the JSON report carries the code as a field
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: definitely-no-such-binary-xyz}
+      - run: {command: "${atago} run --report json bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            json:
+              - path: "$.suites[0].failures[0].code"
+                equals: "ATG4002"
+
+  - name: an assertion failure carries no code in the JSON report
+    # Exit 1 is a spec doing its job. A code there would invite consumers to
+    # branch on one where they should be reading the diff.
+    steps:
+      - fixture:
+          file: fails.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: "false"}
+                  - assert: {exit_code: 0}
+      - run: {command: "${atago} run --report json fails.atago.yaml"}
+      - assert:
+          exit_code: 1
+          stdout:
+            not_contains: '"code"'
+
+  - name: a wrapped error reports one code, not two
+    # A wrapper that adds context to someone else's error leaves the code to the
+    # error it wraps. The service readiness path is where this went wrong once:
+    # it reported its own code in front of the timeout's, so one failure carried
+    # two codes and neither was the whole answer.
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                services:
+                  - {name: s, command: "sleep 30", ready: {port: "127.0.0.1:59993", timeout: 1s}}
+                steps:
+                  - run: {command: echo}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "ATG4102"
+            not_contains: "ATG4301: service"
+
+  # Regression: the same authoring mistake — an assertion whose producing step
+  # never ran — was classified three ways. `screen:` before a pty step was a
+  # load error, a `store from.header` after a run step an exit-4 runtime error,
+  # and `status:` or a leading `exit_code:` merely a FAILED scenario (exit 1),
+  # so a statically knowable mistake was counted as a product regression.
+  - name: an assertion with no producing step is a load-time error
+    steps:
+      - fixture:
+          file: nocontext.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: asserts an http status after a command
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {status: 200}
+      - run:
+          command: ${atago} run nocontext.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "assert.status requires a preceding http step"
+      # The ordering that CAN be fed still loads and runs.
+      - fixture:
+          file: withcontext.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: asserts stdout after the command that produced it
+                steps:
+                  - run: {shell: true, command: "echo ready"}
+                  - assert: {stdout: {contains: ready}}
+      - run:
+          command: ${atago} run withcontext.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  # A store reads the step result an assertion reads, so the same mistake spelled
+  # as a store was the third shape named above and stayed an exit-4 runtime error.
+  - name: a store with no producing step is a load-time error
+    steps:
+      - fixture:
+          file: nostore.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: stores a response header after a command
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - store: {name: token, from: {header: X-Token}}
+      - run:
+          command: ${atago} run nostore.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "store.from.header requires a preceding http step"
+
+  # A suite block admits neither pty nor the runner-backed kinds, so such a read
+  # can never be fed there by any ordering. In suite.teardown it was worse than
+  # unhelpful: a teardown failure preserves the verdict, so the spec printed
+  # SUITE TEARDOWN FAILED on every run and still exited 0.
+  - name: a suite block read that can never be fed is a load-time error
+    steps:
+      - fixture:
+          file: suiteread.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              teardown:
+                - assert: {status: 200}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run suiteread.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2107"
+              - "can never be fed here"
+      # The bootstrap a suite.setup exists for still loads and runs.
+      - fixture:
+          file: suiteok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+              setup:
+                - run: {shell: true, command: "echo built"}
+                - assert: {stdout: {contains: built}}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run suiteok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"

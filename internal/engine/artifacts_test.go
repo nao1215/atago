@@ -285,6 +285,81 @@ scenarios:
 	}
 }
 
+// TestEngine_TeardownArtifactsDoNotOverwriteTheStepsEvidence pins the phase
+// separation end to end: a scenario whose steps and whose teardown both fail at
+// the same index keeps both payloads. The teardown block numbers its steps from
+// zero too, so before the phase segment existed the teardown's payload landed on
+// the scenario step's filename — the verdict and the diff printed beside it were
+// about the step, while the file the report offered held the teardown's bytes.
+func TestEngine_TeardownArtifactsDoNotOverwriteTheStepsEvidence(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	res := runSpecWithArtifacts(t, "art.atago.yaml", `
+version: "1"
+suite:
+  name: s
+scenarios:
+  - name: both phases fail at index 1
+    steps:
+      - run: {shell: true, command: echo STEPS-ACTUAL}
+      - assert:
+          stdout: {equals: "STEPS-EXPECTED\n"}
+    teardown:
+      - run: {shell: true, command: echo TEARDOWN-ACTUAL}
+      - assert:
+          stdout: {equals: "TEARDOWN-EXPECTED\n"}
+`, root)
+	if res.Status != StatusFailed {
+		t.Fatalf("status = %s, want failed", res.Status)
+	}
+
+	// Every payload the run wrote, by content, so the assertion below is about
+	// what survived rather than about a path spelling.
+	payloads := map[string]string{}
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		b, rerr := os.ReadFile(p)
+		if rerr != nil {
+			return rerr
+		}
+		rel, rerr := filepath.Rel(root, p)
+		if rerr != nil {
+			return rerr
+		}
+		payloads[filepath.ToSlash(rel)] = strings.TrimSpace(string(b))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk artifacts: %v", err)
+	}
+
+	want := map[string]bool{"STEPS-ACTUAL": false, "STEPS-EXPECTED": false, "TEARDOWN-ACTUAL": false, "TEARDOWN-EXPECTED": false}
+	for _, content := range payloads {
+		if _, ok := want[content]; ok {
+			want[content] = true
+		}
+	}
+	for content, found := range want {
+		if !found {
+			t.Errorf("payload %q was not preserved; artifacts on disk: %v", content, payloads)
+		}
+	}
+
+	// And the report points at the step's own bytes, not the teardown's.
+	cr := failedCheck(t, res)
+	for _, a := range cr.ArtifactFiles {
+		got := payloads[a.Path]
+		if strings.HasPrefix(got, "TEARDOWN-") {
+			t.Errorf("the failed step's %s sidecar %s holds the teardown's payload %q", a.Role, a.Path, got)
+		}
+	}
+}
+
 // failedCheck returns the first failed CheckResult across a suite result.
 func failedCheck(t *testing.T, res *SuiteResult) *assert.CheckResult {
 	t.Helper()

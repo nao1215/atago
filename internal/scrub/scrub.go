@@ -31,6 +31,8 @@ type compiledRule struct {
 // pattern when a rule's regexp does not compile.
 func New(rules []spec.ScrubRule) (*Scrubber, error) {
 	if len(rules) == 0 {
+		//nolint:nilnil // Documented above: a nil Scrubber is the no-op scrubber, so an empty
+		// rule set has nothing to report.
 		return nil, nil
 	}
 	compiled := make([]compiledRule, 0, len(rules))

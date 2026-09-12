@@ -20,22 +20,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
-
-// PolicyError reports that a request targeted a host the spec's
-// `permissions.network.allow` list does not permit. The engine
-// maps it to exit code 6 (security policy violation).
-type PolicyError struct {
-	Host  string
-	Allow []string
-}
-
-func (e *PolicyError) Error() string {
-	return fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", "))
-}
 
 // Config is the resolved configuration for an HTTP runner, derived from a named
 // `runners:` entry and the spec's network policy.
@@ -93,7 +82,7 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 	method := strings.ToUpper(strings.TrimSpace(h.Method))
 	req, err := http.NewRequestWithContext(ctx, method, target.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("building %s %s: %w", method, target, err)
+		return nil, diag.BadEndpoint.Errorf("building %s %s: %w", method, target, err)
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -124,7 +113,7 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 				return err
 			}
 			if len(via) >= 10 { // preserve net/http's default hop limit
-				return fmt.Errorf("stopped after 10 redirects")
+				return diag.RemoteRejected.Errorf("stopped after 10 redirects")
 			}
 			return nil
 		}
@@ -135,13 +124,13 @@ func (r *Runner) Do(ctx context.Context, h *spec.HTTP) (*runner.Result, error) {
 	resp, err := client.Do(req)
 	elapsed := time.Since(start)
 	if err != nil {
-		return nil, fmt.Errorf("http %s %s: %w", method, target, err)
+		return nil, diag.ConnectFailed.Errorf("http %s %s: %w", method, target, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("reading response body from %s %s: %w", method, target, err)
+		return nil, diag.ResponseUnreadable.Errorf("reading response body from %s %s: %w", method, target, err)
 	}
 
 	// body_to persists the response for the file/image/pdf assertion targets —
@@ -168,31 +157,27 @@ func (r *Runner) resolveURL(path string) (*url.URL, error) {
 	raw := path
 	if !isAbsURL(path) {
 		if r.baseURL == "" {
-			return nil, fmt.Errorf("http path %q is relative but the runner has no base_url", path)
+			return nil, diag.BadEndpoint.Errorf("http path %q is relative but the runner has no base_url", path)
 		}
 		raw = strings.TrimRight(r.baseURL, "/") + "/" + strings.TrimLeft(path, "/")
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid URL %q: %w", raw, err)
+		return nil, diag.BadEndpoint.Errorf("invalid URL %q: %w", raw, err)
 	}
 	if u.Host == "" {
-		return nil, fmt.Errorf("resolved URL %q has no host", raw)
+		return nil, diag.BadEndpoint.Errorf("resolved URL %q has no host", raw)
 	}
 	return u, nil
 }
 
-// checkPolicy enforces the network allowlist when one is configured.
+// checkPolicy enforces the network allowlist when one is configured. The rule
+// itself lives in security.CheckHost, which the gRPC and SSH runners also call:
+// one allowlist declared in one place has to mean one thing, and two copies of
+// the comparison would be free to drift into disagreeing about what "the same
+// host" is.
 func (r *Runner) checkPolicy(u *url.URL) error {
-	if len(r.allow) == 0 {
-		return nil
-	}
-	for _, a := range r.allow {
-		if a == u.Hostname() || a == u.Host {
-			return nil
-		}
-	}
-	return &PolicyError{Host: u.Hostname(), Allow: r.allow}
+	return security.CheckHost(r.allow, u.Host)
 }
 
 func isAbsURL(p string) bool {
@@ -221,7 +206,7 @@ func (r *Runner) encodeBody(h *spec.HTTP) (io.Reader, string, error) {
 		}
 		data, err := os.ReadFile(path) //nolint:gosec // path is confined to the workdir above
 		if err != nil {
-			return nil, "", fmt.Errorf("reading http.body_file %q: %w", h.BodyFile, err)
+			return nil, "", diag.StepFileUnusable.Errorf("reading http.body_file %q: %w", h.BodyFile, err)
 		}
 		return bytes.NewReader(data), detectContentType(data), nil
 	case h.Body != "":
@@ -229,7 +214,7 @@ func (r *Runner) encodeBody(h *spec.HTTP) (io.Reader, string, error) {
 	case h.JSON != nil:
 		b, err := json.Marshal(h.JSON)
 		if err != nil {
-			return nil, "", fmt.Errorf("encoding json body: %w", err)
+			return nil, "", diag.PayloadFailed.Errorf("encoding json body: %w", err)
 		}
 		return bytes.NewReader(b), "application/json", nil
 	default:
@@ -251,7 +236,7 @@ func (r *Runner) encodeMultipart(form map[string]string, files []spec.FilePart) 
 	sort.Strings(keys)
 	for _, k := range keys {
 		if err := w.WriteField(k, form[k]); err != nil {
-			return nil, "", fmt.Errorf("writing form field %q: %w", k, err)
+			return nil, "", diag.PayloadFailed.Errorf("writing form field %q: %w", k, err)
 		}
 	}
 
@@ -262,7 +247,7 @@ func (r *Runner) encodeMultipart(form map[string]string, files []spec.FilePart) 
 		}
 		data, err := os.ReadFile(path) //nolint:gosec // path is confined to the workdir above
 		if err != nil {
-			return nil, "", fmt.Errorf("reading http.files %q: %w", f.Path, err)
+			return nil, "", diag.StepFileUnusable.Errorf("reading http.files %q: %w", f.Path, err)
 		}
 		ct := f.ContentType
 		if ct == "" {
@@ -273,15 +258,15 @@ func (r *Runner) encodeMultipart(form map[string]string, files []spec.FilePart) 
 		hdr["Content-Type"] = []string{ct}
 		part, err := w.CreatePart(hdr)
 		if err != nil {
-			return nil, "", fmt.Errorf("creating multipart part %q: %w", f.Field, err)
+			return nil, "", diag.PayloadFailed.Errorf("creating multipart part %q: %w", f.Field, err)
 		}
 		if _, err := part.Write(data); err != nil {
-			return nil, "", fmt.Errorf("writing multipart part %q: %w", f.Field, err)
+			return nil, "", diag.PayloadFailed.Errorf("writing multipart part %q: %w", f.Field, err)
 		}
 	}
 
 	if err := w.Close(); err != nil {
-		return nil, "", fmt.Errorf("finalizing multipart body: %w", err)
+		return nil, "", diag.PayloadFailed.Errorf("finalizing multipart body: %w", err)
 	}
 	return &buf, w.FormDataContentType(), nil
 }

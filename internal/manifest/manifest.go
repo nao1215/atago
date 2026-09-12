@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -91,8 +92,30 @@ type Spec struct {
 	// setup/teardown steps (their commands, env, service ready probes, asserts).
 	// It mirrors a scenario's Variables so tooling can see which variables the
 	// suite lifecycle depends on.
-	SuiteVariables []string   `json:"suite_variables,omitempty"`
-	Scenarios      []Scenario `json:"scenarios"`
+	SuiteVariables []string `json:"suite_variables,omitempty"`
+	// SuiteSecurity mirrors a scenario's Security for the suite lifecycle:
+	// shell execution, network access, and host-environment reads performed by
+	// setup/teardown steps. Without it, a consumer auditing egress from the
+	// manifest saw no trace of a setup that curls or a suite service that
+	// opens an ssh tunnel.
+	SuiteSecurity []string `json:"suite_security,omitempty"`
+	// SuiteGenerates mirrors a scenario's Generates for the suite lifecycle: a
+	// redirect in setup or teardown writes a file exactly as a scenario's does,
+	// and no suite-level list existed anywhere, so the path was unrecoverable
+	// from any machine surface.
+	SuiteGenerates []string `json:"suite_generates,omitempty"`
+	// Subject is the binary under test declared by the directory manifest
+	// (#393), including the command that builds it on the host before any
+	// scenario runs. Omitted when no manifest declares one.
+	Subject   *Subject   `json:"subject,omitempty"`
+	Scenarios []Scenario `json:"scenarios"`
+}
+
+// Subject is the binary under test declared by a directory manifest (#393).
+type Subject struct {
+	Name    string `json:"name"`
+	Command string `json:"command"`
+	Shell   bool   `json:"shell,omitempty"`
 }
 
 // Network summarizes the spec's network policy.
@@ -109,6 +132,17 @@ type Runner struct {
 	BaseURL string `json:"base_url,omitempty"`
 	Target  string `json:"target,omitempty"`
 	Host    string `json:"host,omitempty"`
+	// User is an ssh runner's login name, and Cwd/Timeout a cmd runner's
+	// declarative bounds. Credential material (password, key file) stays out,
+	// the rule has_dsn already established for a db runner's dsn.
+	User    string `json:"user,omitempty"`
+	Cwd     string `json:"cwd,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	// InsecureHostKey reports that an ssh runner connects without verifying the
+	// host key. The loader forces every ssh runner to decide this explicitly,
+	// and the matching security note fires only when a run step actually uses
+	// the runner — so the runner table said nothing about the opt-out.
+	InsecureHostKey bool `json:"insecure_host_key,omitempty"`
 	// HasDSN reports that a db runner declares a dsn, without exposing the dsn
 	// itself (it may embed credentials).
 	HasDSN bool `json:"has_dsn,omitempty"`
@@ -198,7 +232,26 @@ type Step struct {
 	SQL      string   `json:"sql,omitempty"`
 	File     string   `json:"file,omitempty"`
 	Target   string   `json:"target,omitempty"` // assert target / store name
-	Retry    *Retry   `json:"retry,omitempty"`
+	// Asserts carries one prose phrase per target an assert step checks —
+	// "exit code is 0", `stdout contains "ready"` — the same phrases `atago
+	// explain` prints. The target name alone reduced two different assertions
+	// on one target, and a strong assertion and its weakened version, to the
+	// same word, so a manifest could not answer what a suite checks. Values a
+	// spec declares as secrets are masked before they reach here.
+	Asserts []string `json:"asserts,omitempty"`
+	// Cwd and Timeout are the step's own declarative bounds — where it runs and
+	// how long it may take. Without them a consumer cannot answer "which steps
+	// have no explicit timeout" or "which steps run outside the workdir root"
+	// from the document, which is what the manifest exists for.
+	Cwd     string `json:"cwd,omitempty"`
+	Timeout string `json:"timeout,omitempty"`
+	// StdoutTo / StderrTo (run) and BodyTo (http) are the files the step
+	// redirects into. The scenario's `generates` array names the paths but
+	// attributes them to no step.
+	StdoutTo string `json:"stdout_to,omitempty"`
+	StderrTo string `json:"stderr_to,omitempty"`
+	BodyTo   string `json:"body_to,omitempty"`
+	Retry    *Retry `json:"retry,omitempty"`
 	// Deterministic mirrors a run step's same-input-same-output claim (#398), so
 	// a reviewer reading the manifest sees that the command is run more than
 	// once and what is compared.
@@ -223,6 +276,14 @@ type ExpectFail struct {
 type Retry struct {
 	Times    int    `json:"times"`
 	Interval string `json:"interval,omitempty"`
+	// Until names the assertion target(s) whose success ends the retry loop,
+	// joined with "+" when several are set — the same reduction an assert
+	// step's `target` carries, so a consumer reads a condition the same way
+	// wherever it appears. Omitted when the retry states no condition.
+	Until string `json:"until,omitempty"`
+	// UntilAsserts carries the condition in full, as Step.Asserts does for an
+	// assert step: a retry's condition is an assertion and reduces the same way.
+	UntilAsserts []string `json:"until_asserts,omitempty"`
 }
 
 // Build assembles a deterministic manifest document from the given specs, in the
@@ -266,16 +327,52 @@ func buildSpec(in Input) Spec {
 	}
 	suiteVars := map[string]bool{}
 	for i := range s.Suite.Setup {
-		out.SuiteSetup = append(out.SuiteSetup, buildStep(i, &s.Suite.Setup[i], suiteVars))
+		out.SuiteSetup = append(out.SuiteSetup, buildStep(i, &s.Suite.Setup[i], suiteVars, s.Runners))
 	}
 	for i := range s.Suite.Teardown {
-		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars))
+		out.SuiteTeardown = append(out.SuiteTeardown, buildStep(i, &s.Suite.Teardown[i], suiteVars, s.Runners))
 	}
 	out.SuiteVariables = spec.SortedKeys(suiteVars)
-	for i := range s.Scenarios {
-		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source))
+	out.SuiteSecurity = spec.SuiteSecurityNotes(s)
+	out.SuiteGenerates = spec.SuiteGeneratedArtifacts(&s.Suite)
+	if sub := s.Subject; sub != nil {
+		out.Subject = &Subject{Name: sub.Name, Command: sub.Command, Shell: sub.Shell}
 	}
+	for i := range s.Scenarios {
+		out.Scenarios = append(out.Scenarios, buildScenario(&s.Scenarios[i], in.Source, s.Runners))
+	}
+	maskAsserts(&out, s)
 	return out
+}
+
+// maskAsserts runs every assertion phrase through the spec's own masker before
+// it leaves the builder. An assertion can name the value it expects, and a
+// value the spec declares under `secrets:` must not reach a document meant to
+// be committed and diffed — the same rule that keeps an ssh runner's password
+// and a db runner's dsn out, and that emits suite_env as names without values.
+func maskAsserts(out *Spec, s *spec.Spec) {
+	m := security.NewMaskerForSpec(s)
+	if m.Empty() {
+		return
+	}
+	maskSteps := func(steps []Step) {
+		for i := range steps {
+			for j, phrase := range steps[i].Asserts {
+				steps[i].Asserts[j] = m.Mask(phrase)
+			}
+			if r := steps[i].Retry; r != nil {
+				for j, phrase := range r.UntilAsserts {
+					r.UntilAsserts[j] = m.Mask(phrase)
+				}
+			}
+		}
+	}
+	maskSteps(out.SuiteSetup)
+	maskSteps(out.SuiteTeardown)
+	for i := range out.Scenarios {
+		maskSteps(out.Scenarios[i].Steps)
+		maskSteps(out.Scenarios[i].Teardown)
+	}
 }
 
 func buildNetwork(s *spec.Spec) Network {
@@ -298,15 +395,19 @@ func buildRunners(runners map[string]spec.Runner, src SourceLocator) []Runner {
 	for _, name := range names {
 		r := runners[name]
 		mr := Runner{
-			Name:        name,
-			Type:        r.Type,
-			BaseURL:     r.BaseURL,
-			Target:      r.Target,
-			Host:        r.Host,
-			HasDSN:      r.DSN != "",
-			Headless:    r.Headless,
-			ExecPath:    r.ExecPath,
-			BrowserArgs: r.BrowserArgs,
+			Name:            name,
+			Type:            r.Type,
+			BaseURL:         r.BaseURL,
+			Target:          r.Target,
+			Host:            r.Host,
+			User:            r.User,
+			Cwd:             r.Cwd,
+			Timeout:         r.Timeout,
+			InsecureHostKey: r.InsecureHostKey,
+			HasDSN:          r.DSN != "",
+			Headless:        r.Headless,
+			ExecPath:        r.ExecPath,
+			BrowserArgs:     r.BrowserArgs,
 		}
 		if src != nil {
 			mr.Source = sourceFrom(src.RunnerPos(name))

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -13,7 +14,8 @@ import (
 // present; the concrete scenarios produced by expandMatrix are validated later by
 // validate (which also catches name collisions across expanded rows).
 func validateMatrix(s *spec.Spec) []string {
-	var errs []string
+	var errs errorList
+	add := errs.add
 	for i := range s.Scenarios {
 		sc := &s.Scenarios[i]
 		if sc.Matrix == nil {
@@ -24,24 +26,36 @@ func validateMatrix(s *spec.Spec) []string {
 			where = fmt.Sprintf("scenario %q", sc.Name)
 		}
 		if len(sc.Matrix) == 0 {
-			errs = append(errs, fmt.Sprintf("%s.matrix must contain at least one row", where))
+			add(diag.EmptyList, "%s.matrix must contain at least one row", where)
 			continue
 		}
+		// The name template is expanded from the row alone, so a reference no
+		// row binds survives into the expanded scenario name as literal text.
+		// VarRefs is the shared reader of what a reference looks like, so the
+		// `$${who}` escape stays literal here exactly as it does everywhere else.
+		nameRefs := spec.VarRefs(sc.Name)
 		for r, row := range sc.Matrix {
 			if len(row) == 0 {
-				errs = append(errs, fmt.Sprintf("%s.matrix[%d] must contain at least one variable", where, r))
+				add(diag.EmptyValue, "%s.matrix[%d] must contain at least one variable", where, r)
 			}
 			for k := range row {
-				if reservedVarNames[k] {
-					errs = append(errs, fmt.Sprintf("%s.matrix[%d] key %q shadows a built-in variable (atago/workdir/suitedir); choose another name", where, r, k))
+				if reservedVarName(k) {
+					add(diag.ReservedName, "%s.matrix[%d] key %q shadows a built-in variable (%s); choose another name", where, r, k, builtinList())
+				}
+			}
+			for _, ref := range nameRefs {
+				if _, bound := row[ref]; !bound {
+					add(diag.NameNotDeclared,
+						"%s.matrix[%d] does not bind ${%s}, which the scenario name references, so the row expands to a name carrying the literal text ${%s}; add %s to the row or drop it from the name",
+						where, r, ref, ref, ref)
 				}
 			}
 		}
 		if msg := matrixNameCollapse(sc.Name, sc.Matrix); msg != "" {
-			errs = append(errs, fmt.Sprintf("%s: %s", where, msg))
+			add(diag.DuplicateName, "%s: %s", where, msg)
 		}
 	}
-	return errs
+	return errs.msgs
 }
 
 // matrixNameCollapse reports whether a matrix name template that references at

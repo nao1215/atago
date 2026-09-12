@@ -4,13 +4,22 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
 )
 
 // buildScenario summarizes one (already matrix-expanded) scenario. Variable
 // references, generated artifacts, and security notes are collected across the
 // scenario's services and steps so tooling can see them without replaying the run.
-func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
+func buildScenario(sc *spec.Scenario, src SourceLocator, runners map[string]spec.Runner) Scenario {
+	// The row a matrix instance is expanded from is statically known, and `atago
+	// doc` already substitutes it. Without the same substitution here a consumer
+	// has to re-implement variable expansion (including the $${...} escape) to
+	// learn what a row does, the two rows of one matrix carry identical step
+	// text, and a security note names a command line nobody runs. `vars` below
+	// still carries the binding, so the substitution stays visible.
+	authored := sc
+	sc = spec.ExpandScenarioRow(sc)
 	out := Scenario{
 		Name: sc.Name,
 		Tags: append([]string(nil), sc.Tags...),
@@ -25,7 +34,20 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 		out.Source = sourceFrom(src.ScenarioPos(sc.SourceIndex))
 	}
 
+	// Variable references are collected from the AUTHORED scenario, before the
+	// row is substituted: "which variables does this scenario use" is a question
+	// about the spec, and a row binding that has just been resolved would
+	// otherwise disappear from the list that reports it.
 	vars := map[string]bool{}
+	for i := range authored.Services {
+		spec.CollectServiceVars(vars, &authored.Services[i])
+	}
+	for i := range authored.Steps {
+		spec.CollectStepVars(vars, &authored.Steps[i], runners)
+	}
+	for i := range authored.Teardown {
+		spec.CollectStepVars(vars, &authored.Teardown[i], runners)
+	}
 
 	for i := range sc.Services {
 		svc := &sc.Services[i]
@@ -38,7 +60,7 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
-		st := buildStep(i, step, vars)
+		st := buildStep(i, step, vars, runners)
 		if src != nil {
 			st.Source = sourceFrom(src.StepPos(sc.SourceIndex, i))
 		}
@@ -48,14 +70,14 @@ func buildScenario(sc *spec.Scenario, src SourceLocator) Scenario {
 	// Teardown steps share the step shape; their variable references count
 	// toward the scenario's referenced-variable set like any other step's.
 	for i := range sc.Teardown {
-		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars))
+		out.Teardown = append(out.Teardown, buildStep(i, &sc.Teardown[i], vars, runners))
 	}
 
 	out.Variables = spec.SortedKeys(vars)
 	// Generated artifacts and security notes come from the shared spec model, so
 	// the manifest and the human-facing explain/doc summaries never drift (#56).
 	out.Generates = spec.GeneratedArtifacts(sc)
-	out.Security = spec.SecurityNotes(sc)
+	out.Security = spec.SecurityNotes(sc, runners)
 	return out
 }
 
@@ -80,9 +102,9 @@ func buildService(svc *spec.Service) Service {
 // buildStep reduces one step to its declarative fields and folds its variable
 // references into the scenario-level var set. Generated artifacts and security
 // notes are derived separately from the shared spec model (#56).
-func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
+func buildStep(index int, step *spec.Step, vars map[string]bool, runners map[string]spec.Runner) Step {
 	st := Step{Index: index, Kind: string(step.Kind())}
-	spec.CollectStepVars(vars, step)
+	spec.CollectStepVars(vars, step, runners)
 	switch step.Kind() {
 	case spec.StepFixture:
 		st.File = step.Fixture.File
@@ -104,9 +126,18 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.ClearEnv = r.ClearEnvEnabled()
 		st.PassEnv = r.PassEnv
 		st.Runner = r.Runner
+		st.Cwd = r.Cwd
+		st.Timeout = r.Timeout
+		st.StdoutTo = r.StdoutTo
+		st.StderrTo = r.StderrTo
 		st.Action = "run " + r.Command
+		// The structured runner field already carries the name; the action line
+		// is prose, and read as a local command without this.
+		if host := spec.RunHost(r, runners); host != "" {
+			st.Action = "run via " + host + ": " + r.Command
+		}
 		if r.Retry != nil {
-			st.Retry = &Retry{Times: r.Retry.Times, Interval: r.Retry.Interval}
+			st.Retry = buildRetry(r.Retry)
 		}
 		if r.Deterministic != nil {
 			st.Deterministic = &Deterministic{
@@ -120,9 +151,12 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		st.Method = h.Method
 		st.Path = h.Path
 		st.Runner = h.Runner
-		st.Action = fmt.Sprintf("HTTP %s %s", h.Method, h.Path)
+		st.BodyTo = h.BodyTo
+		// The structured runner field carries the name; the action line is
+		// prose, and read as runner-less while every other kind named one.
+		st.Action = fmt.Sprintf("HTTP %s %s%s", h.Method, h.Path, spec.ViaRunner(h.Runner))
 		if h.Retry != nil {
-			st.Retry = &Retry{Times: h.Retry.Times, Interval: h.Retry.Interval}
+			st.Retry = buildRetry(h.Retry)
 		}
 
 	case spec.StepQuery:
@@ -162,7 +196,7 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 	case spec.StepPTY:
 		pt := step.PTY
 		st.Command = pt.Command
-		st.Shell = pt.Shell != nil && *pt.Shell
+		st.Shell = pt.ShellEnabled()
 		st.ClearEnv = pt.ClearEnvEnabled()
 		st.PassEnv = pt.PassEnv
 		st.Action = "interactive (pty) " + pt.Command
@@ -170,6 +204,12 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 	case spec.StepAssert:
 		st.Target = assertTarget(step.Assert)
 		st.Action = "assert " + st.Target
+		// The target alone cannot say what the step checks: two different
+		// assertions on one target reduce to the same word, and so do a strong
+		// assertion and the weakened version of it — a suite whose assertions
+		// were gutted produced a byte-identical manifest. The phrases come from
+		// the describer explain prints, so the two documents cannot disagree.
+		st.Asserts = assertdesc.Describe(step.Assert)
 
 	case spec.StepStore:
 		if step.Store != nil {
@@ -178,6 +218,23 @@ func buildStep(index int, step *spec.Step, vars map[string]bool) Step {
 		}
 	}
 	return st
+}
+
+// buildRetry reduces a step's retry policy, including the until condition that
+// ends the loop — the manifest carried times and interval and dropped the
+// condition entirely. run and http share the retry shape, so they share this.
+func buildRetry(r *spec.Retry) *Retry {
+	if r == nil {
+		return nil
+	}
+	out := &Retry{Times: r.Times, Interval: r.Interval}
+	if r.Until != nil {
+		out.Until = assertTarget(r.Until)
+		// The condition that ends the loop carries the same detail an assert
+		// step does, or the two spellings of one question drift apart.
+		out.UntilAsserts = assertdesc.Describe(r.Until)
+	}
+	return out
 }
 
 // assertTarget returns the assertion target name (stdout, file, status …). When

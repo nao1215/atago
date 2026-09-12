@@ -53,3 +53,32 @@ scenarios:
           exit_code: 2
           stderr:
             contains: is not declared
+
+  # Every failure on the reflection path used to carry the same "(is server
+  # reflection enabled?)" hint, including ones where no connection was ever
+  # made — a `tls: true` runner aimed at a plaintext endpoint, or nothing
+  # listening at all. That sends a reader to check a server setting that had
+  # nothing to do with it.
+  - name: an unreachable server is a connection failure, not a reflection question
+    steps:
+      - fixture:
+          file: dead.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            runners:
+              rpc: {type: grpc, target: "127.0.0.1:1", timeout: 5s}
+            scenarios:
+              - name: call a server that is not there
+                steps:
+                  - grpc:
+                      runner: rpc
+                      method: pkg.Service/Method
+      - run:
+          command: ${atago} run dead.atago.yaml
+      - assert:
+          exit_code: 4
+          stdout:
+            contains: "the server could not be reached"
+            not_contains: "server reflection enabled"

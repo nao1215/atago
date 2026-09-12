@@ -279,6 +279,97 @@ func TestRender_CrossFormatCountParity_SetupErrored(t *testing.T) {
 	})
 }
 
+// TestRender_LoadFailureAppearsInEveryFormat is a regression: a spec file that
+// could not be parsed runs no scenario, so it lands in no suite result — and
+// only the console summary was told about it. Every machine-readable format
+// rendered a fully green document for a run that exited non-zero, so a CI
+// ingestor judging the run from the report it was given read that as success.
+func TestRender_LoadFailureAppearsInEveryFormat(t *testing.T) {
+	t.Parallel()
+	green := &engine.SuiteResult{
+		Suite: "green", SpecPath: "good.atago.yaml", Status: engine.StatusPassed, Duration: time.Millisecond,
+		Scenarios: []engine.ScenarioResult{
+			{Name: "ok", Status: engine.StatusPassed, Duration: time.Millisecond,
+				Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+		},
+	}
+	fails := []LoadFailure{{SpecPath: "bad.atago.yaml", Message: "ATG2006: string was used where mapping is expected"}}
+	renderWith := func(f Format) string {
+		t.Helper()
+		var b strings.Builder
+		if err := Render(&b, f, []*engine.SuiteResult{green}, WithLoadFailures(fails...)); err != nil {
+			t.Fatalf("Render(%s): %v", f, err)
+		}
+		return b.String()
+	}
+
+	t.Run("console", func(t *testing.T) {
+		t.Parallel()
+		got := renderWith(FormatConsole)
+		for _, want := range []string{"FAILED", "1 spec failed to load"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("console summary missing %q:\n%s", want, got)
+			}
+		}
+	})
+
+	t.Run("json", func(t *testing.T) {
+		t.Parallel()
+		var doc jsonDocument
+		if err := json.Unmarshal([]byte(renderWith(FormatJSON)), &doc); err != nil {
+			t.Fatalf("json invalid: %v", err)
+		}
+		if len(doc.LoadFailures) != 1 {
+			t.Fatalf("json load_failures = %+v, want the one unparseable spec", doc.LoadFailures)
+		}
+		if doc.LoadFailures[0].SpecPath != "bad.atago.yaml" {
+			t.Errorf("json load_failures[0].spec_path = %q, want bad.atago.yaml", doc.LoadFailures[0].SpecPath)
+		}
+		if !strings.Contains(doc.LoadFailures[0].Error, "ATG2006") {
+			t.Errorf("json load_failures[0].error = %q, want the loader diagnostic", doc.LoadFailures[0].Error)
+		}
+	})
+
+	t.Run("junit", func(t *testing.T) {
+		t.Parallel()
+		var root junitTestsuites
+		if err := xml.Unmarshal([]byte(renderWith(FormatJUnit)), &root); err != nil {
+			t.Fatalf("junit invalid: %v", err)
+		}
+		if root.Errors != 1 {
+			t.Errorf("junit errors = %d, want 1 for the spec that failed to load", root.Errors)
+		}
+		if !strings.Contains(renderWith(FormatJUnit), "bad.atago.yaml") {
+			t.Errorf("junit names no failing spec:\n%s", renderWith(FormatJUnit))
+		}
+	})
+
+	t.Run("tap", func(t *testing.T) {
+		t.Parallel()
+		got := renderWith(FormatTAP)
+		if !strings.Contains(got, "1..2") {
+			t.Errorf("tap plan does not count the load failure:\n%s", got)
+		}
+		if !strings.Contains(got, "not ok 1 - bad.atago.yaml") {
+			t.Errorf("tap has no failing point for the unparseable spec:\n%s", got)
+		}
+		if !strings.Contains(got, "ok 2 - green / ok") {
+			t.Errorf("tap dropped or renumbered the suite that did run:\n%s", got)
+		}
+	})
+
+	t.Run("gha", func(t *testing.T) {
+		t.Parallel()
+		got := renderWith(FormatGHA)
+		if !strings.Contains(got, "::error") || !strings.Contains(got, "bad.atago.yaml") {
+			t.Errorf("gha raises no error annotation for the unparseable spec:\n%s", got)
+		}
+		if !strings.Contains(got, "1 spec failed to load") {
+			t.Errorf("gha summary hides the load failure, contradicting its own annotation:\n%s", got)
+		}
+	})
+}
+
 // TestRender_HostileCharsStayWellFormed feeds XML/JSON/TAP-hostile bytes through
 // the scenario name and failure detail — angle brackets, ampersands, a CDATA
 // terminator, quotes, an embedded newline, a C0 control byte, and a multibyte

@@ -41,10 +41,10 @@ func TestFormat_Valid(t *testing.T) {
 
 // render is a single-suite helper around Render (the sole rendering entry point
 // after the dead Reporter/For path was removed, issue #25).
-func render(t *testing.T, f Format, res *engine.SuiteResult) string {
+func render(t *testing.T, f Format, res *engine.SuiteResult, opts ...Option) string {
 	t.Helper()
 	var b bytes.Buffer
-	if err := Render(&b, f, []*engine.SuiteResult{res}); err != nil {
+	if err := Render(&b, f, []*engine.SuiteResult{res}, opts...); err != nil {
 		t.Fatal(err)
 	}
 	return b.String()

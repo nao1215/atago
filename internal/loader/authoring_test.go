@@ -1,8 +1,11 @@
 package loader
 
 import (
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // TestLoadBytes_ContainsScalarAndList proves `contains` / `not_contains` accept
@@ -463,6 +466,53 @@ scenarios:
 		_, err := LoadBytes("sample.atago.yaml", []byte(src))
 		if err == nil {
 			t.Fatalf("%s: LoadBytes() error = nil, want a negative-duration validation error", name)
+		}
+	}
+}
+
+// fileAssertNonMatchers are the FileAssert keys that are not ways to satisfy the
+// "must set one of" rule: the subject itself, the store-only selector, and the
+// bounds that qualify a matcher rather than being one.
+var fileAssertNonMatchers = map[string]string{
+	"path":      "names the file under test",
+	"text":      "store-only selector, refused in an assertion",
+	"count":     "qualifies the contains matcher",
+	"min_count": "qualifies the contains matcher",
+	"max_count": "qualifies the contains matcher",
+}
+
+// TestFileAssert_EveryMatcherIsNamedInTheDiagnostic keeps the no-matcher
+// diagnostic honest. The message used to list the content matchers only, while
+// a size bound alone is accepted, so `file: {path: out.txt}` was answered with
+// eight of the eleven ways out and the author was sent looking for a content
+// matcher they may not have needed. Walking the struct means a matcher added
+// later cannot fall out of the message quietly: it has to be listed as a way to
+// satisfy the rule, or recorded as something else.
+func TestFileAssert_EveryMatcherIsNamedInTheDiagnostic(t *testing.T) {
+	t.Parallel()
+	satisfied := map[string]bool{}
+	for _, k := range strings.Split(fileContentMatchers+"/"+fileSizeMatchers, "/") {
+		satisfied[k] = true
+	}
+	typ := reflect.TypeOf(spec.FileAssert{})
+	for i := 0; i < typ.NumField(); i++ {
+		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
+		if name == "" || name == "-" {
+			continue
+		}
+		if satisfied[name] {
+			continue
+		}
+		if _, ok := fileAssertNonMatchers[name]; ok {
+			continue
+		}
+		t.Errorf("spec.FileAssert has key %q, which is neither named in the no-matcher diagnostic (%s) nor recorded in fileAssertNonMatchers; an author who writes only that key gets a message that does not mention it", name, fileContentMatchers+"/"+fileSizeMatchers)
+	}
+	// The exclusive list is a subset of what satisfies the rule: a key that
+	// competes with others must also be a way to satisfy it.
+	for _, k := range strings.Split(fileContentMatchers, "/") {
+		if !satisfied[k] {
+			t.Errorf("%q is listed as an exclusive content matcher but not as a way to satisfy the at-least-one rule", k)
 		}
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/artifact"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/report"
@@ -39,14 +40,26 @@ type runOptions struct {
 	tag             csvFlag
 	skipTag         csvFlag
 	artifactsDir    string
-	rerunFailed     bool
-	allowFlaky      bool
-	allowXPass      bool
-	profile         string
-	verbose         bool
-	ci              bool
-	stdout          io.Writer
-	stderr          io.Writer
+	// snapshotsUpdated is how many golden files the run rewrote under
+	// --update-snapshots, read from the engine after the run. It reaches the
+	// report from the recorder the writes go through rather than from the
+	// results, which cannot see the writes a teardown, a suite lifecycle block,
+	// or a non-surviving repeat/retry iteration made.
+	snapshotsUpdated int
+	rerunFailed      bool
+	// rerunTargets are the spec paths the run was pointed at BEFORE
+	// --rerun-failed narrowed them to the ones holding recorded failures. The
+	// ledger warning needs the difference: an entry under a spec that was never
+	// a target went unexecuted because of the user's own targeting, not because
+	// the scenario disappeared.
+	rerunTargets []string
+	allowFlaky   bool
+	allowXPass   bool
+	profile      string
+	verbose      bool
+	ci           bool
+	stdout       io.Writer
+	stderr       io.Writer
 }
 
 // selectionActive reports whether the user narrowed the run with a name/tag
@@ -87,6 +100,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	// the previous run (#64); the selection and canonicalization invariants live
 	// with the ledger primitives in rerun.go.
 	if opts.rerunFailed {
+		opts.rerunTargets = append([]string(nil), paths...)
 		narrowed, exitNow, done := applyRerunSelection(label, stderr, paths, eng)
 		if done {
 			return exitNow
@@ -155,8 +169,29 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 	start := time.Now()
 	suiteResults, loadErrs := runSpecs(ctx, eng, paths)
 	elapsed := time.Since(start)
+	// Read the rewrite count from the engine that did the writing: a run that
+	// ends red still has to report the goldens it replaced along the way.
+	opts.snapshotsUpdated = eng.SnapshotsUpdated()
 
 	return finishRun(ctx, opts, suiteResults, loadErrs, progress, elapsed)
+}
+
+// formatAlternatives renders the report formats as the "console|json|…" list
+// the flag help and usage line show. Derived from report.AllFormats — the list
+// used to be spelled here by hand and a format added to the report package
+// would have been invisible in --help.
+func formatAlternatives() string {
+	return strings.Join(report.FormatNames(), "|")
+}
+
+// formatProse renders the report formats as the "console, json, …, or tap"
+// prose the unknown-format diagnostic uses, from the same list.
+func formatProse() string {
+	names := report.FormatNames()
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + ", or " + names[len(names)-1]
 }
 
 // parseRunFlags parses and validates `atago run`'s flags into a runOptions. The
@@ -167,7 +202,7 @@ func runCmd(label string, args []string, stdout, stderr io.Writer) int {
 func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runOptions, int, bool) {
 	fs := flag.NewFlagSet(label, flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	reportFmt := fs.String("report", "console", "report format: console|json|junit|gha|tap")
+	reportFmt := fs.String("report", "console", "report format: "+formatAlternatives())
 	updateSnapshots := fs.Bool("update-snapshots", false, "create or overwrite snapshot files instead of comparing")
 	ci := fs.Bool("ci", false, "CI-safe defaults: deterministic, no color (sets NO_COLOR), secret masking")
 	parallel := fs.Int("parallel", runtime.NumCPU(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
@@ -187,24 +222,28 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
 	fs.Usage = func() {
-		fmt.Fprint(stderr, "Usage: atago run [--report console|json|junit|gha|tap] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(fs.Output(), "Usage: atago run [--report "+formatAlternatives()+"] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	operands, err := parseFlagsAnywhere(fs, args)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			replayFlagOutput(err, stderr)
 			return nil, ExitOK, true
 		}
+		reportFlagError(label, err, stderr)
 		return nil, ExitConfig, true
 	}
 	if *ci {
 		// Force deterministic, color-free output. Secret masking is always on.
+		//nolint:forbidigo // Process-wide on purpose, and set once during flag parsing:
+		// --ci has to reach the color decision in every package, before any scenario runs.
 		_ = os.Setenv("NO_COLOR", "1")
 	}
 
 	format := report.Format(*reportFmt)
 	if !format.Valid() {
-		fmt.Fprintf(stderr, label+": unknown --report %q (want console, json, junit, gha, or tap)\n", *reportFmt)
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.BadOptionValue.Annotate(fmt.Sprintf("unknown --report %q (want %s)", *reportFmt, formatProse())))
 		return nil, ExitConfig, true
 	}
 
@@ -218,11 +257,11 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	// only ACTIVATES at > 1 (a value < 2 is a documented no-op), so --repeat 1
 	// changes nothing and must not be rejected alongside --retry-failed.
 	if *repeat > 1 && *retryFailed > 0 {
-		fmt.Fprintln(stderr, label+": --repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionsExclusive.Annotate("--repeat and --retry-failed are mutually exclusive (repeat detects flakiness, retry-failed tolerates it)"))
 		return nil, ExitConfig, true
 	}
 	if *repeat < 0 || *retryFailed < 0 {
-		fmt.Fprintln(stderr, label+": --repeat and --retry-failed must be >= 0")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionOutOfRange.Annotate("--repeat and --retry-failed must be >= 0"))
 		return nil, ExitConfig, true
 	}
 	// A negative --parallel is a typo, not a request: the engine would clamp it to
@@ -230,7 +269,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	// config error as --repeat/--retry-failed for consistent bounds checking. Zero
 	// is left to mean the default (like repeat/retry allow 0).
 	if *parallel < 0 {
-		fmt.Fprintln(stderr, label+": --parallel must be >= 0")
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.OptionOutOfRange.Annotate("--parallel must be >= 0"))
 		return nil, ExitConfig, true
 	}
 	if strings.TrimSpace(*artifactsDir) != "" {
@@ -239,7 +278,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 		// every artifact write fail silently, leaving the user to believe a run
 		// produced no reviewable failures when in fact none could be written.
 		if err := ensureArtifactsDir(*artifactsDir); err != nil {
-			fmt.Fprintf(stderr, label+": --artifacts-dir %q is not usable: %v\n", *artifactsDir, err)
+			fmt.Fprintf(stderr, "%s: %s\n", label, diag.OutputNotWritable.Annotate(fmt.Sprintf("--artifacts-dir %q is not usable: %v", *artifactsDir, err)))
 			return nil, ExitConfig, true
 		}
 	}

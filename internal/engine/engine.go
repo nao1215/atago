@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/artifact"
+	"github.com/nao1215/atago/internal/assert"
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	mockrunner "github.com/nao1215/atago/internal/runner/mock"
@@ -19,6 +20,7 @@ import (
 	"github.com/nao1215/atago/internal/scrub"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 )
 
 // teardownInterruptTimeout bounds teardown execution after the run itself was
@@ -39,6 +41,13 @@ type Engine struct {
 	// UpdateSnapshots makes snapshot assertions write the snapshot file instead
 	// of comparing against it.
 	UpdateSnapshots bool
+	// snapshotWrites records what this run has written to each snapshot path, so
+	// two scenarios cannot claim one path with different content — which made an
+	// update run report green and leave the next verify run red. One Engine
+	// serves the whole run, so the record spans every spec file it executes,
+	// which is the scope the conflict actually lives in: two specs beside each
+	// other can name the same golden as easily as two scenarios can.
+	snapshotWrites *assert.SnapshotWrites
 
 	// Parallel is the maximum number of scenarios to run concurrently. Values
 	// < 1 mean sequential execution.
@@ -109,8 +118,21 @@ const defaultProbeTimeout = 30 * time.Second
 
 // New returns an Engine with the default command runner.
 func New() *Engine {
-	return &Engine{cmd: runnercmd.New(), builtins: builtinVars(), probeTimeout: defaultProbeTimeout}
+	return &Engine{
+		cmd:            runnercmd.New(),
+		builtins:       builtinVars(),
+		probeTimeout:   defaultProbeTimeout,
+		snapshotWrites: assert.NewSnapshotWrites(),
+	}
 }
+
+// SnapshotsUpdated reports how many distinct golden files this engine's run
+// rewrote under --update-snapshots. It comes from the recorder the writes
+// themselves go through, which is the only place that sees all of them: a walk
+// over the reported results misses a teardown, a suite lifecycle block, and the
+// repeat/retry iterations that are not the surviving one, and it counts a check
+// per matrix row where one file was written.
+func (e *Engine) SnapshotsUpdated() int { return e.snapshotWrites.Count() }
 
 // builtinVars are variables seeded into every scenario's store. ${atago} is the
 // absolute path of the running atago binary, which lets self-hosted E2E specs
@@ -118,7 +140,7 @@ func New() *Engine {
 func builtinVars() map[string]string {
 	m := make(map[string]string)
 	if exe, err := os.Executable(); err == nil {
-		m["atago"] = exe
+		m[store.BuiltinAtago] = exe
 	}
 	return m
 }
@@ -181,7 +203,7 @@ func (e *Engine) Run(ctx context.Context, s *spec.Spec, specPath string) *SuiteR
 	res.Scenarios = make([]ScenarioResult, 0, len(selected))
 	for _, i := range selected {
 		if !done[i] {
-			results[i] = ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusSkipped, SkipReason: unrunReason}
+			results[i] = ScenarioResult{Name: s.Scenarios[i].Name, Suite: s.Suite.Name, Status: StatusSkipped, SkipReason: unrunReason, NotRun: true}
 		}
 		res.Scenarios = append(res.Scenarios, results[i])
 		res.Status = worseStatus(res.Status, results[i].Status)
@@ -438,6 +460,42 @@ type runConfig struct {
 	// suiteMocks are the suite-wide stub HTTP servers (#24), threaded here so
 	// scenario `mock:` asserts can read their recorded requests.
 	suiteMocks []*mockrunner.Server
+	// snapshotWriter identifies who a snapshot claim belongs to. runScenario
+	// sets it on its own copy to the scenario's identity, so a path claimed
+	// twice under that name is one scenario's own repeat/retry attempt rather
+	// than two scenarios sharing a golden. The suite lifecycle leaves it at the
+	// suite-block label it sets for itself.
+	snapshotWriter string
+	// keepSnapshots freezes this scenario's snapshot goldens against
+	// --update-snapshots. runScenario sets it on its own copy for an
+	// expect_fail scenario, so it reaches every assert Env the scenario builds
+	// — the step loop, the retry `until` contexts, and http steps — while the
+	// suite lifecycle, which has no expect_fail, keeps updating.
+	keepSnapshots bool
+}
+
+// assertEnv builds the assertion context every checking site shares: the step
+// loop, the run/http retry `until` polls, and the suite lifecycle. It is the
+// one place the run-scoped fields are wired, because hand-built Envs are how
+// they go missing — the snapshot-freeze flag and the clash writer were each
+// added to some of the four sites and had to be chased into the rest. A site
+// with extra context (mock records) sets it on the returned value.
+func (e *Engine) assertEnv(rc runConfig, workdir, specDir string) assert.Env {
+	return assert.Env{
+		Workdir:         workdir,
+		SpecDir:         specDir,
+		UpdateSnapshots: e.UpdateSnapshots,
+		SnapshotWrites:  e.snapshotWrites,
+		Writer:          rc.snapshotWriter,
+		KeepSnapshots:   rc.keepSnapshots,
+		Secrets:         rc.masker.MaskBytes,
+		Scrub:           rc.scrubber.Apply,
+		// Named explicitly, not omitted: the mock records are the one field a
+		// caller supplies afterwards, because only the scenario step path has them.
+		// Spelling the nil out keeps this constructor exhaustive, which is what
+		// stops the next run-scoped field from reaching three of the four sites.
+		MockRecords: nil,
+	}
 }
 
 // absPath makes a path absolute for use as a spec variable, falling back to the

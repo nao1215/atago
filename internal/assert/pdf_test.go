@@ -365,6 +365,95 @@ func TestParsePDF_PageContentIsNotMetadata(t *testing.T) {
 	}
 }
 
+// TestParsePDF_StoredDeflateBlockIsNotMetadata is the deterministic form of the
+// scenario above. TestParsePDF_PageContentIsNotMetadata compresses its payload
+// with zlib and so depends on what compress/flate decides to emit: through Go
+// 1.26 that was a compressed block, which hid the bug because the literal
+// "/Title(" never appeared in the file; Go 1.27 emits a STORED block for a
+// payload this short, putting the drawn text in the file verbatim and letting
+// the raw scan read it as the document's title.
+//
+// A real producer can emit a stored block at any time, so the toolchain must not
+// be what decides whether this is caught. Here the stream is stored explicitly:
+// a zlib header, a final stored block, and the Adler-32 checksum, which inflates
+// to the same bytes on every Go release.
+func TestParsePDF_StoredDeflateBlockIsNotMetadata(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte("BT (/Title(Drawn On The Page)) Tj ET")
+	var stream bytes.Buffer
+	stream.Write([]byte{0x78, 0x01}) // zlib header, no preset dictionary
+	stream.WriteByte(0x01)           // final block, stored
+	n := uint16(len(payload))
+	stream.WriteByte(byte(n))
+	stream.WriteByte(byte(n >> 8))
+	stream.WriteByte(byte(^n))
+	stream.WriteByte(byte(^n >> 8))
+	stream.Write(payload)
+	var a, b uint32 = 1, 0
+	for _, c := range payload {
+		a = (a + uint32(c)) % 65521
+		b = (b + a) % 65521
+	}
+	adler := b<<16 | a
+	stream.Write([]byte{byte(adler >> 24), byte(adler >> 16), byte(adler >> 8), byte(adler)})
+
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.5\n1 0 obj\n<< /Type /Page /Contents 2 0 R >>\nendobj\n")
+	pdf.WriteString("2 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(stream.Bytes())
+	pdf.WriteString("\nendstream\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n")
+
+	// The premise of the test: the drawn text really is in the file verbatim.
+	if !bytes.Contains(pdf.Bytes(), []byte("/Title(Drawn On The Page)")) {
+		t.Fatal("the stored block did not carry the payload verbatim; the test no longer covers what it claims")
+	}
+
+	doc := parsePDF(pdf.Bytes())
+	if got, ok := doc.metadata["title"]; ok {
+		t.Errorf("title = %q, want no metadata from a page content stream", got)
+	}
+	if !strings.Contains(doc.text, "Drawn On The Page") {
+		t.Errorf("text = %q, want the drawn text to still be extracted", doc.text)
+	}
+}
+
+// TestParsePDF_TrailerMetadataSurvivesMasking pins the other side of the mask:
+// blanking stream payloads must not cost the Info dictionary that sits outside
+// them, which is where a PDF 1.4-style writer leaves it.
+func TestParsePDF_TrailerMetadataSurvivesMasking(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte("BT (some drawn words) Tj ET")
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	if _, err := zw.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var pdf bytes.Buffer
+	pdf.WriteString("%PDF-1.5\n1 0 obj\n<< /Type /Page /Contents 2 0 R >>\nendobj\n")
+	pdf.WriteString("2 0 obj\n<< /Filter /FlateDecode >>\nstream\n")
+	pdf.Write(buf.Bytes())
+	pdf.WriteString("\nendstream\nendobj\n")
+	pdf.WriteString("3 0 obj\n<< /Title (The Real Title) /Author (A Person) >>\nendobj\n")
+	pdf.WriteString("trailer\n<< /Root 1 0 R /Info 3 0 R >>\n%%EOF\n")
+
+	doc := parsePDF(pdf.Bytes())
+	if got := doc.metadata["title"]; got != "The Real Title" {
+		t.Errorf("title = %q, want the trailer value", got)
+	}
+	if got := doc.metadata["author"]; got != "A Person" {
+		t.Errorf("author = %q, want the trailer value", got)
+	}
+	if !strings.Contains(doc.text, "some drawn words") {
+		t.Errorf("text = %q, want the drawn text to still be extracted", doc.text)
+	}
+}
+
 // TestParsePDF_StreamWithoutTrailingNewline is a regression: ISO 32000
 // recommends an EOL before `endstream` but does not require one, and
 // Ghostscript omits it. Requiring the newline made the scan run past the true

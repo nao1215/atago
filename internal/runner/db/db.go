@@ -11,10 +11,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 
 	_ "github.com/go-sql-driver/mysql" // mysql driver (pure Go)
@@ -31,6 +35,16 @@ type Config struct {
 	DataSource string
 	// Timeout bounds a single query; zero means no timeout.
 	Timeout time.Duration
+	// Hosts are the "host" or "host:port" peers the DSN may dial, so the engine
+	// can hold a db connection to permissions.network.allow the way it already
+	// holds an http, grpc, or ssh one. It is empty when the DSN names no network
+	// peer — a sqlite file, a unix socket — and when the DSN leaves the peer
+	// implicit, because the hosts to check are the ones the spec names, not ones
+	// inferred from a driver's defaults. It holds more than one entry when the
+	// DSN names more than one peer (a libpq failover list, or a host paired with
+	// a hostaddr): each is somewhere the driver may connect, so all of them must
+	// clear the policy (#497).
+	Hosts []string
 }
 
 // Resolve derives a Config from a runner's optional driver and its dsn. When
@@ -39,7 +53,7 @@ type Config struct {
 // driver.
 func Resolve(driver, dsn string) (Config, error) {
 	if strings.TrimSpace(dsn) == "" {
-		return Config{}, fmt.Errorf("db runner requires a dsn")
+		return Config{}, diag.RunnerConfigIncomplete.Errorf("db runner requires a dsn")
 	}
 	drv, err := resolveDriver(driver, dsn)
 	if err != nil {
@@ -49,7 +63,205 @@ func Resolve(driver, dsn string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Driver: drv, DataSource: ds}, nil
+	return Config{Driver: drv, DataSource: ds, Hosts: dsnHosts(drv, dsn)}, nil
+}
+
+// dsnHosts returns every network peer a DSN may dial, each as "host" or
+// "host:port". It returns none when the DSN dials none.
+//
+// It reads the DSN the spec wrote rather than asking the driver, because the
+// answer is needed BEFORE opening: database/sql connects lazily, so by the time
+// a driver could report its peer the connection to the denied host has already
+// been made. Only explicitly named hosts are returned — a sqlite path, a unix
+// socket, and a form that leaves the peer to the driver's default all yield
+// nothing — so the check never denies a spec over a host the spec does not name.
+func dsnHosts(driver, dsn string) []string {
+	switch driver {
+	case "sqlite":
+		return nil // a file path, not a peer
+	case "postgres":
+		if u, err := url.Parse(dsn); err == nil && u.Host != "" {
+			return []string{u.Host}
+		}
+		return keywordDSNHosts(dsn)
+	case "mysql":
+		if strings.HasPrefix(dsn, "mysql://") {
+			if u, err := url.Parse(dsn); err == nil && u.Host != "" {
+				return []string{u.Host}
+			}
+			return nil
+		}
+		return nonEmpty(nativeMySQLHost(dsn))
+	default:
+		return nil
+	}
+}
+
+// nonEmpty wraps a single host in a slice, or returns none for an empty one.
+func nonEmpty(host string) []string {
+	if host == "" {
+		return nil
+	}
+	return []string{host}
+}
+
+// keywordDSNHosts pulls every peer out of a libpq keyword/value DSN
+// ("host=db.example port=5432 user=u").
+//
+// Both `host` and `hostaddr` are read: they are alternative spellings of the
+// same peer, and when a DSN carries both, lib/pq dials the hostaddr and keeps
+// the host only as a name for authentication — so reading just one of them
+// leaves an address the policy never saw (#497). Each may also be a
+// comma-separated failover list, whose entries the driver tries in turn, with
+// `port` either a matching list or one port shared by all. An entry beginning
+// with '/' is a unix socket directory, which reaches no network.
+func keywordDSNHosts(dsn string) []string {
+	opts := keywordDSNOptions(dsn)
+	ports := splitDSNList(opts["port"])
+	var out []string
+	for _, key := range []string{"host", "hostaddr"} {
+		for i, host := range splitDSNList(opts[key]) {
+			if host == "" || strings.HasPrefix(host, "/") {
+				continue
+			}
+			if port := portAt(ports, i); port != "" {
+				host = net.JoinHostPort(host, port)
+			}
+			if !slices.Contains(out, host) {
+				out = append(out, host)
+			}
+		}
+	}
+	return out
+}
+
+// splitDSNList splits a libpq comma-separated value (a host or port failover
+// list) into its entries. An empty value is no entries rather than one empty.
+func splitDSNList(v string) []string {
+	if v == "" {
+		return nil
+	}
+	return strings.Split(v, ",")
+}
+
+// portAt returns the port libpq pairs with the i-th host: a single port applies
+// to every host, otherwise the ports line up with the hosts by position.
+func portAt(ports []string, i int) string {
+	switch {
+	case len(ports) == 1:
+		return ports[0]
+	case i < len(ports):
+		return ports[i]
+	default:
+		return ""
+	}
+}
+
+// keywordDSNOptions tokenises a libpq keyword/value connection string into its
+// keyword/value pairs, lowercasing the keywords.
+//
+// It follows libpq's own syntax rather than splitting on whitespace: whitespace
+// may surround the '=', a value may be single-quoted (so that it can contain
+// spaces), and a backslash escapes the next character inside or outside the
+// quotes. Splitting on spaces instead both kept the quotes as part of the value
+// — denying a host the policy allowed — and mis-split the fields around a
+// legitimately quoted space (#497).
+//
+// A malformed tail is ignored: the driver reports a bad DSN far better than a
+// host extractor could, and the keywords already read are still worth checking.
+func keywordDSNOptions(dsn string) map[string]string {
+	opts := make(map[string]string)
+	s := &dsnScanner{r: []rune(dsn)}
+	for {
+		key, ok := s.keyword()
+		if !ok {
+			return opts
+		}
+		value := s.value()
+		if key != "" {
+			opts[key] = value
+		}
+	}
+}
+
+// dsnScanner walks a libpq keyword/value connection string token by token.
+type dsnScanner struct {
+	r []rune
+	i int
+}
+
+func (s *dsnScanner) skipSpace() {
+	for s.i < len(s.r) && unicode.IsSpace(s.r[s.i]) {
+		s.i++
+	}
+}
+
+// keyword reads the next keyword and consumes the '=' that follows it. It
+// reports false at the end of the string, and for a keyword carrying no value —
+// which libpq rejects outright, so there is nothing further worth reading.
+func (s *dsnScanner) keyword() (string, bool) {
+	s.skipSpace()
+	start := s.i
+	for s.i < len(s.r) && s.r[s.i] != '=' && !unicode.IsSpace(s.r[s.i]) {
+		s.i++
+	}
+	key := strings.ToLower(string(s.r[start:s.i]))
+	s.skipSpace()
+	if s.i >= len(s.r) || s.r[s.i] != '=' {
+		return "", false
+	}
+	s.i++
+	return key, true
+}
+
+// value reads the value after an '=': single-quoted, where a space is literal
+// and the value ends at the closing quote, or bare, where it ends at the next
+// space. A backslash escapes the next character in either form.
+func (s *dsnScanner) value() string {
+	s.skipSpace()
+	quoted := s.i < len(s.r) && s.r[s.i] == '\''
+	if quoted {
+		s.i++
+	}
+	var b strings.Builder
+	for s.i < len(s.r) {
+		c := s.r[s.i]
+		if quoted && c == '\'' {
+			s.i++ // the closing quote
+			break
+		}
+		if !quoted && unicode.IsSpace(c) {
+			break
+		}
+		if c == '\\' && s.i+1 < len(s.r) {
+			s.i++
+			c = s.r[s.i]
+		}
+		b.WriteRune(c)
+		s.i++
+	}
+	return b.String()
+}
+
+// nativeMySQLHost pulls the address out of a go-sql-driver native DSN
+// ("user:pass@tcp(db.example:3306)/app"). Only the tcp protocol reaches the
+// network; unix() is a socket, and a DSN naming no protocol leaves the peer to
+// the driver.
+func nativeMySQLHost(dsn string) string {
+	at := strings.LastIndex(dsn, "@")
+	rest := dsn
+	if at >= 0 {
+		rest = dsn[at+1:]
+	}
+	lparen := strings.Index(rest, "(")
+	rparen := strings.Index(rest, ")")
+	if lparen < 0 || rparen < lparen {
+		return ""
+	}
+	if !strings.EqualFold(rest[:lparen], "tcp") {
+		return ""
+	}
+	return rest[lparen+1 : rparen]
 }
 
 // Runner holds an open database/sql pool for one db runner.
@@ -63,7 +275,7 @@ type Runner struct {
 func Open(cfg Config) (*Runner, error) {
 	db, err := sql.Open(cfg.Driver, cfg.DataSource)
 	if err != nil {
-		return nil, fmt.Errorf("opening %s database: %w", cfg.Driver, err)
+		return nil, diag.ConnectFailed.Errorf("opening %s database: %w", cfg.Driver, err)
 	}
 	// A scenario runs its queries sequentially against its own pool, so a single
 	// connection is sufficient — and it is required for correctness with an
@@ -90,7 +302,7 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 	if isRowReturning(query) {
 		rows, err := r.db.QueryContext(ctx, query)
 		if err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
+			return nil, diag.RemoteRejected.Errorf("query failed: %w", err)
 		}
 		defer func() { _ = rows.Close() }()
 		data, err := rowsToJSON(rows)
@@ -98,14 +310,14 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 			return nil, err
 		}
 		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("reading rows: %w", err)
+			return nil, diag.ResponseUnreadable.Errorf("reading rows: %w", err)
 		}
 		return &runner.Result{Command: query, IsDB: true, RowsJSON: data, Duration: time.Since(start)}, nil
 	}
 
 	res, err := r.db.ExecContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("exec failed: %w", err)
+		return nil, diag.CommandNotStarted.Errorf("exec failed: %w", err)
 	}
 	affected, _ := res.RowsAffected() // not all drivers report it; best effort
 	return &runner.Result{Command: query, IsDB: true, RowsJSON: []byte("[]"), RowsAffected: affected, Duration: time.Since(start)}, nil
@@ -117,7 +329,7 @@ func (r *Runner) Query(ctx context.Context, query string) (*runner.Result, error
 func rowsToJSON(rows *sql.Rows) ([]byte, error) {
 	cols, err := rows.Columns()
 	if err != nil {
-		return nil, fmt.Errorf("reading columns: %w", err)
+		return nil, diag.ResponseUnreadable.Errorf("reading columns: %w", err)
 	}
 	out := make([]map[string]any, 0)
 	for rows.Next() {
@@ -127,7 +339,7 @@ func rowsToJSON(rows *sql.Rows) ([]byte, error) {
 			ptrs[i] = &vals[i]
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			return nil, fmt.Errorf("scanning row: %w", err)
+			return nil, diag.ResponseUnreadable.Errorf("scanning row: %w", err)
 		}
 		m := make(map[string]any, len(cols))
 		for i, c := range cols {
@@ -307,13 +519,13 @@ func resolveDriver(driver, dsn string) (string, error) {
 	if strings.TrimSpace(driver) == "" {
 		drv := driverForScheme(schemeOf(dsn))
 		if drv == "" {
-			return "", fmt.Errorf("cannot infer db driver from dsn %q; set runner.driver to sqlite, postgres, or mysql", dsn)
+			return "", diag.BadEndpoint.Errorf("cannot infer db driver from dsn %q; set runner.driver to sqlite, postgres, or mysql", dsn)
 		}
 		return drv, nil
 	}
 	drv := canonicalDriver(driver)
 	if drv == "" {
-		return "", fmt.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
+		return "", diag.BadEndpoint.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
 	}
 	return drv, nil
 }
@@ -327,7 +539,7 @@ func ValidateDriver(driver string) error {
 		return nil
 	}
 	if canonicalDriver(driver) == "" {
-		return fmt.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
+		return diag.BadEndpoint.Errorf("unsupported runner.driver %q; use sqlite, postgres, or mysql (aliases: sqlite3, postgresql, pgx)", driver)
 	}
 	return nil
 }
@@ -392,7 +604,7 @@ func dataSource(driver, dsn string) (string, error) {
 func mysqlNativeDSN(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", fmt.Errorf("invalid mysql dsn %q: %w", raw, err)
+		return "", diag.BadEndpoint.Errorf("invalid mysql dsn %q: %w", raw, err)
 	}
 	var b strings.Builder
 	if u.User != nil {

@@ -2064,12 +2064,14 @@
   - [describes itself with --help](#scenario-describes-itself-with---help-214)
 - [mimixbox wall](#mimixbox-wall) — 1 scenario
   - [runs and exits successfully](#scenario-runs-and-exits-successfully-2)
+
 ## mimixbox ar
 Source: `test/e2e/tools/mimixbox/archival/ar.atago.yaml`
 ### Scenario: lists members
 #### Given
 - Fixture file `a.txt` is created.
 - Fixture file `b.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2087,9 +2089,11 @@ ar rc lib.a a.txt b.txt && ar t lib.a
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: extracts a member
 #### Given
 - Fixture file `a.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2102,6 +2106,7 @@ ar rc lib2.a a.txt && mkdir -p out && cd out && ar x ../lib2.a && cat a.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox bunzip2
 Source: `test/e2e/tools/mimixbox/archival/bunzip2.atago.yaml`
 ### Scenario: decompresses a .bz2 file to stdout with -c
@@ -2112,6 +2117,7 @@ printf 'bunzip2 payload' | bzip2 -c > data.bz2 && bunzip2 -c data.bz2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox bzcat
 Source: `test/e2e/tools/mimixbox/archival/bzcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2123,6 +2129,7 @@ bzcat --help
 - exit code is `0`
 - stdout contains `Usage: bzcat`
 - stderr is empty
+
 ## mimixbox bzip2
 Source: `test/e2e/tools/mimixbox/archival/bzip2.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2134,11 +2141,13 @@ bzip2 --help
 - exit code is `0`
 - stdout contains `Usage: bzip2`
 - stderr is empty
+
 ## mimixbox compress and uncompress
 Source: `test/e2e/tools/mimixbox/archival/compress.atago.yaml`
 ### Scenario: round-trips a file through compress and uncompress
 #### Given
 - Fixture file `data.txt` is created.
+
 #### Inputs
 _Fixture `data.txt`:_
 ```text
@@ -2151,11 +2160,13 @@ cp data.txt rt.txt && compress rt.txt && uncompress rt.txt.Z && cat rt.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cpio
 Source: `test/e2e/tools/mimixbox/archival/cpio.atago.yaml`
 ### Scenario: round-trips a file through -o and -i
 #### Given
 - Fixture file `in/file.txt` is created.
+
 #### Inputs
 _Fixture `in/file.txt`:_
 ```text
@@ -2174,9 +2185,11 @@ cat file.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lists archive contents with -i -t
 #### Given
 - Fixture file `in/file.txt` is created.
+
 #### Inputs
 _Fixture `in/file.txt`:_
 ```text
@@ -2193,6 +2206,7 @@ cpio -i -t < arch2.cpio
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox bzip2, lzop and Debian package applets
 Source: `test/e2e/tools/mimixbox/archival/debcomp.atago.yaml`
 ### Scenario: bzip2 | bzip2 -dc round-trips data
@@ -2203,6 +2217,7 @@ printf 'roundtrip-bzip2\n' | bzip2 | bzip2 -dc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lzop | lzopcat round-trips data
 #### When
 ```shell
@@ -2211,6 +2226,7 @@ printf 'roundtrip-lzop\n' | lzop | lzopcat
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lzop | unlzop -c round-trips data
 #### When
 ```shell
@@ -2219,9 +2235,11 @@ printf 'roundtrip-unlzop\n' | lzop | unlzop -c
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: dpkg-deb -c lists package contents
 #### Given
 - Fixture file `hello.deb` is created.
+
 #### When
 ```shell
 dpkg-deb -c hello.deb | grep -q 'usr/bin/hello' && printf 'has-hello\n'
@@ -2229,9 +2247,11 @@ dpkg-deb -c hello.deb | grep -q 'usr/bin/hello' && printf 'has-hello\n'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: dpkg-deb -f prints a control field
 #### Given
 - Fixture file `hello.deb` is created.
+
 #### When
 ```shell
 dpkg-deb -f hello.deb Package
@@ -2239,9 +2259,11 @@ dpkg-deb -f hello.deb Package
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: dpkg -x extracts the data tarball path-safely
 #### Given
 - Fixture file `hello.deb` is created.
+
 #### When
 ```shell
 dpkg -x hello.deb out
@@ -2251,9 +2273,11 @@ test -f out/usr/bin/hello && printf 'extracted\n'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: dpkg rejects unsupported database operations
 #### Given
 - Fixture file `hello.deb` is created.
+
 #### When
 ```shell
 if dpkg -i hello.deb 2>/dev/null; then
@@ -2266,6 +2290,7 @@ fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox dpkg-deb
 Source: `test/e2e/tools/mimixbox/archival/dpkg-deb.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2277,6 +2302,7 @@ dpkg-deb --help
 - exit code is `0`
 - stdout contains `Usage: dpkg-deb`
 - stderr is empty
+
 ## mimixbox dpkg
 Source: `test/e2e/tools/mimixbox/archival/dpkg.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2288,6 +2314,7 @@ dpkg --help
 - exit code is `0`
 - stdout contains `Usage: dpkg`
 - stderr is empty
+
 ## mimixbox gunzip
 Source: `test/e2e/tools/mimixbox/archival/gunzip.atago.yaml`
 ### Scenario: decompresses a .gz file to stdout with -c
@@ -2298,6 +2325,7 @@ printf 'gunzip payload' > data && gzip data && gunzip -c data.gz
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox archival commands expose a dedicated --help helper
 Source: `test/e2e/tools/mimixbox/archival/help_helpers_archival.atago.yaml`
 ### Scenario: bzcat --help is structured
@@ -2308,6 +2336,7 @@ bzcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: bzip2 --help is structured
 #### When
 ```shell
@@ -2316,6 +2345,7 @@ bzip2 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dpkg --help is structured
 #### When
 ```shell
@@ -2324,6 +2354,7 @@ dpkg --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dpkg-deb --help is structured
 #### When
 ```shell
@@ -2332,6 +2363,7 @@ dpkg-deb --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lzcat --help is structured
 #### When
 ```shell
@@ -2340,6 +2372,7 @@ lzcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lzma --help is structured
 #### When
 ```shell
@@ -2348,6 +2381,7 @@ lzma --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lzopcat --help is structured
 #### When
 ```shell
@@ -2356,6 +2390,7 @@ lzopcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: pipe_progress --help is structured
 #### When
 ```shell
@@ -2364,6 +2399,7 @@ pipe_progress --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: rpm2cpio --help is structured
 #### When
 ```shell
@@ -2372,6 +2408,7 @@ rpm2cpio --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: uncompress --help is structured
 #### When
 ```shell
@@ -2380,6 +2417,7 @@ uncompress --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: unlzma --help is structured
 #### When
 ```shell
@@ -2388,6 +2426,7 @@ unlzma --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: unlzop --help is structured
 #### When
 ```shell
@@ -2396,6 +2435,7 @@ unlzop --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: unxz --help is structured
 #### When
 ```shell
@@ -2404,6 +2444,7 @@ unxz --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: unzip --help is structured
 #### When
 ```shell
@@ -2412,6 +2453,7 @@ unzip --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: xz --help is structured
 #### When
 ```shell
@@ -2420,6 +2462,7 @@ xz --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: xzcat --help is structured
 #### When
 ```shell
@@ -2428,6 +2471,7 @@ xzcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: zcat --help is structured
 #### When
 ```shell
@@ -2436,11 +2480,13 @@ zcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox rpm and rpm2cpio
 Source: `test/e2e/tools/mimixbox/archival/rpm.atago.yaml`
 ### Scenario: queries the package identity with rpm -qp
 #### Given
 - Fixture file `sample.rpm` is created.
+
 #### When
 ```shell
 rpm -qp sample.rpm
@@ -2448,9 +2494,11 @@ rpm -qp sample.rpm
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lists package files with rpm -qpl
 #### Given
 - Fixture file `sample.rpm` is created.
+
 #### When
 ```shell
 rpm -qpl sample.rpm
@@ -2459,9 +2507,11 @@ rpm -qpl sample.rpm
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: extracts the payload with rpm2cpio
 #### Given
 - Fixture file `sample.rpm` is created.
+
 #### When
 ```shell
 rpm2cpio sample.rpm
@@ -2469,6 +2519,7 @@ rpm2cpio sample.rpm
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox rpm2cpio
 Source: `test/e2e/tools/mimixbox/archival/rpm2cpio.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2480,11 +2531,13 @@ rpm2cpio --help
 - exit code is `0`
 - stdout contains `Usage: rpm2cpio`
 - stderr is empty
+
 ## mimixbox tar
 Source: `test/e2e/tools/mimixbox/archival/tar.atago.yaml`
 ### Scenario: creates and extracts an archive
 #### Given
 - Fixture file `src/a.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2501,9 +2554,11 @@ cat dest/src/a.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lists archive contents
 #### Given
 - Fixture file `src/a.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -2518,6 +2573,7 @@ tar -t -f list.tar
 #### Then
 - exit code is `0`
 - stdout contains `src/a.txt`
+
 ## mimixbox uncompress
 Source: `test/e2e/tools/mimixbox/archival/uncompress.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2529,6 +2585,7 @@ uncompress --help
 - exit code is `0`
 - stdout contains `Usage: uncompress`
 - stderr is empty
+
 ## mimixbox unlzma
 Source: `test/e2e/tools/mimixbox/archival/unlzma.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2540,6 +2597,7 @@ unlzma --help
 - exit code is `0`
 - stdout contains `Usage: unlzma`
 - stderr is empty
+
 ## mimixbox unlzop
 Source: `test/e2e/tools/mimixbox/archival/unlzop.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2551,6 +2609,7 @@ unlzop --help
 - exit code is `0`
 - stdout contains `Usage: unlzop`
 - stderr is empty
+
 ## mimixbox unxz
 Source: `test/e2e/tools/mimixbox/archival/unxz.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2562,6 +2621,7 @@ unxz --help
 - exit code is `0`
 - stdout contains `Usage: unxz`
 - stderr is empty
+
 ## mimixbox unzip
 Source: `test/e2e/tools/mimixbox/archival/unzip.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2573,6 +2633,7 @@ unzip --help
 - exit code is `0`
 - stdout contains `Usage: unzip`
 - stderr is empty
+
 ## mimixbox xz
 Source: `test/e2e/tools/mimixbox/archival/xz.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2584,6 +2645,7 @@ xz --help
 - exit code is `0`
 - stdout contains `Usage: xz`
 - stderr is empty
+
 ## mimixbox xzcat
 Source: `test/e2e/tools/mimixbox/archival/xzcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2595,6 +2657,7 @@ xzcat --help
 - exit code is `0`
 - stdout contains `Usage: xzcat`
 - stderr is empty
+
 ## mimixbox compression applets
 Source: `test/e2e/tools/mimixbox/archival/xzcomp.atago.yaml`
 ### Scenario: xz | xzcat round-trips data
@@ -2605,6 +2668,7 @@ printf 'roundtrip-xz\n' | xz | xzcat
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lzma | unlzma round-trips data
 #### When
 ```shell
@@ -2613,6 +2677,7 @@ printf 'roundtrip-lzma\n' | lzma | unlzma
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: zcat decompresses a gzip file to stdout
 #### When
 ```shell
@@ -2621,6 +2686,7 @@ printf 'gz-payload\n' | gzip > f.gz && zcat f.gz
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: pipe_progress passes stdin through to stdout
 #### When
 ```shell
@@ -2629,6 +2695,7 @@ printf 'pass-through\n' | pipe_progress 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox zcat
 Source: `test/e2e/tools/mimixbox/archival/zcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2640,11 +2707,13 @@ zcat --help
 - exit code is `0`
 - stdout contains `Usage: zcat`
 - stderr is empty
+
 ## mimixbox zip and unzip
 Source: `test/e2e/tools/mimixbox/archival/zip.atago.yaml`
 ### Scenario: lists a zipped file via unzip -l
 #### Given
 - Fixture file `a.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2657,9 +2726,11 @@ zip out.zip a.txt >/dev/null && unzip -l out.zip
 #### Then
 - exit code is `0`
 - stdout contains `a.txt`
+
 ### Scenario: round-trips a file through zip and unzip
 #### Given
 - Fixture file `a.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -2675,6 +2746,7 @@ cat dest/a.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox [
 Source: `test/e2e/tools/mimixbox/compat/[.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2686,6 +2758,7 @@ Source: `test/e2e/tools/mimixbox/compat/[.atago.yaml`
 - exit code is `0`
 - stdout contains `Usage: [`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2694,6 +2767,7 @@ Source: `test/e2e/tools/mimixbox/compat/[.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `Evaluate EXPRESSION`
+
 ## mimixbox [[
 Source: `test/e2e/tools/mimixbox/compat/[[.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2705,6 +2779,7 @@ Source: `test/e2e/tools/mimixbox/compat/[[.atago.yaml`
 - exit code is `0`
 - stdout contains `Usage: [[`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2713,6 +2788,7 @@ Source: `test/e2e/tools/mimixbox/compat/[[.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `Evaluate EXPRESSION`
+
 ## mimixbox ash
 Source: `test/e2e/tools/mimixbox/compat/ash.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2724,6 +2800,7 @@ ash --help
 - exit code is `0`
 - stdout contains `Usage: ash`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2732,6 +2809,7 @@ ash --help
 #### Then
 - exit code is `0`
 - stdout contains `compatibility front-end over MimixBox`
+
 ## mimixbox bash
 Source: `test/e2e/tools/mimixbox/compat/bash.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2743,6 +2821,7 @@ bash --help
 - exit code is `0`
 - stdout contains `Usage: bash`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2751,6 +2830,7 @@ bash --help
 #### Then
 - exit code is `0`
 - stdout contains `compatibility front-end over MimixBox`
+
 ## mimixbox busybox
 Source: `test/e2e/tools/mimixbox/compat/busybox.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2762,6 +2842,7 @@ busybox --help
 - exit code is `0`
 - stdout contains `Usage: busybox`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2770,6 +2851,7 @@ busybox --help
 #### Then
 - exit code is `0`
 - stdout contains `multi-call front-end`
+
 ## mimixbox compat front-ends
 Source: `test/e2e/tools/mimixbox/compat/compat.atago.yaml`
 ### Scenario: the [ alias returns true for an existing file
@@ -2780,6 +2862,7 @@ mimixbox '[' -f /etc/hosts ']' && echo yes || echo no
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: the [ alias returns false for a missing file
 #### When
 ```shell
@@ -2788,9 +2871,11 @@ mimixbox '[' -f /no/such/mimixbox/file ']' && echo yes || echo no
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: busybox dispatches to an applet
 #### Given
 - Fixture file `f` is created.
+
 #### Inputs
 _Fixture `f`:_
 ```text
@@ -2803,6 +2888,7 @@ busybox cat f
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: busybox --list shows applets
 #### When
 ```shell
@@ -2812,6 +2898,7 @@ busybox --list
 - exit code is `0`
 - stdout contains `cat`
 - stdout contains `busybox`
+
 ### Scenario: sh -c runs a command without a prompt
 #### When
 ```shell
@@ -2820,6 +2907,7 @@ sh -c 'echo from-sh'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: bash reads a non-interactive script from stdin without a prompt
 #### When
 ```shell
@@ -2834,6 +2922,7 @@ esac
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cttyhack
 Source: `test/e2e/tools/mimixbox/compat/cttyhack.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2845,6 +2934,7 @@ cttyhack --help
 - exit code is `0`
 - stdout contains `Usage: cttyhack`
 - stderr is empty
+
 ## mimixbox compat commands expose a dedicated --help helper
 Source: `test/e2e/tools/mimixbox/compat/help_helpers_compat.atago.yaml`
 ### Scenario: [ --help is structured
@@ -2855,6 +2945,7 @@ Source: `test/e2e/tools/mimixbox/compat/help_helpers_compat.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: [[ --help is structured
 #### When
 ```shell
@@ -2863,6 +2954,7 @@ Source: `test/e2e/tools/mimixbox/compat/help_helpers_compat.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ash --help is structured
 #### When
 ```shell
@@ -2871,6 +2963,7 @@ ash --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: bash --help is structured
 #### When
 ```shell
@@ -2879,6 +2972,7 @@ bash --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: busybox --help is structured
 #### When
 ```shell
@@ -2887,6 +2981,7 @@ busybox --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: cttyhack --help is structured
 #### When
 ```shell
@@ -2895,6 +2990,7 @@ cttyhack --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: hush --help is structured
 #### When
 ```shell
@@ -2903,6 +2999,7 @@ hush --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: unit --help is structured
 #### When
 ```shell
@@ -2911,6 +3008,7 @@ unit --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox hush
 Source: `test/e2e/tools/mimixbox/compat/hush.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2922,6 +3020,7 @@ hush --help
 - exit code is `0`
 - stdout contains `Usage: hush`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2930,6 +3029,7 @@ hush --help
 #### Then
 - exit code is `0`
 - stdout contains `compatibility front-end over MimixBox`
+
 ## mimixbox sh
 Source: `test/e2e/tools/mimixbox/compat/sh.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2941,6 +3041,7 @@ env sh --help
 - exit code is `0`
 - stdout contains `Usage: sh`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2949,6 +3050,7 @@ env sh --help
 #### Then
 - exit code is `0`
 - stdout contains `compatibility front-end over MimixBox`
+
 ## mimixbox unit
 Source: `test/e2e/tools/mimixbox/compat/unit.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2960,6 +3062,7 @@ unit --help
 - exit code is `0`
 - stdout contains `Usage: unit`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -2968,6 +3071,7 @@ unit --help
 #### Then
 - exit code is `0`
 - stdout contains `does not embed`
+
 ## mimixbox adjtimex
 Source: `test/e2e/tools/mimixbox/console-tools/adjtimex.atago.yaml`
 ### Scenario: describes itself with --help
@@ -2979,6 +3083,7 @@ adjtimex --help
 - exit code is `0`
 - stdout contains `Usage: adjtimex`
 - stderr is empty
+
 ## mimixbox ascii
 Source: `test/e2e/tools/mimixbox/console-tools/ascii.atago.yaml`
 ### Scenario: prints 128 entries
@@ -2989,6 +3094,7 @@ ascii | grep -c .
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: maps code 65 to A
 #### When
 ```shell
@@ -2997,6 +3103,7 @@ ascii | grep '0x41' | grep -c 'A'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox bbconfig
 Source: `test/e2e/tools/mimixbox/console-tools/bbconfig.atago.yaml`
 ### Scenario: prints the version line
@@ -3007,6 +3114,7 @@ bbconfig | grep -c 'CONFIG_MIMIXBOX_VERSION='
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lists itself among the applets
 #### When
 ```shell
@@ -3015,6 +3123,7 @@ bbconfig --names | grep -c '^bbconfig$'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects an unexpected argument
 #### When
 ```shell
@@ -3022,6 +3131,7 @@ bbconfig extra
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox beep
 Source: `test/e2e/tools/mimixbox/console-tools/beep.atago.yaml`
 ### Scenario: rejects a non-positive frequency
@@ -3031,6 +3141,7 @@ beep -f 0
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: rejects a zero repeat count
 #### When
 ```shell
@@ -3038,6 +3149,7 @@ beep -r 0
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox chat
 Source: `test/e2e/tools/mimixbox/console-tools/chat.atago.yaml`
 ### Scenario: sends the reply after the expected string
@@ -3048,6 +3160,7 @@ printf 'OK' | chat OK GO | grep -c 'GO'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a script
 #### When
 ```shell
@@ -3055,6 +3168,7 @@ chat
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: fails when an expected string never arrives
 #### Inputs
 _stdin for `chat`:_
@@ -3067,6 +3181,7 @@ chat LOGIN: user
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox chvt
 Source: `test/e2e/tools/mimixbox/console-tools/chvt.atago.yaml`
 ### Scenario: rejects a non-numeric VT
@@ -3076,6 +3191,7 @@ chvt notanumber
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: requires a VT number
 #### When
 ```shell
@@ -3083,6 +3199,7 @@ chvt
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox clear
 Source: `test/e2e/tools/mimixbox/console-tools/clear.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -3093,6 +3210,7 @@ clear --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: clear`
+
 ### Scenario: exits 0 when clearing the screen
 #### When
 ```shell
@@ -3100,6 +3218,7 @@ clear
 ```
 #### Then
 - exit code is `0`
+
 ## mimixbox conspy
 Source: `test/e2e/tools/mimixbox/console-tools/conspy.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3111,6 +3230,7 @@ conspy --help
 - exit code is `0`
 - stdout contains `Usage: conspy`
 - stderr is empty
+
 ## mimixbox deallocvt
 Source: `test/e2e/tools/mimixbox/console-tools/deallocvt.atago.yaml`
 ### Scenario: rejects a non-numeric VT
@@ -3120,6 +3240,7 @@ deallocvt notanumber
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -3128,6 +3249,7 @@ deallocvt --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: deallocvt`, `virtual terminal`
+
 ## mimixbox dumpkmap
 Source: `test/e2e/tools/mimixbox/console-tools/dumpkmap.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3139,6 +3261,7 @@ dumpkmap --help
 - exit code is `0`
 - stdout contains `Usage: dumpkmap`
 - stderr is empty
+
 ## mimixbox fgconsole
 Source: `test/e2e/tools/mimixbox/console-tools/fgconsole.atago.yaml`
 ### Scenario: fails without a virtual console
@@ -3148,6 +3271,7 @@ fgconsole
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -3156,6 +3280,7 @@ fgconsole --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fgconsole`, `virtual terminal`
+
 ## mimixbox console-tools --help contract
 Source: `test/e2e/tools/mimixbox/console-tools/help_helpers_console-tools.atago.yaml`
 ### Scenario: adjtimex --help is structured
@@ -3166,6 +3291,7 @@ adjtimex --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: conspy --help is structured
 #### When
 ```shell
@@ -3174,6 +3300,7 @@ conspy --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dumpkmap --help is structured
 #### When
 ```shell
@@ -3182,6 +3309,7 @@ dumpkmap --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: less --help is structured
 #### When
 ```shell
@@ -3190,6 +3318,7 @@ less --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: loadfont --help is structured
 #### When
 ```shell
@@ -3198,6 +3327,7 @@ loadfont --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: loadkmap --help is structured
 #### When
 ```shell
@@ -3206,6 +3336,7 @@ loadkmap --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: microcom --help is structured
 #### When
 ```shell
@@ -3214,6 +3345,7 @@ microcom --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: more --help is structured
 #### When
 ```shell
@@ -3222,6 +3354,7 @@ more --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: openvt --help is structured
 #### When
 ```shell
@@ -3230,6 +3363,7 @@ openvt --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: rx --help is structured
 #### When
 ```shell
@@ -3238,6 +3372,7 @@ rx --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: setfont --help is structured
 #### When
 ```shell
@@ -3246,6 +3381,7 @@ setfont --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox inotifyd
 Source: `test/e2e/tools/mimixbox/console-tools/inotifyd.atago.yaml`
 ### Scenario: runs the handler on a create event
@@ -3276,6 +3412,7 @@ echo "$found"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a handler and a file
 #### When
 ```shell
@@ -3283,6 +3420,7 @@ inotifyd ./h
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox kbd_mode
 Source: `test/e2e/tools/mimixbox/console-tools/kbd_mode.atago.yaml`
 ### Scenario: rejects conflicting mode options
@@ -3292,6 +3430,7 @@ kbd_mode -a -u
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -3300,6 +3439,7 @@ kbd_mode --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: kbd_mode`, `keyboard`
+
 ## mimixbox loadfont
 Source: `test/e2e/tools/mimixbox/console-tools/loadfont.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3311,6 +3451,7 @@ loadfont --help
 - exit code is `0`
 - stdout contains `Usage: loadfont`
 - stderr is empty
+
 ## mimixbox loadkmap
 Source: `test/e2e/tools/mimixbox/console-tools/loadkmap.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3322,6 +3463,7 @@ loadkmap --help
 - exit code is `0`
 - stdout contains `Usage: loadkmap`
 - stderr is empty
+
 ## mimixbox microcom
 Source: `test/e2e/tools/mimixbox/console-tools/microcom.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3333,6 +3475,7 @@ microcom --help
 - exit code is `0`
 - stdout contains `Usage: microcom`
 - stderr is empty
+
 ## mimixbox openvt
 Source: `test/e2e/tools/mimixbox/console-tools/openvt.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3344,6 +3487,7 @@ openvt --help
 - exit code is `0`
 - stdout contains `Usage: openvt`
 - stderr is empty
+
 ## mimixbox more / less
 Source: `test/e2e/tools/mimixbox/console-tools/pager.atago.yaml`
 ### Scenario: more streams stdin through when stdout is not a terminal
@@ -3354,6 +3498,7 @@ printf 'a\nb\nc\n' | more
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3369,6 +3514,7 @@ printf 'x\ny\nz\n' | less
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3379,6 +3525,7 @@ z
 ### Scenario: more streams a file through
 #### Given
 - Fixture file `f` is created.
+
 #### Inputs
 _Fixture `f`:_
 ```text
@@ -3392,6 +3539,7 @@ more f
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3408,6 +3556,7 @@ reset --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: reset`
+
 ## mimixbox resize
 Source: `test/e2e/tools/mimixbox/console-tools/resize.atago.yaml`
 ### Scenario: shows the usage line for --help
@@ -3418,6 +3567,7 @@ resize --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: resize`
+
 ## mimixbox rfkill
 Source: `test/e2e/tools/mimixbox/console-tools/rfkill.atago.yaml`
 ### Scenario: lists devices cleanly
@@ -3427,6 +3577,7 @@ rfkill list
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: rejects an unknown command
 #### When
 ```shell
@@ -3434,6 +3585,7 @@ rfkill bogus
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox rx
 Source: `test/e2e/tools/mimixbox/console-tools/rx.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3445,6 +3597,7 @@ rx --help
 - exit code is `0`
 - stdout contains `Usage: rx`
 - stderr is empty
+
 ## mimixbox setconsole
 Source: `test/e2e/tools/mimixbox/console-tools/setconsole.atago.yaml`
 ### Scenario: fails on an inaccessible device
@@ -3454,6 +3607,7 @@ setconsole /dev/no_such_console
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -3462,6 +3616,7 @@ setconsole --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: setconsole`, `console`
+
 ## mimixbox setfont
 Source: `test/e2e/tools/mimixbox/console-tools/setfont.atago.yaml`
 ### Scenario: describes itself with --help
@@ -3473,6 +3628,7 @@ setfont --help
 - exit code is `0`
 - stdout contains `Usage: setfont`
 - stderr is empty
+
 ## mimixbox setkeycodes
 Source: `test/e2e/tools/mimixbox/console-tools/setkeycodes.atago.yaml`
 ### Scenario: requires arguments in pairs
@@ -3482,6 +3638,7 @@ setkeycodes e060
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: rejects an invalid scancode
 #### When
 ```shell
@@ -3489,6 +3646,7 @@ setkeycodes zz 1
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox setlogcons
 Source: `test/e2e/tools/mimixbox/console-tools/setlogcons.atago.yaml`
 ### Scenario: rejects a non-numeric VT
@@ -3498,6 +3656,7 @@ setlogcons notanumber
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -3506,6 +3665,7 @@ setlogcons --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: setlogcons`, `kernel`
+
 ## mimixbox setserial
 Source: `test/e2e/tools/mimixbox/console-tools/setserial.atago.yaml`
 ### Scenario: echoes the parsed request with -g
@@ -3516,6 +3676,7 @@ setserial -g /dev/ttyS0 baud_base 115200 | grep -c 'baud_base 115200'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects an unknown parameter
 #### When
 ```shell
@@ -3523,6 +3684,7 @@ setserial /dev/ttyS0 bogus 1
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: requires a device
 #### When
 ```shell
@@ -3530,6 +3692,7 @@ setserial
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox showkey
 Source: `test/e2e/tools/mimixbox/console-tools/showkey.atago.yaml`
 ### Scenario: rejects conflicting modes
@@ -3539,6 +3702,7 @@ showkey -a -s
 ```
 #### Then
 - exit code is `1`
+
 ### Scenario: fails deterministically without a console
 #### When
 ```shell
@@ -3546,6 +3710,7 @@ showkey
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox stty
 Source: `test/e2e/tools/mimixbox/console-tools/stty.atago.yaml`
 ### Scenario: reports when standard input is not a terminal
@@ -3561,6 +3726,7 @@ stty
 #### Then
 - exit code is `1`
 - stderr equals an exact value
+
 ## mimixbox ts
 Source: `test/e2e/tools/mimixbox/console-tools/ts.atago.yaml`
 ### Scenario: prefixes each line with a timestamp
@@ -3571,6 +3737,7 @@ printf 'alpha\nbeta\n' | ts | grep -cE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox ttysize
 Source: `test/e2e/tools/mimixbox/console-tools/ttysize.atago.yaml`
 ### Scenario: prints width and height
@@ -3581,6 +3748,7 @@ ttysize
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints just the width with w
 #### When
 ```shell
@@ -3589,6 +3757,7 @@ ttysize w
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox coreutils slice
 Source: `test/e2e/tools/mimixbox/coreutils/coreutils_slice.atago.yaml`
 ### Scenario: factor prints prime factors
@@ -3599,6 +3768,7 @@ factor 360
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: tsort topologically sorts
 #### When
 ```shell
@@ -3607,6 +3777,7 @@ printf 'a b\nb c\n' | tsort
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3622,6 +3793,7 @@ printf 'foo\nbar\nbaz\n' | egrep 'ba(r|z)'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3636,6 +3808,7 @@ printf 'a.b\naxb\n' | fgrep 'a.b'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox add-shell
 Source: `test/e2e/tools/mimixbox/debianutils/add-shell.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -3646,6 +3819,7 @@ add-shell --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: add-shell`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -3654,6 +3828,7 @@ add-shell
 #### Then
 - exit code is not `0`
 - stderr contains `add-shell`
+
 ## mimixbox ischroot
 Source: `test/e2e/tools/mimixbox/debianutils/ischroot.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -3664,6 +3839,7 @@ ischroot --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: ischroot`
+
 ## mimixbox mktemp
 Source: `test/e2e/tools/mimixbox/debianutils/mktemp.atago.yaml`
 ### Scenario: creates a regular file under the temp dir
@@ -3677,6 +3853,7 @@ test -f "$f" && echo "created"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: creates a directory
 #### When
 ```shell
@@ -3688,6 +3865,7 @@ test -d "$d" && echo "created"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: mktemp -u only prints a name
 #### When
 ```shell
@@ -3699,6 +3877,7 @@ test ! -e "$f" && echo "not created"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox remove-shell
 Source: `test/e2e/tools/mimixbox/debianutils/remove-shell.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -3709,6 +3888,7 @@ remove-shell --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: remove-shell`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -3717,6 +3897,7 @@ remove-shell
 #### Then
 - exit code is not `0`
 - stderr contains `remove-shell`
+
 ## mimixbox valid-shell
 Source: `test/e2e/tools/mimixbox/debianutils/valid-shell.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -3727,9 +3908,11 @@ valid-shell --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: valid-shell`
+
 ### Scenario: accepts a file listing existing shells
 #### Given
 - Fixture file `shells.txt` is created.
+
 #### Inputs
 _Fixture `shells.txt`:_
 ```text
@@ -3743,6 +3926,7 @@ valid-shell shells.txt
 #### Then
 - exit code is `0`
 - stdout contains `OK`
+
 ## mimixbox awk
 Source: `test/e2e/tools/mimixbox/editors/awk.atago.yaml`
 ### Scenario: prints a field
@@ -3753,6 +3937,7 @@ printf 'one two three\n' | awk '{print $2}'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: honors -F
 #### When
 ```shell
@@ -3761,6 +3946,7 @@ printf 'root:x:0\n' | awk -F: '{print $1}'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: selects a record with NR
 #### When
 ```shell
@@ -3769,6 +3955,7 @@ printf 'a\nb\nc\n' | awk 'NR==2'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: counts records in END
 #### When
 ```shell
@@ -3777,12 +3964,14 @@ printf 'a\nb\nc\n' | awk 'END{print NR}'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox diff
 Source: `test/e2e/tools/mimixbox/editors/diff.atago.yaml`
 ### Scenario: reports a change in normal format
 #### Given
 - Fixture file `a` is created.
 - Fixture file `b` is created.
+
 #### Inputs
 _Fixture `a`:_
 ```text
@@ -3803,10 +3992,12 @@ diff a b
 #### Then
 - exit code is `1`
 - stdout line `1` equals an exact value
+
 ### Scenario: is silent and succeeds for identical files
 #### Given
 - Fixture file `a` is created.
 - Fixture file `c` is created.
+
 #### Inputs
 _Fixture `a`:_
 ```text
@@ -3827,10 +4018,12 @@ diff a c
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ### Scenario: reports briefly with -q
 #### Given
 - Fixture file `a` is created.
 - Fixture file `b` is created.
+
 #### Inputs
 _Fixture `a`:_
 ```text
@@ -3851,11 +4044,13 @@ diff -q a b
 #### Then
 - exit code is `1`
 - stdout contains `differ`
+
 ## mimixbox ed
 Source: `test/e2e/tools/mimixbox/editors/ed.atago.yaml`
 ### Scenario: prints the buffer with size
 #### Given
 - Fixture file `buf.txt` is created.
+
 #### Inputs
 _Fixture `buf.txt`:_
 ```text
@@ -3875,6 +4070,7 @@ ed buf.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3886,6 +4082,7 @@ three
 ### Scenario: appends a line and writes it
 #### Given
 - Fixture file `buf.txt` is created.
+
 #### Inputs
 _Fixture `buf.txt`:_
 ```text
@@ -3902,6 +4099,7 @@ cat buf.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3913,6 +4111,7 @@ three
 ### Scenario: substitutes text on a line
 #### Given
 - Fixture file `buf.txt` is created.
+
 #### Inputs
 _Fixture `buf.txt`:_
 ```text
@@ -3929,6 +4128,7 @@ cat buf.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3942,6 +4142,7 @@ Source: `test/e2e/tools/mimixbox/editors/patch.atago.yaml`
 #### Given
 - Fixture file `f.txt` is created.
 - Fixture file `p.diff` is created.
+
 #### Inputs
 _Fixture `f.txt`:_
 ```text
@@ -3970,6 +4171,7 @@ cat f.txt
 - after `cat f.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -3987,6 +4189,7 @@ printf 'hello world\n' | sed 's/world/sed/'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: substitutes globally
 #### When
 ```shell
@@ -3995,6 +4198,7 @@ printf 'a a a\n' | sed 's/a/b/g'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: deletes a line by number
 #### When
 ```shell
@@ -4004,6 +4208,7 @@ printf '1\n2\n3\n' | sed '2d'
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: prints a single line with -n
 #### When
 ```shell
@@ -4012,11 +4217,13 @@ printf 'x\ny\nz\n' | sed -n '2p'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox vi
 Source: `test/e2e/tools/mimixbox/editors/vi.atago.yaml`
 ### Scenario: deletes a character and writes the file
 #### Given
 - Fixture file `a.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -4032,6 +4239,7 @@ cat a.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -4041,6 +4249,7 @@ world
 ### Scenario: inserts text and writes the file
 #### Given
 - Fixture file `b.txt` is created.
+
 #### Inputs
 _Fixture `b.txt`:_
 ```text
@@ -4055,6 +4264,7 @@ cat b.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: creates a new file
 #### When
 ```shell
@@ -4065,9 +4275,11 @@ cat new.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: treats an arrow-key escape sequence as a motion, not an edit
 #### Given
 - Fixture file `a.txt` is created.
+
 #### Inputs
 _Fixture `a.txt`:_
 ```text
@@ -4083,6 +4295,7 @@ cat a.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -4092,6 +4305,7 @@ world
 ### Scenario: duplicates a line with yy then p
 #### Given
 - Fixture file `yp.txt` is created.
+
 #### Inputs
 _Fixture `yp.txt`:_
 ```text
@@ -4107,6 +4321,7 @@ cat yp.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -4117,6 +4332,7 @@ two
 ### Scenario: applies a count to an edit (2x)
 #### Given
 - Fixture file `cd.txt` is created.
+
 #### Inputs
 _Fixture `cd.txt`:_
 ```text
@@ -4131,9 +4347,11 @@ cat cd.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: undoes the last change with u
 #### Given
 - Fixture file `u.txt` is created.
+
 #### Inputs
 _Fixture `u.txt`:_
 ```text
@@ -4148,9 +4366,11 @@ cat u.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: searches with /pattern and moves to the next match with n
 #### Given
 - Fixture file `sn.txt` is created.
+
 #### Inputs
 _Fixture `sn.txt`:_
 ```text
@@ -4169,6 +4389,7 @@ cat sn.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -4188,6 +4409,7 @@ devmem --help
 - exit code is `0`
 - stdout contains `Usage: devmem`
 - stderr is empty
+
 ## mimixbox capability-gated applets
 Source: `test/e2e/tools/mimixbox/embedded/gated_plan.atago.yaml`
 ### Scenario: netctl: brctl addbr prints the plan then fails with a capability-gated backend error
@@ -4199,6 +4421,7 @@ brctl addbr br0
 - exit code is not `0`
 - stdout contains `brctl: planned action: brctl addbr br0`
 - stderr contains `planned action [brctl addbr br0] requires privileged kernel network configuration not available in this environment (capability-gated backend)`
+
 ### Scenario: selinux: setenforce refuses to mutate SELinux state and exits non-zero
 #### When
 ```shell
@@ -4207,6 +4430,7 @@ setenforce Permissive
 #### Then
 - exit code is not `0`
 - stderr contains `setenforce: refusing to mutate SELinux state: requires CAP_MAC_ADMIN and a loaded policy; this operation is intentionally not implemented in the hermetic build`
+
 ### Scenario: modutils: modprobe validates the module then fails on the CAP_SYS_MODULE gate
 #### When
 ```shell
@@ -4215,11 +4439,13 @@ modprobe foo
 #### Then
 - exit code is not `0`
 - stderr contains `modprobe: load of foo validated successfully, but inserting/removing kernel modules requires CAP_SYS_MODULE; this privileged step is intentionally not implemented in the hermetic build`
+
 ## mimixbox getfattr
 Source: `test/e2e/tools/mimixbox/embedded/getfattr.atago.yaml`
 ### Scenario: dumps a user attribute set by setfattr (or skips without xattr support)
 #### Given
 - Fixture file `file.txt` is created.
+
 #### When
 ```shell
 if ! setfattr -n user.demo -v hello file.txt 2>/dev/null; then
@@ -4232,6 +4458,7 @@ fi
 #### Then
 - exit code is `0`
 - stdout contains `user.demo`
+
 ### Scenario: fails when no file operand is given
 #### When
 ```shell
@@ -4240,6 +4467,7 @@ getfattr
 #### Then
 - exit code is not `0`
 - stderr contains `file operand`
+
 ### Scenario: prints usage for --help
 #### When
 ```shell
@@ -4248,6 +4476,7 @@ getfattr --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: getfattr`
+
 ### Scenario: prints the version line for --version
 #### When
 ```shell
@@ -4256,6 +4485,7 @@ getfattr --version
 #### Then
 - exit code is `0`
 - stdout contains `getfattr (mimixbox)`
+
 ## mimixbox compression --help contract
 Source: `test/e2e/tools/mimixbox/embedded/help_compression.atago.yaml`
 ### Scenario: xz --help exposes the documented sections
@@ -4267,6 +4497,7 @@ xz --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: xz/`
 - stdout contains `Examples:`, `Exit status:`, `  xz `
+
 ### Scenario: unxz --help exposes the documented sections
 #### When
 ```shell
@@ -4276,6 +4507,7 @@ unxz --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unxz/`
 - stdout contains `Examples:`, `Exit status:`, `  unxz `
+
 ### Scenario: xzcat --help exposes the documented sections
 #### When
 ```shell
@@ -4285,6 +4517,7 @@ xzcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: xzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  xzcat `
+
 ### Scenario: lzma --help exposes the documented sections
 #### When
 ```shell
@@ -4294,6 +4527,7 @@ lzma --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lzma/`
 - stdout contains `Examples:`, `Exit status:`, `  lzma `
+
 ### Scenario: unlzma --help exposes the documented sections
 #### When
 ```shell
@@ -4303,6 +4537,7 @@ unlzma --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unlzma/`
 - stdout contains `Examples:`, `Exit status:`, `  unlzma `
+
 ### Scenario: lzcat --help exposes the documented sections
 #### When
 ```shell
@@ -4312,6 +4547,7 @@ lzcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  lzcat `
+
 ### Scenario: lzop --help exposes the documented sections
 #### When
 ```shell
@@ -4321,6 +4557,7 @@ lzop --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lzop/`
 - stdout contains `Examples:`, `Exit status:`, `  lzop `
+
 ### Scenario: unlzop --help exposes the documented sections
 #### When
 ```shell
@@ -4330,6 +4567,7 @@ unlzop --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unlzop/`
 - stdout contains `Examples:`, `Exit status:`, `  unlzop `
+
 ### Scenario: lzopcat --help exposes the documented sections
 #### When
 ```shell
@@ -4339,6 +4577,7 @@ lzopcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lzopcat/`
 - stdout contains `Examples:`, `Exit status:`, `  lzopcat `
+
 ### Scenario: zcat --help exposes the documented sections
 #### When
 ```shell
@@ -4348,6 +4587,7 @@ zcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: zcat/`
 - stdout contains `Examples:`, `Exit status:`, `  zcat `
+
 ### Scenario: bzcat --help exposes the documented sections
 #### When
 ```shell
@@ -4357,6 +4597,7 @@ bzcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: bzcat/`
 - stdout contains `Examples:`, `Exit status:`, `  bzcat `
+
 ### Scenario: unit --help exposes the documented sections
 #### When
 ```shell
@@ -4366,6 +4607,7 @@ unit --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unit/`
 - stdout contains `Examples:`, `Exit status:`, `  unit `
+
 ## mimixbox --help exit-status contract
 Source: `test/e2e/tools/mimixbox/embedded/help_exit_status.atago.yaml`
 ### Scenario: ash --help exposes the documented sections
@@ -4377,6 +4619,7 @@ ash --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ash/`
 - stdout contains `Exit status:`
+
 ### Scenario: bash --help exposes the documented sections
 #### When
 ```shell
@@ -4386,6 +4629,7 @@ bash --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: bash/`
 - stdout contains `Exit status:`
+
 ### Scenario: bc --help exposes the documented sections
 #### When
 ```shell
@@ -4395,6 +4639,7 @@ bc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: bc/`
 - stdout contains `Exit status:`
+
 ### Scenario: busybox --help exposes the documented sections
 #### When
 ```shell
@@ -4404,6 +4649,7 @@ busybox --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: busybox/`
 - stdout contains `Exit status:`
+
 ### Scenario: cttyhack --help exposes the documented sections
 #### When
 ```shell
@@ -4413,6 +4659,7 @@ cttyhack --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cttyhack/`
 - stdout contains `Exit status:`
+
 ### Scenario: dc --help exposes the documented sections
 #### When
 ```shell
@@ -4422,6 +4669,7 @@ dc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: dc/`
 - stdout contains `Exit status:`
+
 ### Scenario: ed --help exposes the documented sections
 #### When
 ```shell
@@ -4431,6 +4679,7 @@ ed --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ed/`
 - stdout contains `Exit status:`
+
 ### Scenario: hd --help exposes the documented sections
 #### When
 ```shell
@@ -4440,6 +4689,7 @@ hd --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: hd/`
 - stdout contains `Exit status:`
+
 ### Scenario: hexdump --help exposes the documented sections
 #### When
 ```shell
@@ -4449,6 +4699,7 @@ hexdump --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: hexdump/`
 - stdout contains `Exit status:`
+
 ### Scenario: hush --help exposes the documented sections
 #### When
 ```shell
@@ -4458,6 +4709,7 @@ hush --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: hush/`
 - stdout contains `Exit status:`
+
 ### Scenario: iostat --help exposes the documented sections
 #### When
 ```shell
@@ -4467,6 +4719,7 @@ iostat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: iostat/`
 - stdout contains `Exit status:`
+
 ### Scenario: ipcs --help exposes the documented sections
 #### When
 ```shell
@@ -4476,6 +4729,7 @@ ipcs --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ipcs/`
 - stdout contains `Exit status:`
+
 ### Scenario: last --help exposes the documented sections
 #### When
 ```shell
@@ -4485,6 +4739,7 @@ last --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: last/`
 - stdout contains `Exit status:`
+
 ### Scenario: less --help exposes the documented sections
 #### When
 ```shell
@@ -4494,6 +4749,7 @@ less --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: less/`
 - stdout contains `Exit status:`
+
 ### Scenario: lsblk --help exposes the documented sections
 #### When
 ```shell
@@ -4503,6 +4759,7 @@ lsblk --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lsblk/`
 - stdout contains `Exit status:`
+
 ### Scenario: lspci --help exposes the documented sections
 #### When
 ```shell
@@ -4512,6 +4769,7 @@ lspci --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lspci/`
 - stdout contains `Exit status:`
+
 ### Scenario: lsusb --help exposes the documented sections
 #### When
 ```shell
@@ -4521,6 +4779,7 @@ lsusb --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lsusb/`
 - stdout contains `Exit status:`
+
 ### Scenario: mbsh --help exposes the documented sections
 #### When
 ```shell
@@ -4530,6 +4789,7 @@ mbsh --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mbsh/`
 - stdout contains `Exit status:`
+
 ### Scenario: minips --help exposes the documented sections
 #### When
 ```shell
@@ -4539,6 +4799,7 @@ minips --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: minips/`
 - stdout contains `Exit status:`
+
 ### Scenario: more --help exposes the documented sections
 #### When
 ```shell
@@ -4548,6 +4809,7 @@ more --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: more/`
 - stdout contains `Exit status:`
+
 ### Scenario: mpstat --help exposes the documented sections
 #### When
 ```shell
@@ -4557,6 +4819,7 @@ mpstat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mpstat/`
 - stdout contains `Exit status:`
+
 ### Scenario: nmeter --help exposes the documented sections
 #### When
 ```shell
@@ -4566,6 +4829,7 @@ nmeter --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nmeter/`
 - stdout contains `Exit status:`
+
 ### Scenario: pipe_progress --help exposes the documented sections
 #### When
 ```shell
@@ -4575,6 +4839,7 @@ pipe_progress --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pipe_progress/`
 - stdout contains `Exit status:`
+
 ### Scenario: powertop --help exposes the documented sections
 #### When
 ```shell
@@ -4584,6 +4849,7 @@ powertop --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: powertop/`
 - stdout contains `Exit status:`
+
 ### Scenario: ps --help exposes the documented sections
 #### When
 ```shell
@@ -4593,6 +4859,7 @@ ps --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ps/`
 - stdout contains `Exit status:`
+
 ### Scenario: pstree --help exposes the documented sections
 #### When
 ```shell
@@ -4602,6 +4869,7 @@ pstree --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pstree/`
 - stdout contains `Exit status:`
+
 ### Scenario: sh --help exposes the documented sections
 #### When
 ```shell
@@ -4611,6 +4879,7 @@ sh --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sh/`
 - stdout contains `Exit status:`
+
 ### Scenario: smemcap --help exposes the documented sections
 #### When
 ```shell
@@ -4620,6 +4889,7 @@ smemcap --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: smemcap/`
 - stdout contains `Exit status:`
+
 ### Scenario: top --help exposes the documented sections
 #### When
 ```shell
@@ -4629,6 +4899,7 @@ top --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: top/`
 - stdout contains `Exit status:`
+
 ### Scenario: uptime --help exposes the documented sections
 #### When
 ```shell
@@ -4638,6 +4909,7 @@ uptime --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uptime/`
 - stdout contains `Exit status:`
+
 ### Scenario: users --help exposes the documented sections
 #### When
 ```shell
@@ -4647,6 +4919,7 @@ users --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: users/`
 - stdout contains `Exit status:`
+
 ### Scenario: uudecode --help exposes the documented sections
 #### When
 ```shell
@@ -4656,6 +4929,7 @@ uudecode --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uudecode/`
 - stdout contains `Exit status:`
+
 ### Scenario: uuencode --help exposes the documented sections
 #### When
 ```shell
@@ -4665,6 +4939,7 @@ uuencode --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uuencode/`
 - stdout contains `Exit status:`
+
 ### Scenario: vi --help exposes the documented sections
 #### When
 ```shell
@@ -4674,6 +4949,7 @@ vi --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: vi/`
 - stdout contains `Exit status:`
+
 ### Scenario: vmstat --help exposes the documented sections
 #### When
 ```shell
@@ -4683,6 +4959,7 @@ vmstat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: vmstat/`
 - stdout contains `Exit status:`
+
 ### Scenario: w --help exposes the documented sections
 #### When
 ```shell
@@ -4692,6 +4969,7 @@ w --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: w/`
 - stdout contains `Exit status:`
+
 ### Scenario: wall --help exposes the documented sections
 #### When
 ```shell
@@ -4701,6 +4979,7 @@ wall --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: wall/`
 - stdout contains `Exit status:`
+
 ## mimixbox embedded --help helpers
 Source: `test/e2e/tools/mimixbox/embedded/help_helpers_embedded.atago.yaml`
 ### Scenario: devmem --help is structured
@@ -4711,6 +4990,7 @@ devmem --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: i2cdetect --help is structured
 #### When
 ```shell
@@ -4719,6 +4999,7 @@ i2cdetect --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: i2cdump --help is structured
 #### When
 ```shell
@@ -4727,6 +5008,7 @@ i2cdump --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: i2cget --help is structured
 #### When
 ```shell
@@ -4735,6 +5017,7 @@ i2cget --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: i2cset --help is structured
 #### When
 ```shell
@@ -4743,6 +5026,7 @@ i2cset --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: partprobe --help is structured
 #### When
 ```shell
@@ -4751,6 +5035,7 @@ partprobe --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: raidautorun --help is structured
 #### When
 ```shell
@@ -4759,6 +5044,7 @@ raidautorun --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: readahead --help is structured
 #### When
 ```shell
@@ -4767,6 +5053,7 @@ readahead --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: resume --help is structured
 #### When
 ```shell
@@ -4775,6 +5062,7 @@ resume --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: seedrng --help is structured
 #### When
 ```shell
@@ -4783,6 +5071,7 @@ seedrng --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: volname --help is structured
 #### When
 ```shell
@@ -4791,6 +5080,7 @@ volname --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: watchdog --help is structured
 #### When
 ```shell
@@ -4799,6 +5089,7 @@ watchdog --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox --help Notes contract
 Source: `test/e2e/tools/mimixbox/embedded/help_notes.atago.yaml`
 ### Scenario: acpid --help exposes the documented sections
@@ -4810,6 +5101,7 @@ acpid --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: acpid/`
 - stdout contains `Notes:`
+
 ### Scenario: brctl --help exposes the documented sections
 #### When
 ```shell
@@ -4819,6 +5111,7 @@ brctl --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: brctl/`
 - stdout contains `Notes:`
+
 ### Scenario: crond --help exposes the documented sections
 #### When
 ```shell
@@ -4828,6 +5121,7 @@ crond --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: crond/`
 - stdout contains `Notes:`
+
 ### Scenario: ifenslave --help exposes the documented sections
 #### When
 ```shell
@@ -4837,6 +5131,7 @@ ifenslave --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ifenslave/`
 - stdout contains `Notes:`
+
 ### Scenario: mkfs.reiser --help exposes the documented sections
 #### When
 ```shell
@@ -4846,6 +5141,7 @@ mkfs.reiser --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mkfs\.reiser/`
 - stdout contains `Notes:`
+
 ### Scenario: nbd-client --help exposes the documented sections
 #### When
 ```shell
@@ -4855,6 +5151,7 @@ nbd-client --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nbd\-client/`
 - stdout contains `Notes:`
+
 ### Scenario: ssl_server --help exposes the documented sections
 #### When
 ```shell
@@ -4864,6 +5161,7 @@ ssl_server --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ssl_server/`
 - stdout contains `Notes:`
+
 ### Scenario: tunctl --help exposes the documented sections
 #### When
 ```shell
@@ -4873,6 +5171,7 @@ tunctl --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tunctl/`
 - stdout contains `Notes:`
+
 ### Scenario: vconfig --help exposes the documented sections
 #### When
 ```shell
@@ -4882,6 +5181,7 @@ vconfig --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: vconfig/`
 - stdout contains `Notes:`
+
 ### Scenario: zcip --help exposes the documented sections
 #### When
 ```shell
@@ -4891,6 +5191,7 @@ zcip --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: zcip/`
 - stdout contains `Notes:`
+
 ### Scenario: [ --help exposes the documented sections
 #### When
 ```shell
@@ -4900,6 +5201,7 @@ env [ --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: \[/`
 - stdout contains `Notes:`
+
 ### Scenario: [[ --help exposes the documented sections
 #### When
 ```shell
@@ -4909,6 +5211,7 @@ env [[ --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: \[\[/`
 - stdout contains `Notes:`
+
 ## mimixbox structured --help sections
 Source: `test/e2e/tools/mimixbox/embedded/help_structured_sections.atago.yaml`
 ### Scenario: ln --help exposes the documented sections
@@ -4920,6 +5223,7 @@ ln --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ln/`
 - stdout contains `Examples:`, `Exit status:`, `  ln `
+
 ### Scenario: log-collect --help exposes the documented sections
 #### When
 ```shell
@@ -4929,6 +5233,7 @@ log-collect --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: log\-collect/`
 - stdout contains `Examples:`, `Exit status:`, `  log-collect `
+
 ### Scenario: logname --help exposes the documented sections
 #### When
 ```shell
@@ -4938,6 +5243,7 @@ logname --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: logname/`
 - stdout contains `Examples:`, `Exit status:`, `  logname `
+
 ### Scenario: md5sum --help exposes the documented sections
 #### When
 ```shell
@@ -4947,6 +5253,7 @@ md5sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: md5sum/`
 - stdout contains `Examples:`, `Exit status:`, `  md5sum `
+
 ### Scenario: mkdir --help exposes the documented sections
 #### When
 ```shell
@@ -4956,6 +5263,7 @@ mkdir --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mkdir/`
 - stdout contains `Examples:`, `Exit status:`, `  mkdir `
+
 ### Scenario: mkfifo --help exposes the documented sections
 #### When
 ```shell
@@ -4965,6 +5273,7 @@ mkfifo --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mkfifo/`
 - stdout contains `Examples:`, `Exit status:`, `  mkfifo `
+
 ### Scenario: mknod --help exposes the documented sections
 #### When
 ```shell
@@ -4974,6 +5283,7 @@ mknod --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mknod/`
 - stdout contains `Examples:`, `Exit status:`, `  mknod `
+
 ### Scenario: mktemp --help exposes the documented sections
 #### When
 ```shell
@@ -4983,6 +5293,7 @@ mktemp --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mktemp/`
 - stdout contains `Examples:`, `Exit status:`, `  mktemp `
+
 ### Scenario: mountpoint --help exposes the documented sections
 #### When
 ```shell
@@ -4992,6 +5303,7 @@ mountpoint --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mountpoint/`
 - stdout contains `Examples:`, `Exit status:`, `  mountpoint `
+
 ### Scenario: mv --help exposes the documented sections
 #### When
 ```shell
@@ -5001,6 +5313,7 @@ mv --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: mv/`
 - stdout contains `Examples:`, `Exit status:`, `  mv `
+
 ### Scenario: nc --help exposes the documented sections
 #### When
 ```shell
@@ -5010,6 +5323,7 @@ nc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nc/`
 - stdout contains `Examples:`, `Exit status:`, `  nc `
+
 ### Scenario: netcat --help exposes the documented sections
 #### When
 ```shell
@@ -5019,6 +5333,7 @@ netcat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: netcat/`
 - stdout contains `Examples:`, `Exit status:`, `  netcat `
+
 ### Scenario: nl --help exposes the documented sections
 #### When
 ```shell
@@ -5028,6 +5343,7 @@ nl --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nl/`
 - stdout contains `Examples:`, `Exit status:`, `  nl `
+
 ### Scenario: nohup --help exposes the documented sections
 #### When
 ```shell
@@ -5037,6 +5353,7 @@ nohup --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nohup/`
 - stdout contains `Examples:`, `Exit status:`, `  nohup `
+
 ### Scenario: nproc --help exposes the documented sections
 #### When
 ```shell
@@ -5046,6 +5363,7 @@ nproc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nproc/`
 - stdout contains `Examples:`, `Exit status:`, `  nproc `
+
 ### Scenario: nyancat --help exposes the documented sections
 #### When
 ```shell
@@ -5055,6 +5373,7 @@ nyancat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: nyancat/`
 - stdout contains `Examples:`, `Exit status:`, `  nyancat `
+
 ### Scenario: od --help exposes the documented sections
 #### When
 ```shell
@@ -5064,6 +5383,7 @@ od --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: od/`
 - stdout contains `Examples:`, `Exit status:`, `  od `
+
 ### Scenario: paste --help exposes the documented sections
 #### When
 ```shell
@@ -5073,6 +5393,7 @@ paste --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: paste/`
 - stdout contains `Examples:`, `Exit status:`, `  paste `
+
 ### Scenario: patch --help exposes the documented sections
 #### When
 ```shell
@@ -5082,6 +5403,7 @@ patch --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: patch/`
 - stdout contains `Examples:`, `Exit status:`, `  patch `
+
 ### Scenario: path --help exposes the documented sections
 #### When
 ```shell
@@ -5091,6 +5413,7 @@ path --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: path/`
 - stdout contains `Examples:`, `Exit status:`, `  path `
+
 ### Scenario: pidof --help exposes the documented sections
 #### When
 ```shell
@@ -5100,6 +5423,7 @@ pidof --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pidof/`
 - stdout contains `Examples:`, `Exit status:`, `  pidof `
+
 ### Scenario: ping --help exposes the documented sections
 #### When
 ```shell
@@ -5109,6 +5433,7 @@ ping --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ping/`
 - stdout contains `Examples:`, `Exit status:`, `  ping `
+
 ### Scenario: posixer --help exposes the documented sections
 #### When
 ```shell
@@ -5118,6 +5443,7 @@ posixer --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: posixer/`
 - stdout contains `Examples:`, `Exit status:`, `  posixer `
+
 ### Scenario: poweroff --help exposes the documented sections
 #### When
 ```shell
@@ -5127,6 +5453,7 @@ poweroff --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: poweroff/`
 - stdout contains `Examples:`, `Exit status:`, `  poweroff `
+
 ### Scenario: printenv --help exposes the documented sections
 #### When
 ```shell
@@ -5136,6 +5463,7 @@ printenv --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: printenv/`
 - stdout contains `Examples:`, `Exit status:`, `  printenv `
+
 ### Scenario: pwcrack --help exposes the documented sections
 #### When
 ```shell
@@ -5145,6 +5473,7 @@ pwcrack --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pwcrack/`
 - stdout contains `Examples:`, `Exit status:`, `  pwcrack `
+
 ### Scenario: pwgen --help exposes the documented sections
 #### When
 ```shell
@@ -5154,6 +5483,7 @@ pwgen --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pwgen/`
 - stdout contains `Examples:`, `Exit status:`, `  pwgen `
+
 ### Scenario: pwscore --help exposes the documented sections
 #### When
 ```shell
@@ -5163,6 +5493,7 @@ pwscore --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pwscore/`
 - stdout contains `Examples:`, `Exit status:`, `  pwscore `
+
 ### Scenario: readlink --help exposes the documented sections
 #### When
 ```shell
@@ -5172,6 +5503,7 @@ readlink --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: readlink/`
 - stdout contains `Examples:`, `Exit status:`, `  readlink `
+
 ### Scenario: realpath --help exposes the documented sections
 #### When
 ```shell
@@ -5181,6 +5513,7 @@ realpath --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: realpath/`
 - stdout contains `Examples:`, `Exit status:`, `  realpath `
+
 ### Scenario: reboot --help exposes the documented sections
 #### When
 ```shell
@@ -5190,6 +5523,7 @@ reboot --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: reboot/`
 - stdout contains `Examples:`, `Exit status:`, `  reboot `
+
 ### Scenario: remove-shell --help exposes the documented sections
 #### When
 ```shell
@@ -5199,6 +5533,7 @@ remove-shell --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: remove\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  remove-shell `
+
 ### Scenario: reset --help exposes the documented sections
 #### When
 ```shell
@@ -5208,6 +5543,7 @@ reset --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: reset/`
 - stdout contains `Examples:`, `Exit status:`, `  reset `
+
 ### Scenario: resize --help exposes the documented sections
 #### When
 ```shell
@@ -5217,6 +5553,7 @@ resize --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: resize/`
 - stdout contains `Examples:`, `Exit status:`, `  resize `
+
 ### Scenario: rev --help exposes the documented sections
 #### When
 ```shell
@@ -5226,6 +5563,7 @@ rev --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: rev/`
 - stdout contains `Examples:`, `Exit status:`, `  rev `
+
 ### Scenario: rm --help exposes the documented sections
 #### When
 ```shell
@@ -5235,6 +5573,7 @@ rm --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: rm/`
 - stdout contains `Examples:`, `Exit status:`, `  rm `
+
 ### Scenario: rmdir --help exposes the documented sections
 #### When
 ```shell
@@ -5244,6 +5583,7 @@ rmdir --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: rmdir/`
 - stdout contains `Examples:`, `Exit status:`, `  rmdir `
+
 ### Scenario: rpm --help exposes the documented sections
 #### When
 ```shell
@@ -5253,6 +5593,7 @@ rpm --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: rpm/`
 - stdout contains `Examples:`, `Exit status:`, `  rpm `
+
 ### Scenario: rpm2cpio --help exposes the documented sections
 #### When
 ```shell
@@ -5262,6 +5603,7 @@ rpm2cpio --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: rpm2cpio/`
 - stdout contains `Examples:`, `Exit status:`, `  rpm2cpio `
+
 ### Scenario: sddf --help exposes the documented sections
 #### When
 ```shell
@@ -5271,6 +5613,7 @@ sddf --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sddf/`
 - stdout contains `Examples:`, `Exit status:`, `  sddf `
+
 ### Scenario: sed --help exposes the documented sections
 #### When
 ```shell
@@ -5280,6 +5623,7 @@ sed --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sed/`
 - stdout contains `Examples:`, `Exit status:`, `  sed `
+
 ### Scenario: seq --help exposes the documented sections
 #### When
 ```shell
@@ -5289,6 +5633,7 @@ seq --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: seq/`
 - stdout contains `Examples:`, `Exit status:`, `  seq `
+
 ### Scenario: serial --help exposes the documented sections
 #### When
 ```shell
@@ -5298,6 +5643,7 @@ serial --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: serial/`
 - stdout contains `Examples:`, `Exit status:`, `  serial `
+
 ### Scenario: sha1sum --help exposes the documented sections
 #### When
 ```shell
@@ -5307,6 +5653,7 @@ sha1sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sha1sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha1sum `
+
 ### Scenario: sha256sum --help exposes the documented sections
 #### When
 ```shell
@@ -5316,6 +5663,7 @@ sha256sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sha256sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha256sum `
+
 ### Scenario: sha384sum --help exposes the documented sections
 #### When
 ```shell
@@ -5325,6 +5673,7 @@ sha384sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sha384sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha384sum `
+
 ### Scenario: sha3sum --help exposes the documented sections
 #### When
 ```shell
@@ -5334,6 +5683,7 @@ sha3sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sha3sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha3sum `
+
 ### Scenario: sha512sum --help exposes the documented sections
 #### When
 ```shell
@@ -5343,6 +5693,7 @@ sha512sum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sha512sum/`
 - stdout contains `Examples:`, `Exit status:`, `  sha512sum `
+
 ### Scenario: shred --help exposes the documented sections
 #### When
 ```shell
@@ -5352,6 +5703,7 @@ shred --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: shred/`
 - stdout contains `Examples:`, `Exit status:`, `  shred `
+
 ### Scenario: shuf --help exposes the documented sections
 #### When
 ```shell
@@ -5361,6 +5713,7 @@ shuf --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: shuf/`
 - stdout contains `Examples:`, `Exit status:`, `  shuf `
+
 ### Scenario: sl --help exposes the documented sections
 #### When
 ```shell
@@ -5370,6 +5723,7 @@ sl --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sl/`
 - stdout contains `Examples:`, `Exit status:`, `  sl `
+
 ### Scenario: sleep --help exposes the documented sections
 #### When
 ```shell
@@ -5379,6 +5733,7 @@ sleep --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sleep/`
 - stdout contains `Examples:`, `Exit status:`, `  sleep `
+
 ### Scenario: sort --help exposes the documented sections
 #### When
 ```shell
@@ -5388,6 +5743,7 @@ sort --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sort/`
 - stdout contains `Examples:`, `Exit status:`, `  sort `
+
 ### Scenario: speaker --help exposes the documented sections
 #### When
 ```shell
@@ -5397,6 +5753,7 @@ speaker --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: speaker/`
 - stdout contains `Examples:`, `Exit status:`, `  speaker `
+
 ### Scenario: split --help exposes the documented sections
 #### When
 ```shell
@@ -5406,6 +5763,7 @@ split --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: split/`
 - stdout contains `Examples:`, `Exit status:`, `  split `
+
 ### Scenario: stat --help exposes the documented sections
 #### When
 ```shell
@@ -5415,6 +5773,7 @@ stat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: stat/`
 - stdout contains `Examples:`, `Exit status:`, `  stat `
+
 ### Scenario: strings --help exposes the documented sections
 #### When
 ```shell
@@ -5424,6 +5783,7 @@ strings --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: strings/`
 - stdout contains `Examples:`, `Exit status:`, `  strings `
+
 ### Scenario: sync --help exposes the documented sections
 #### When
 ```shell
@@ -5433,6 +5793,7 @@ sync --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: sync/`
 - stdout contains `Examples:`, `Exit status:`, `  sync `
+
 ### Scenario: tac --help exposes the documented sections
 #### When
 ```shell
@@ -5442,6 +5803,7 @@ tac --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tac/`
 - stdout contains `Examples:`, `Exit status:`, `  tac `
+
 ### Scenario: tar --help exposes the documented sections
 #### When
 ```shell
@@ -5451,6 +5813,7 @@ tar --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tar/`
 - stdout contains `Examples:`, `Exit status:`, `  tar `
+
 ### Scenario: tee --help exposes the documented sections
 #### When
 ```shell
@@ -5460,6 +5823,7 @@ tee --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tee/`
 - stdout contains `Examples:`, `Exit status:`, `  tee `
+
 ### Scenario: timeout --help exposes the documented sections
 #### When
 ```shell
@@ -5469,6 +5833,7 @@ timeout --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: timeout/`
 - stdout contains `Examples:`, `Exit status:`, `  timeout `
+
 ### Scenario: touch --help exposes the documented sections
 #### When
 ```shell
@@ -5478,6 +5843,7 @@ touch --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: touch/`
 - stdout contains `Examples:`, `Exit status:`, `  touch `
+
 ### Scenario: tr --help exposes the documented sections
 #### When
 ```shell
@@ -5487,6 +5853,7 @@ tr --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tr/`
 - stdout contains `Examples:`, `Exit status:`, `  tr `
+
 ### Scenario: truncate --help exposes the documented sections
 #### When
 ```shell
@@ -5496,6 +5863,7 @@ truncate --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: truncate/`
 - stdout contains `Examples:`, `Exit status:`, `  truncate `
+
 ### Scenario: tty --help exposes the documented sections
 #### When
 ```shell
@@ -5505,6 +5873,7 @@ tty --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: tty/`
 - stdout contains `Examples:`, `Exit status:`, `  tty `
+
 ### Scenario: uname --help exposes the documented sections
 #### When
 ```shell
@@ -5514,6 +5883,7 @@ uname --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uname/`
 - stdout contains `Examples:`, `Exit status:`, `  uname `
+
 ### Scenario: uncompress --help exposes the documented sections
 #### When
 ```shell
@@ -5523,6 +5893,7 @@ uncompress --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uncompress/`
 - stdout contains `Examples:`, `Exit status:`, `  uncompress `
+
 ### Scenario: unexpand --help exposes the documented sections
 #### When
 ```shell
@@ -5532,6 +5903,7 @@ unexpand --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unexpand/`
 - stdout contains `Examples:`, `Exit status:`, `  unexpand `
+
 ### Scenario: uniq --help exposes the documented sections
 #### When
 ```shell
@@ -5541,6 +5913,7 @@ uniq --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uniq/`
 - stdout contains `Examples:`, `Exit status:`, `  uniq `
+
 ### Scenario: unix2dos --help exposes the documented sections
 #### When
 ```shell
@@ -5550,6 +5923,7 @@ unix2dos --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unix2dos/`
 - stdout contains `Examples:`, `Exit status:`, `  unix2dos `
+
 ### Scenario: unlink --help exposes the documented sections
 #### When
 ```shell
@@ -5559,6 +5933,7 @@ unlink --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unlink/`
 - stdout contains `Examples:`, `Exit status:`, `  unlink `
+
 ### Scenario: unshadow --help exposes the documented sections
 #### When
 ```shell
@@ -5568,6 +5943,7 @@ unshadow --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unshadow/`
 - stdout contains `Examples:`, `Exit status:`, `  unshadow `
+
 ### Scenario: unzip --help exposes the documented sections
 #### When
 ```shell
@@ -5577,6 +5953,7 @@ unzip --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: unzip/`
 - stdout contains `Examples:`, `Exit status:`, `  unzip `
+
 ### Scenario: uuidgen --help exposes the documented sections
 #### When
 ```shell
@@ -5586,6 +5963,7 @@ uuidgen --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: uuidgen/`
 - stdout contains `Examples:`, `Exit status:`, `  uuidgen `
+
 ### Scenario: valid-shell --help exposes the documented sections
 #### When
 ```shell
@@ -5595,6 +5973,7 @@ valid-shell --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: valid\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  valid-shell `
+
 ### Scenario: watch --help exposes the documented sections
 #### When
 ```shell
@@ -5604,6 +5983,7 @@ watch --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: watch/`
 - stdout contains `Examples:`, `Exit status:`, `  watch `
+
 ### Scenario: wc --help exposes the documented sections
 #### When
 ```shell
@@ -5613,6 +5993,7 @@ wc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: wc/`
 - stdout contains `Examples:`, `Exit status:`, `  wc `
+
 ### Scenario: which --help exposes the documented sections
 #### When
 ```shell
@@ -5622,6 +6003,7 @@ which --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: which/`
 - stdout contains `Examples:`, `Exit status:`, `  which `
+
 ### Scenario: who --help exposes the documented sections
 #### When
 ```shell
@@ -5631,6 +6013,7 @@ who --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: who/`
 - stdout contains `Examples:`, `Exit status:`, `  who `
+
 ### Scenario: whoami --help exposes the documented sections
 #### When
 ```shell
@@ -5640,6 +6023,7 @@ whoami --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: whoami/`
 - stdout contains `Examples:`, `Exit status:`, `  whoami `
+
 ### Scenario: whris --help exposes the documented sections
 #### When
 ```shell
@@ -5649,6 +6033,7 @@ whris --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: whris/`
 - stdout contains `Examples:`, `Exit status:`, `  whris `
+
 ### Scenario: xargs --help exposes the documented sections
 #### When
 ```shell
@@ -5658,6 +6043,7 @@ xargs --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: xargs/`
 - stdout contains `Examples:`, `Exit status:`, `  xargs `
+
 ### Scenario: xxd --help exposes the documented sections
 #### When
 ```shell
@@ -5667,6 +6053,7 @@ xxd --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: xxd/`
 - stdout contains `Examples:`, `Exit status:`, `  xxd `
+
 ### Scenario: yes --help exposes the documented sections
 #### When
 ```shell
@@ -5676,6 +6063,7 @@ yes --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: yes/`
 - stdout contains `Examples:`, `Exit status:`, `  yes `
+
 ### Scenario: zip --help exposes the documented sections
 #### When
 ```shell
@@ -5685,6 +6073,7 @@ zip --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: zip/`
 - stdout contains `Examples:`, `Exit status:`, `  zip `
+
 ### Scenario: zip-pwcrack --help exposes the documented sections
 #### When
 ```shell
@@ -5694,6 +6083,7 @@ zip-pwcrack --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: zip\-pwcrack/`
 - stdout contains `Examples:`, `Exit status:`, `  zip-pwcrack `
+
 ### Scenario: true --help exposes the documented sections
 #### When
 ```shell
@@ -5703,6 +6093,7 @@ env true --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: true/`
 - stdout contains `Examples:`, `Exit status:`, `  true `
+
 ### Scenario: test --help exposes the documented sections
 #### When
 ```shell
@@ -5712,6 +6103,7 @@ env test --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: test/`
 - stdout contains `Examples:`, `Exit status:`, `  test `
+
 ### Scenario: printf --help exposes the documented sections
 #### When
 ```shell
@@ -5721,6 +6113,7 @@ env printf --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: printf/`
 - stdout contains `Examples:`, `Exit status:`, `  printf `
+
 ### Scenario: pwd --help exposes the documented sections
 #### When
 ```shell
@@ -5730,6 +6123,7 @@ env pwd --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: pwd/`
 - stdout contains `Examples:`, `Exit status:`, `  pwd `
+
 ## mimixbox structured --help sections (2)
 Source: `test/e2e/tools/mimixbox/embedded/help_structured_sections_2.atago.yaml`
 ### Scenario: add-shell --help exposes the documented sections
@@ -5741,6 +6135,7 @@ add-shell --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: add\-shell/`
 - stdout contains `Examples:`, `Exit status:`, `  add-shell `
+
 ### Scenario: ar --help exposes the documented sections
 #### When
 ```shell
@@ -5750,6 +6145,7 @@ ar --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ar/`
 - stdout contains `Examples:`, `Exit status:`, `  ar `
+
 ### Scenario: arch --help exposes the documented sections
 #### When
 ```shell
@@ -5759,6 +6155,7 @@ arch --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: arch/`
 - stdout contains `Examples:`, `Exit status:`, `  arch `
+
 ### Scenario: awk --help exposes the documented sections
 #### When
 ```shell
@@ -5768,6 +6165,7 @@ awk --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: awk/`
 - stdout contains `Examples:`, `Exit status:`, `  awk `
+
 ### Scenario: banner --help exposes the documented sections
 #### When
 ```shell
@@ -5777,6 +6175,7 @@ banner --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: banner/`
 - stdout contains `Examples:`, `Exit status:`, `  banner `
+
 ### Scenario: base32 --help exposes the documented sections
 #### When
 ```shell
@@ -5786,6 +6185,7 @@ base32 --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: base32/`
 - stdout contains `Examples:`, `Exit status:`, `  base32 `
+
 ### Scenario: base64 --help exposes the documented sections
 #### When
 ```shell
@@ -5795,6 +6195,7 @@ base64 --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: base64/`
 - stdout contains `Examples:`, `Exit status:`, `  base64 `
+
 ### Scenario: basename --help exposes the documented sections
 #### When
 ```shell
@@ -5804,6 +6205,7 @@ basename --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: basename/`
 - stdout contains `Examples:`, `Exit status:`, `  basename `
+
 ### Scenario: bunzip2 --help exposes the documented sections
 #### When
 ```shell
@@ -5813,6 +6215,7 @@ bunzip2 --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: bunzip2/`
 - stdout contains `Examples:`, `Exit status:`, `  bunzip2 `
+
 ### Scenario: cal --help exposes the documented sections
 #### When
 ```shell
@@ -5822,6 +6225,7 @@ cal --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cal/`
 - stdout contains `Examples:`, `Exit status:`, `  cal `
+
 ### Scenario: cat --help exposes the documented sections
 #### When
 ```shell
@@ -5831,6 +6235,7 @@ cat --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cat/`
 - stdout contains `Examples:`, `Exit status:`, `  cat `
+
 ### Scenario: chgrp --help exposes the documented sections
 #### When
 ```shell
@@ -5840,6 +6245,7 @@ chgrp --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: chgrp/`
 - stdout contains `Examples:`, `Exit status:`, `  chgrp `
+
 ### Scenario: chmod --help exposes the documented sections
 #### When
 ```shell
@@ -5849,6 +6255,7 @@ chmod --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: chmod/`
 - stdout contains `Examples:`, `Exit status:`, `  chmod `
+
 ### Scenario: chown --help exposes the documented sections
 #### When
 ```shell
@@ -5858,6 +6265,7 @@ chown --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: chown/`
 - stdout contains `Examples:`, `Exit status:`, `  chown `
+
 ### Scenario: cksum --help exposes the documented sections
 #### When
 ```shell
@@ -5867,6 +6275,7 @@ cksum --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cksum/`
 - stdout contains `Examples:`, `Exit status:`, `  cksum `
+
 ### Scenario: clear --help exposes the documented sections
 #### When
 ```shell
@@ -5876,6 +6285,7 @@ clear --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: clear/`
 - stdout contains `Examples:`, `Exit status:`, `  clear `
+
 ### Scenario: cmatrix --help exposes the documented sections
 #### When
 ```shell
@@ -5885,6 +6295,7 @@ cmatrix --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cmatrix/`
 - stdout contains `Examples:`, `Exit status:`, `  cmatrix `
+
 ### Scenario: cmp --help exposes the documented sections
 #### When
 ```shell
@@ -5894,6 +6305,7 @@ cmp --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cmp/`
 - stdout contains `Examples:`, `Exit status:`, `  cmp `
+
 ### Scenario: comm --help exposes the documented sections
 #### When
 ```shell
@@ -5903,6 +6315,7 @@ comm --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: comm/`
 - stdout contains `Examples:`, `Exit status:`, `  comm `
+
 ### Scenario: compress --help exposes the documented sections
 #### When
 ```shell
@@ -5912,6 +6325,7 @@ compress --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: compress/`
 - stdout contains `Examples:`, `Exit status:`, `  compress `
+
 ### Scenario: cowsay --help exposes the documented sections
 #### When
 ```shell
@@ -5921,6 +6335,7 @@ cowsay --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cowsay/`
 - stdout contains `Examples:`, `Exit status:`, `  cowsay `
+
 ### Scenario: cowthink --help exposes the documented sections
 #### When
 ```shell
@@ -5930,6 +6345,7 @@ cowthink --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cowthink/`
 - stdout contains `Examples:`, `Exit status:`, `  cowthink `
+
 ### Scenario: cpio --help exposes the documented sections
 #### When
 ```shell
@@ -5939,6 +6355,7 @@ cpio --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cpio/`
 - stdout contains `Examples:`, `Exit status:`, `  cpio `
+
 ### Scenario: cut --help exposes the documented sections
 #### When
 ```shell
@@ -5948,6 +6365,7 @@ cut --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: cut/`
 - stdout contains `Examples:`, `Exit status:`, `  cut `
+
 ### Scenario: date --help exposes the documented sections
 #### When
 ```shell
@@ -5957,6 +6375,7 @@ date --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: date/`
 - stdout contains `Examples:`, `Exit status:`, `  date `
+
 ### Scenario: dd --help exposes the documented sections
 #### When
 ```shell
@@ -5966,6 +6385,7 @@ dd --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: dd/`
 - stdout contains `Examples:`, `Exit status:`, `  dd `
+
 ### Scenario: df --help exposes the documented sections
 #### When
 ```shell
@@ -5975,6 +6395,7 @@ df --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: df/`
 - stdout contains `Examples:`, `Exit status:`, `  df `
+
 ### Scenario: diff --help exposes the documented sections
 #### When
 ```shell
@@ -5984,6 +6405,7 @@ diff --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: diff/`
 - stdout contains `Examples:`, `Exit status:`, `  diff `
+
 ### Scenario: dirname --help exposes the documented sections
 #### When
 ```shell
@@ -5993,6 +6415,7 @@ dirname --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: dirname/`
 - stdout contains `Examples:`, `Exit status:`, `  dirname `
+
 ### Scenario: dos2unix --help exposes the documented sections
 #### When
 ```shell
@@ -6002,6 +6425,7 @@ dos2unix --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: dos2unix/`
 - stdout contains `Examples:`, `Exit status:`, `  dos2unix `
+
 ### Scenario: du --help exposes the documented sections
 #### When
 ```shell
@@ -6011,6 +6435,7 @@ du --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: du/`
 - stdout contains `Examples:`, `Exit status:`, `  du `
+
 ### Scenario: egrep --help exposes the documented sections
 #### When
 ```shell
@@ -6020,6 +6445,7 @@ egrep --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: egrep/`
 - stdout contains `Examples:`, `Exit status:`, `  egrep `
+
 ### Scenario: env --help exposes the documented sections
 #### When
 ```shell
@@ -6029,6 +6455,7 @@ env --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: env/`
 - stdout contains `Examples:`, `Exit status:`, `  env `
+
 ### Scenario: expand --help exposes the documented sections
 #### When
 ```shell
@@ -6038,6 +6465,7 @@ expand --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: expand/`
 - stdout contains `Examples:`, `Exit status:`, `  expand `
+
 ### Scenario: expr --help exposes the documented sections
 #### When
 ```shell
@@ -6047,6 +6475,7 @@ expr --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: expr/`
 - stdout contains `Examples:`, `Exit status:`, `  expr `
+
 ### Scenario: fakemovie --help exposes the documented sections
 #### When
 ```shell
@@ -6056,6 +6485,7 @@ fakemovie --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: fakemovie/`
 - stdout contains `Examples:`, `Exit status:`, `  fakemovie `
+
 ### Scenario: fgrep --help exposes the documented sections
 #### When
 ```shell
@@ -6065,6 +6495,7 @@ fgrep --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: fgrep/`
 - stdout contains `Examples:`, `Exit status:`, `  fgrep `
+
 ### Scenario: fmt --help exposes the documented sections
 #### When
 ```shell
@@ -6074,6 +6505,7 @@ fmt --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: fmt/`
 - stdout contains `Examples:`, `Exit status:`, `  fmt `
+
 ### Scenario: fold --help exposes the documented sections
 #### When
 ```shell
@@ -6083,6 +6515,7 @@ fold --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: fold/`
 - stdout contains `Examples:`, `Exit status:`, `  fold `
+
 ### Scenario: fortune --help exposes the documented sections
 #### When
 ```shell
@@ -6092,6 +6525,7 @@ fortune --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: fortune/`
 - stdout contains `Examples:`, `Exit status:`, `  fortune `
+
 ### Scenario: free --help exposes the documented sections
 #### When
 ```shell
@@ -6101,6 +6535,7 @@ free --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: free/`
 - stdout contains `Examples:`, `Exit status:`, `  free `
+
 ### Scenario: ghrdc --help exposes the documented sections
 #### When
 ```shell
@@ -6110,6 +6545,7 @@ ghrdc --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ghrdc/`
 - stdout contains `Examples:`, `Exit status:`, `  ghrdc `
+
 ### Scenario: grep --help exposes the documented sections
 #### When
 ```shell
@@ -6119,6 +6555,7 @@ grep --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: grep/`
 - stdout contains `Examples:`, `Exit status:`, `  grep `
+
 ### Scenario: groups --help exposes the documented sections
 #### When
 ```shell
@@ -6128,6 +6565,7 @@ groups --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: groups/`
 - stdout contains `Examples:`, `Exit status:`, `  groups `
+
 ### Scenario: gunzip --help exposes the documented sections
 #### When
 ```shell
@@ -6137,6 +6575,7 @@ gunzip --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: gunzip/`
 - stdout contains `Examples:`, `Exit status:`, `  gunzip `
+
 ### Scenario: gzip --help exposes the documented sections
 #### When
 ```shell
@@ -6146,6 +6585,7 @@ gzip --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: gzip/`
 - stdout contains `Examples:`, `Exit status:`, `  gzip `
+
 ### Scenario: halt --help exposes the documented sections
 #### When
 ```shell
@@ -6155,6 +6595,7 @@ halt --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: halt/`
 - stdout contains `Examples:`, `Exit status:`, `  halt `
+
 ### Scenario: head --help exposes the documented sections
 #### When
 ```shell
@@ -6164,6 +6605,7 @@ head --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: head/`
 - stdout contains `Examples:`, `Exit status:`, `  head `
+
 ### Scenario: hostid --help exposes the documented sections
 #### When
 ```shell
@@ -6173,6 +6615,7 @@ hostid --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: hostid/`
 - stdout contains `Examples:`, `Exit status:`, `  hostid `
+
 ### Scenario: hostname --help exposes the documented sections
 #### When
 ```shell
@@ -6182,6 +6625,7 @@ hostname --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: hostname/`
 - stdout contains `Examples:`, `Exit status:`, `  hostname `
+
 ### Scenario: http-status-code --help exposes the documented sections
 #### When
 ```shell
@@ -6191,6 +6635,7 @@ http-status-code --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: http\-status\-code/`
 - stdout contains `Examples:`, `Exit status:`, `  http-status-code `
+
 ### Scenario: id --help exposes the documented sections
 #### When
 ```shell
@@ -6200,6 +6645,7 @@ id --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: id/`
 - stdout contains `Examples:`, `Exit status:`, `  id `
+
 ### Scenario: install --help exposes the documented sections
 #### When
 ```shell
@@ -6209,6 +6655,7 @@ install --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: install/`
 - stdout contains `Examples:`, `Exit status:`, `  install `
+
 ### Scenario: ischroot --help exposes the documented sections
 #### When
 ```shell
@@ -6218,6 +6665,7 @@ ischroot --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: ischroot/`
 - stdout contains `Examples:`, `Exit status:`, `  ischroot `
+
 ### Scenario: killall --help exposes the documented sections
 #### When
 ```shell
@@ -6227,6 +6675,7 @@ killall --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: killall/`
 - stdout contains `Examples:`, `Exit status:`, `  killall `
+
 ### Scenario: lifegame --help exposes the documented sections
 #### When
 ```shell
@@ -6236,6 +6685,7 @@ lifegame --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: lifegame/`
 - stdout contains `Examples:`, `Exit status:`, `  lifegame `
+
 ### Scenario: link --help exposes the documented sections
 #### When
 ```shell
@@ -6245,6 +6695,7 @@ link --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: link/`
 - stdout contains `Examples:`, `Exit status:`, `  link `
+
 ### Scenario: echo --help exposes the documented sections
 #### When
 ```shell
@@ -6254,6 +6705,7 @@ env echo --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: echo/`
 - stdout contains `Examples:`, `Exit status:`, `  echo `
+
 ### Scenario: false --help exposes the documented sections
 #### When
 ```shell
@@ -6263,6 +6715,7 @@ env false --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: false/`
 - stdout contains `Examples:`, `Exit status:`, `  false `
+
 ### Scenario: kill --help exposes the documented sections
 #### When
 ```shell
@@ -6272,6 +6725,7 @@ env kill --help
 - exit code is `0`
 - stdout line `1` matches `/^Usage: kill/`
 - stdout contains `Examples:`, `Exit status:`, `  kill `
+
 ## mimixbox i2cdetect
 Source: `test/e2e/tools/mimixbox/embedded/i2cdetect.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6283,6 +6737,7 @@ i2cdetect --help
 - exit code is `0`
 - stdout contains `Usage: i2cdetect`
 - stderr is empty
+
 ## mimixbox i2cdump
 Source: `test/e2e/tools/mimixbox/embedded/i2cdump.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6294,6 +6749,7 @@ i2cdump --help
 - exit code is `0`
 - stdout contains `Usage: i2cdump`
 - stderr is empty
+
 ## mimixbox i2cget
 Source: `test/e2e/tools/mimixbox/embedded/i2cget.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6305,6 +6761,7 @@ i2cget --help
 - exit code is `0`
 - stdout contains `Usage: i2cget`
 - stderr is empty
+
 ## mimixbox i2cset
 Source: `test/e2e/tools/mimixbox/embedded/i2cset.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6316,6 +6773,7 @@ i2cset --help
 - exit code is `0`
 - stdout contains `Usage: i2cset`
 - stderr is empty
+
 ## mimixbox ifup
 Source: `test/e2e/tools/mimixbox/embedded/ifup.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6327,6 +6785,7 @@ ifup --help
 - exit code is `0`
 - stdout contains `Usage: ifup`
 - stderr is empty
+
 ## mimixbox insmod
 Source: `test/e2e/tools/mimixbox/embedded/insmod.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6338,6 +6797,7 @@ insmod --help
 - exit code is `0`
 - stdout contains `Usage: insmod`
 - stderr is empty
+
 ## mimixbox ip
 Source: `test/e2e/tools/mimixbox/embedded/ip.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6349,6 +6809,7 @@ ip --help
 - exit code is `0`
 - stdout contains `Usage: ip`
 - stderr is empty
+
 ## mimixbox ipaddr
 Source: `test/e2e/tools/mimixbox/embedded/ipaddr.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6360,6 +6821,7 @@ ipaddr --help
 - exit code is `0`
 - stdout contains `Usage: ipaddr`
 - stderr is empty
+
 ## mimixbox iplink
 Source: `test/e2e/tools/mimixbox/embedded/iplink.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6371,6 +6833,7 @@ iplink --help
 - exit code is `0`
 - stdout contains `Usage: iplink`
 - stderr is empty
+
 ## mimixbox ipneigh
 Source: `test/e2e/tools/mimixbox/embedded/ipneigh.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6382,6 +6845,7 @@ ipneigh --help
 - exit code is `0`
 - stdout contains `Usage: ipneigh`
 - stderr is empty
+
 ## mimixbox iproute
 Source: `test/e2e/tools/mimixbox/embedded/iproute.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6393,6 +6857,7 @@ iproute --help
 - exit code is `0`
 - stdout contains `Usage: iproute`
 - stderr is empty
+
 ## mimixbox iprule
 Source: `test/e2e/tools/mimixbox/embedded/iprule.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6404,6 +6869,7 @@ iprule --help
 - exit code is `0`
 - stdout contains `Usage: iprule`
 - stderr is empty
+
 ## mimixbox iptunnel
 Source: `test/e2e/tools/mimixbox/embedded/iptunnel.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6415,6 +6881,7 @@ iptunnel --help
 - exit code is `0`
 - stdout contains `Usage: iptunnel`
 - stderr is empty
+
 ## mimixbox less
 Source: `test/e2e/tools/mimixbox/embedded/less.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6426,6 +6893,7 @@ less --help
 - exit code is `0`
 - stdout contains `Usage: less`
 - stderr is empty
+
 ## mimixbox linux32
 Source: `test/e2e/tools/mimixbox/embedded/linux32.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6437,6 +6905,7 @@ linux32 --help
 - exit code is `0`
 - stdout contains `Usage: linux32`
 - stderr is empty
+
 ## mimixbox linux64
 Source: `test/e2e/tools/mimixbox/embedded/linux64.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6448,6 +6917,7 @@ linux64 --help
 - exit code is `0`
 - stdout contains `Usage: linux64`
 - stderr is empty
+
 ## mimixbox linuxrc
 Source: `test/e2e/tools/mimixbox/embedded/linuxrc.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6459,6 +6929,7 @@ linuxrc --help
 - exit code is `0`
 - stdout contains `Usage: linuxrc`
 - stderr is empty
+
 ## mimixbox load_policy
 Source: `test/e2e/tools/mimixbox/embedded/load_policy.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6470,6 +6941,7 @@ load_policy --help
 - exit code is `0`
 - stdout contains `Usage: load_policy`
 - stderr is empty
+
 ## mimixbox log-collect
 Source: `test/e2e/tools/mimixbox/embedded/log-collect.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6481,6 +6953,7 @@ log-collect --help
 - exit code is `0`
 - stdout contains `Usage: log-collect`
 - stderr is empty
+
 ## mimixbox lpd
 Source: `test/e2e/tools/mimixbox/embedded/lpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6492,6 +6965,7 @@ lpd --help
 - exit code is `0`
 - stdout contains `Usage: lpd`
 - stderr is empty
+
 ## mimixbox lpq
 Source: `test/e2e/tools/mimixbox/embedded/lpq.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6503,6 +6977,7 @@ lpq --help
 - exit code is `0`
 - stdout contains `Usage: lpq`
 - stderr is empty
+
 ## mimixbox lpr
 Source: `test/e2e/tools/mimixbox/embedded/lpr.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6514,6 +6989,7 @@ lpr --help
 - exit code is `0`
 - stdout contains `Usage: lpr`
 - stderr is empty
+
 ## mimixbox lpr_roundtrip
 Source: `test/e2e/tools/mimixbox/embedded/lpr_roundtrip.atago.yaml`
 ### Scenario: queues, lists, drains, and empties the spool
@@ -6544,6 +7020,7 @@ lpq -S spool
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -6565,6 +7042,7 @@ fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints usage for --help
 #### When
 ```shell
@@ -6573,6 +7051,7 @@ lsscsi --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: lsscsi`
+
 ### Scenario: prints the version line for --version
 #### When
 ```shell
@@ -6581,6 +7060,7 @@ lsscsi --version
 #### Then
 - exit code is `0`
 - stdout contains `lsscsi (mimixbox)`
+
 ## mimixbox lzcat
 Source: `test/e2e/tools/mimixbox/embedded/lzcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6592,6 +7072,7 @@ lzcat --help
 - exit code is `0`
 - stdout contains `Usage: lzcat`
 - stderr is empty
+
 ## mimixbox lzma
 Source: `test/e2e/tools/mimixbox/embedded/lzma.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6603,6 +7084,7 @@ lzma --help
 - exit code is `0`
 - stdout contains `Usage: lzma`
 - stderr is empty
+
 ## mimixbox lzop
 Source: `test/e2e/tools/mimixbox/embedded/lzop.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6614,6 +7096,7 @@ lzop --help
 - exit code is `0`
 - stdout contains `Usage: lzop`
 - stderr is empty
+
 ## mimixbox lzopcat
 Source: `test/e2e/tools/mimixbox/embedded/lzopcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6625,11 +7108,13 @@ lzopcat --help
 - exit code is `0`
 - stdout contains `Usage: lzopcat`
 - stderr is empty
+
 ## mimixbox makedevs
 Source: `test/e2e/tools/mimixbox/embedded/makedevs.atago.yaml`
 ### Scenario: creates the directory and file tree from a device table
 #### Given
 - Fixture file `table.txt` is created.
+
 #### Inputs
 _Fixture `table.txt`:_
 ```text
@@ -6650,6 +7135,7 @@ fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails without the -d table option
 #### When
 ```shell
@@ -6658,6 +7144,7 @@ makedevs ./rootfs
 #### Then
 - exit code is not `0`
 - stderr contains `usage: makedevs`
+
 ### Scenario: prints usage for --help
 #### When
 ```shell
@@ -6666,6 +7153,7 @@ makedevs --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: makedevs`
+
 ### Scenario: prints the version line for --version
 #### When
 ```shell
@@ -6674,6 +7162,7 @@ makedevs --version
 #### Then
 - exit code is `0`
 - stdout contains `makedevs (mimixbox)`
+
 ## mimixbox matchpathcon
 Source: `test/e2e/tools/mimixbox/embedded/matchpathcon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6685,6 +7174,7 @@ matchpathcon --help
 - exit code is `0`
 - stdout contains `Usage: matchpathcon`
 - stderr is empty
+
 ## mimixbox mkdosfs
 Source: `test/e2e/tools/mimixbox/embedded/mkdosfs.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6696,6 +7186,7 @@ mkdosfs --help
 - exit code is `0`
 - stdout contains `Usage: mkdosfs`
 - stderr is empty
+
 ## mimixbox mkfs.ext2
 Source: `test/e2e/tools/mimixbox/embedded/mkfs.ext2.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6707,6 +7198,7 @@ mkfs.ext2 --help
 - exit code is `0`
 - stdout contains `Usage: mkfs.ext2`
 - stderr is empty
+
 ## mimixbox mkfs.minix
 Source: `test/e2e/tools/mimixbox/embedded/mkfs.minix.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6718,6 +7210,7 @@ mkfs.minix --help
 - exit code is `0`
 - stdout contains `Usage: mkfs.minix`
 - stderr is empty
+
 ## mimixbox mkfs.reiser
 Source: `test/e2e/tools/mimixbox/embedded/mkfs.reiser.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6729,6 +7222,7 @@ mkfs.reiser --help
 - exit code is `0`
 - stdout contains `Usage: mkfs.reiser`
 - stderr is empty
+
 ## mimixbox mkfs.vfat
 Source: `test/e2e/tools/mimixbox/embedded/mkfs.vfat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6740,6 +7234,7 @@ mkfs.vfat --help
 - exit code is `0`
 - stdout contains `Usage: mkfs.vfat`
 - stderr is empty
+
 ## mimixbox modprobe
 Source: `test/e2e/tools/mimixbox/embedded/modprobe.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6751,6 +7246,7 @@ modprobe --help
 - exit code is `0`
 - stdout contains `Usage: modprobe`
 - stderr is empty
+
 ## mimixbox more
 Source: `test/e2e/tools/mimixbox/embedded/more.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6762,6 +7258,7 @@ more --help
 - exit code is `0`
 - stdout contains `Usage: more`
 - stderr is empty
+
 ## mimixbox nameif
 Source: `test/e2e/tools/mimixbox/embedded/nameif.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6773,6 +7270,7 @@ nameif --help
 - exit code is `0`
 - stdout contains `Usage: nameif`
 - stderr is empty
+
 ## mimixbox nbd-client
 Source: `test/e2e/tools/mimixbox/embedded/nbd-client.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6784,6 +7282,7 @@ nbd-client --help
 - exit code is `0`
 - stdout contains `Usage: nbd-client`
 - stderr is empty
+
 ## mimixbox partprobe
 Source: `test/e2e/tools/mimixbox/embedded/partprobe.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6795,6 +7294,7 @@ partprobe --help
 - exit code is `0`
 - stdout contains `Usage: partprobe`
 - stderr is empty
+
 ## mimixbox ping6
 Source: `test/e2e/tools/mimixbox/embedded/ping6.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6806,6 +7306,7 @@ ping6 --help
 - exit code is `0`
 - stdout contains `Usage: ping6`
 - stderr is empty
+
 ## mimixbox pipe_progress
 Source: `test/e2e/tools/mimixbox/embedded/pipe_progress.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6817,6 +7318,7 @@ pipe_progress --help
 - exit code is `0`
 - stdout contains `Usage: pipe_progress`
 - stderr is empty
+
 ## mimixbox pkill
 Source: `test/e2e/tools/mimixbox/embedded/pkill.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6828,6 +7330,7 @@ pkill --help
 - exit code is `0`
 - stdout contains `Usage: pkill`
 - stderr is empty
+
 ## mimixbox poweroff
 Source: `test/e2e/tools/mimixbox/embedded/poweroff.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6839,6 +7342,7 @@ poweroff --help
 - exit code is `0`
 - stdout contains `Usage: poweroff`
 - stderr is empty
+
 ## mimixbox preexisting_tmp_root
 Source: `test/e2e/tools/mimixbox/embedded/preexisting_tmp_root.atago.yaml`
 ### Scenario: allocates a usable per-run root that is not /tmp/mimixbox
@@ -6854,6 +7358,7 @@ printf 'ok'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: leaves a pre-existing /tmp/mimixbox file untouched (harness-specific)
 _only when env ATAGO_RUN_HARNESS_SPECIFIC is set_
 #### When
@@ -6864,6 +7369,7 @@ _only when env ATAGO_RUN_HARNESS_SPECIFIC is set_
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox raidautorun
 Source: `test/e2e/tools/mimixbox/embedded/raidautorun.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6875,6 +7381,7 @@ raidautorun --help
 - exit code is `0`
 - stdout contains `Usage: raidautorun`
 - stderr is empty
+
 ## mimixbox readahead
 Source: `test/e2e/tools/mimixbox/embedded/readahead.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6886,6 +7393,7 @@ readahead --help
 - exit code is `0`
 - stdout contains `Usage: readahead`
 - stderr is empty
+
 ## mimixbox reboot
 Source: `test/e2e/tools/mimixbox/embedded/reboot.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6897,6 +7405,7 @@ reboot --help
 - exit code is `0`
 - stdout contains `Usage: reboot`
 - stderr is empty
+
 ## mimixbox restorecon
 Source: `test/e2e/tools/mimixbox/embedded/restorecon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6908,6 +7417,7 @@ restorecon --help
 - exit code is `0`
 - stdout contains `Usage: restorecon`
 - stderr is empty
+
 ## mimixbox resume
 Source: `test/e2e/tools/mimixbox/embedded/resume.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6919,6 +7429,7 @@ resume --help
 - exit code is `0`
 - stdout contains `Usage: resume`
 - stderr is empty
+
 ## mimixbox seedrng
 Source: `test/e2e/tools/mimixbox/embedded/seedrng.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6930,6 +7441,7 @@ seedrng --help
 - exit code is `0`
 - stdout contains `Usage: seedrng`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -6938,11 +7450,13 @@ seedrng --help
 #### Then
 - exit code is `0`
 - stdout contains `boot seed`
+
 ## mimixbox setfattr
 Source: `test/e2e/tools/mimixbox/embedded/setfattr.atago.yaml`
 ### Scenario: sets an attribute that getfattr can read back (or skips without xattr support)
 #### Given
 - Fixture file `file.txt` is created.
+
 #### When
 ```shell
 if ! setfattr -n user.k -v v file.txt 2>/dev/null; then
@@ -6955,9 +7469,11 @@ fi
 #### Then
 - exit code is `0`
 - stdout contains `user.k`
+
 ### Scenario: rejects mutually exclusive -n and -x
 #### Given
 - Fixture file `file.txt` is created.
+
 #### When
 ```shell
 setfattr -n user.k -x user.k file.txt
@@ -6965,6 +7481,7 @@ setfattr -n user.k -x user.k file.txt
 #### Then
 - exit code is not `0`
 - stderr contains `mutually exclusive`
+
 ### Scenario: prints usage for --help
 #### When
 ```shell
@@ -6973,6 +7490,7 @@ setfattr --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: setfattr`
+
 ### Scenario: prints the version line for --version
 #### When
 ```shell
@@ -6981,6 +7499,7 @@ setfattr --version
 #### Then
 - exit code is `0`
 - stdout contains `setfattr (mimixbox)`
+
 ## mimixbox volname
 Source: `test/e2e/tools/mimixbox/embedded/volname.atago.yaml`
 ### Scenario: describes itself with --help
@@ -6992,6 +7511,7 @@ volname --help
 - exit code is `0`
 - stdout contains `Usage: volname`
 - stderr is empty
+
 ## mimixbox watchdog
 Source: `test/e2e/tools/mimixbox/embedded/watchdog.atago.yaml`
 ### Scenario: describes itself with --help
@@ -7003,6 +7523,7 @@ watchdog --help
 - exit code is `0`
 - stdout contains `Usage: watchdog`
 - stderr is empty
+
 ## mimixbox chgrp
 Source: `test/e2e/tools/mimixbox/fileutils/chgrp.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -7013,6 +7534,7 @@ chgrp --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: chgrp`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -7021,6 +7543,7 @@ chgrp
 #### Then
 - exit code is not `0`
 - stderr contains `chgrp`
+
 ## mimixbox chown
 Source: `test/e2e/tools/mimixbox/fileutils/chown.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -7031,6 +7554,7 @@ chown --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: chown`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -7039,6 +7563,7 @@ chown
 #### Then
 - exit code is not `0`
 - stderr contains `chown`
+
 ## mimixbox cp
 Source: `test/e2e/tools/mimixbox/fileutils/cp.atago.yaml`
 ### Scenario: copy one file
@@ -7051,6 +7576,7 @@ cp ${workdir}/cp/1.txt ${workdir}/cp/cp.txt && ls ${workdir}/cp/cp.txt
 - after `cp ${workdir}/cp/1.txt ${workdir}/cp/cp.txt && ls ${workdir}/cp/cp.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: copy directory recursively
 #### When
 ```shell
@@ -7061,6 +7587,7 @@ cp -r ${workdir}/cp ${workdir}/cp2 && ls ${workdir}/cp2 && ls ${workdir}/cp2/cp
 - after `cp -r ${workdir}/cp ${workdir}/cp2 && ls ${workdir}/cp2 && ls ${workdir}/cp2/cp`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7080,6 +7607,7 @@ cp -r ${workdir}/cp ${workdir}/cp; ls ${workdir}/cp
 - after `cp -r ${workdir}/cp ${workdir}/cp; ls ${workdir}/cp`:
   - stdout equals an exact value
   - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7098,6 +7626,7 @@ cp -r ${workdir}/cp ${workdir}/cp
 - after `cp -r ${workdir}/cp ${workdir}/cp`:
   - exit code is not `0`
   - stderr equals an exact value
+
 ### Scenario: copy three files at the same time
 #### When
 ```shell
@@ -7108,6 +7637,7 @@ cp ${workdir}/cp/1.txt ${workdir}/cp/2.txt ${workdir}/cp/3.txt ${workdir}/cp2 &&
 - after `cp ${workdir}/cp/1.txt ${workdir}/cp/2.txt ${workdir}/cp/3.txt ${workdir}/cp2 && ls ${workdir}/cp2`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7125,6 +7655,7 @@ cp ${workdir}/cp ${workdir}/cp2
 - after `cp ${workdir}/cp ${workdir}/cp2`:
   - exit code is not `0`
   - stderr equals an exact value
+
 #### Expected output
 _expected stderr:_
 ```text
@@ -7138,6 +7669,7 @@ cp -r ${workdir}/cp /
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox cp GNU flags
 Source: `test/e2e/tools/mimixbox/fileutils/cp_gnu.atago.yaml`
 ### Scenario: copies into the target directory (-t equals destination-last form)
@@ -7149,6 +7681,7 @@ printf 'A\n' > a.txt && printf 'B\n' > b.txt && mkdir dst_t dst_plain && cp --ta
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7163,6 +7696,7 @@ printf 'A\n' > a.txt && mkdir b && cp -T a.txt b
 #### Then
 - exit code is not `0`
 - stderr contains `cannot overwrite directory`
+
 ### Scenario: recreates the source path prefix with --parents
 #### When
 ```shell
@@ -7172,6 +7706,7 @@ mkdir -p src/a dst && printf 'deep\n' > src/a/b.txt && cp --parents src/a/b.txt 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: makes a backup before overwriting with --backup
 #### When
 ```shell
@@ -7181,6 +7716,7 @@ printf 'new\n' > src.txt && printf 'old\n' > dst.txt && cp --backup=simple src.t
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7196,6 +7732,7 @@ printf 'srcdata\n' > src.txt && printf 'dstdata\n' > dst.txt && touch -d '2020-0
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: skips a newer file inside the tree with -ru (#940)
 #### When
 ```shell
@@ -7205,6 +7742,7 @@ mkdir -p src dst/src && printf 'from-src\n' > src/f.txt && printf 'newer-dst\n' 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: backs up a file inside the tree with -r --backup (#940)
 #### When
 ```shell
@@ -7214,6 +7752,7 @@ mkdir -p src dst/src && printf 'new\n' > src/f.txt && printf 'old\n' > dst/src/f
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7234,6 +7773,7 @@ cp -P link copy
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: cp -L copies the link target as a regular file
 #### When
 ```shell
@@ -7246,6 +7786,7 @@ if [ -L copy ]; then echo link; elif [ -f copy ]; then echo regular; else echo m
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: cp -d preserves a symlink inside a copied tree
 #### When
 ```shell
@@ -7259,6 +7800,7 @@ cp -d -r src dst
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox fileutils help helpers
 Source: `test/e2e/tools/mimixbox/fileutils/help_helpers_fileutils.atago.yaml`
 ### Scenario: chgrp --help is structured
@@ -7269,6 +7811,7 @@ chgrp --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: chown --help is structured
 #### When
 ```shell
@@ -7277,11 +7820,13 @@ chown --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox link
 Source: `test/e2e/tools/mimixbox/fileutils/link.atago.yaml`
 ### Scenario: creates a hard link sharing contents
 #### Given
 - Fixture file `link_src` is created.
+
 #### Inputs
 _Fixture `link_src`:_
 ```text
@@ -7294,11 +7839,13 @@ link ${workdir}/link_src ${workdir}/link_dst && cat ${workdir}/link_dst
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox ln
 Source: `test/e2e/tools/mimixbox/fileutils/ln.atago.yaml`
 ### Scenario: ln creates a hard link to the same content
 #### Given
 - Fixture file `ln/target.txt` is created.
+
 #### Inputs
 _Fixture `ln/target.txt`:_
 ```text
@@ -7311,9 +7858,11 @@ ln ${workdir}/ln/target.txt ${workdir}/ln/hardlink.txt && cat ${workdir}/ln/hard
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: ln -s creates a symbolic link
 #### Given
 - Fixture file `ln/target.txt` is created.
+
 #### Inputs
 _Fixture `ln/target.txt`:_
 ```text
@@ -7326,6 +7875,7 @@ ln -s ${workdir}/ln/target.txt ${workdir}/ln/symlink.txt && test -L ${workdir}/l
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: ln with no operand reports an error
 #### When
 ```shell
@@ -7334,6 +7884,7 @@ ln
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox ln GNU flags
 Source: `test/e2e/tools/mimixbox/fileutils/ln_gnu.atago.yaml`
 ### Scenario: ln -s --relative stores the target relative to the link location
@@ -7348,6 +7899,7 @@ ln -s --relative ${workdir}/ln_gnu/a/target.txt ${workdir}/ln_gnu/b/link.txt && 
 - after `ln -s --relative ${workdir}/ln_gnu/a/target.txt ${workdir}/ln_gnu/b/link.txt && readlink ${workdir}/ln_gnu/b/link.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: ln --target-directory links each operand into the directory
 #### When
 ```shell
@@ -7361,6 +7913,7 @@ ln --target-directory ${workdir}/ln_gnu/dst ${workdir}/ln_gnu/a.txt ${workdir}/l
 - after `ln --target-directory ${workdir}/ln_gnu/dst ${workdir}/ln_gnu/a.txt ${workdir}/ln_gnu/b.txt && ls ${workdir}/ln_gnu/dst`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7379,6 +7932,7 @@ ls ${workdir}/ls
 - after `ls ${workdir}/ls`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7396,6 +7950,7 @@ ls -a ${workdir}/ls
 - after `ls -a ${workdir}/ls`:
   - exit code is `0`
   - stdout contains `.hidden`
+
 ### Scenario: marks directories with -F
 #### When
 ```shell
@@ -7406,6 +7961,7 @@ ls -F ${workdir}/ls
 - after `ls -F ${workdir}/ls`:
   - exit code is `0`
   - stdout contains `sub/`
+
 ## mimixbox ls GNU flags
 Source: `test/e2e/tools/mimixbox/fileutils/ls_gnu.atago.yaml`
 ### Scenario: colors directories with --color=always
@@ -7427,6 +7983,7 @@ ls --color=always ${workdir}/ls_gnu
   - exit code is `0`
   - stdout contains `adir`
   - stdout matches `/\x1b\[01;34m/`
+
 ### Scenario: emits no escapes with --color=never
 #### When
 ```shell
@@ -7445,6 +8002,7 @@ ls --color=never ${workdir}/ls_gnu
 - after `ls --color=never ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout does not contain `"\x1b"`
+
 ### Scenario: appends / * @ with -F
 #### When
 ```shell
@@ -7463,6 +8021,7 @@ ls -F ${workdir}/ls_gnu
 - after `ls -F ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout contains `adir/`, `run.sh*`, `link@`
+
 ### Scenario: omits * for executables with --file-type
 #### When
 ```shell
@@ -7482,6 +8041,7 @@ ls --file-type ${workdir}/ls_gnu
   - exit code is `0`
   - stdout contains `adir/`
   - stdout does not contain `run.sh*`
+
 ### Scenario: marks only dirs with --indicator-style=slash
 #### When
 ```shell
@@ -7501,6 +8061,7 @@ ls --indicator-style=slash ${workdir}/ls_gnu
   - exit code is `0`
   - stdout contains `adir/`
   - stdout does not contain `link@`
+
 ### Scenario: lists largest first with --sort=size
 #### When
 ```shell
@@ -7519,6 +8080,7 @@ ls --sort=size ${workdir}/ls_gnu
 - after `ls --sort=size ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout line `1` equals an exact value
+
 ### Scenario: lists directories first with --group-directories-first
 #### When
 ```shell
@@ -7537,6 +8099,7 @@ ls --group-directories-first ${workdir}/ls_gnu
 - after `ls --group-directories-first ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout line `1` equals an exact value
+
 ### Scenario: drops matches with --ignore
 #### When
 ```shell
@@ -7555,6 +8118,7 @@ ls --ignore=*.log ${workdir}/ls_gnu
 - after `ls --ignore=*.log ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout does not contain `a.log`
+
 ### Scenario: drops matches with --hide
 #### When
 ```shell
@@ -7573,6 +8137,7 @@ ls --hide=tmp* ${workdir}/ls_gnu
 - after `ls --hide=tmp* ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout does not contain `tmpfile`
+
 ### Scenario: keeps hidden matches when -a is given
 #### When
 ```shell
@@ -7591,6 +8156,7 @@ ls -a --hide=tmp* ${workdir}/ls_gnu
 - after `ls -a --hide=tmp* ${workdir}/ls_gnu`:
   - exit code is `0`
   - stdout contains `tmpfile`
+
 ### Scenario: prints an inode number with -i
 #### When
 ```shell
@@ -7603,6 +8169,7 @@ ls -i ${workdir}/ls_gnu/small.txt
 - after `ls -i ${workdir}/ls_gnu/small.txt`:
   - exit code is `0`
   - stdout matches `/[0-9]+ +.*small.txt/`
+
 ### Scenario: scales sizes to 1024-byte blocks with -k
 #### When
 ```shell
@@ -7615,6 +8182,7 @@ ls -l -k ${workdir}/ls_gnu/big.txt
 - after `ls -l -k ${workdir}/ls_gnu/big.txt`:
   - exit code is `0`
   - stdout contains ` 5 `
+
 ## mimixbox mkdir
 Source: `test/e2e/tools/mimixbox/fileutils/mkdir.atago.yaml`
 ### Scenario: make a single directory
@@ -7625,6 +8193,7 @@ mkdir -p mkdir && mkdir ${workdir}/mkdir/single && ls ${workdir}/mkdir
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: make three directories
 #### When
 ```shell
@@ -7633,6 +8202,7 @@ mkdir -p mkdir && mkdir ${workdir}/mkdir/1 ${workdir}/mkdir/2 ${workdir}/mkdir/3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7648,6 +8218,7 @@ mkdir -p mkdir && mkdir -p ${workdir}/mkdir/parents/child && ls ${workdir}/mkdir
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: make a directory from a pipe
 #### When
 ```shell
@@ -7656,6 +8227,7 @@ mkdir -p mkdir && echo "${workdir}/mkdir/pipe" | xargs mkdir && ls ${workdir}/mk
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print error without operand
 #### When
 ```shell
@@ -7664,6 +8236,7 @@ mkdir
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: print error with --parents and no operand
 #### When
 ```shell
@@ -7672,6 +8245,7 @@ mkdir -p
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: make 1 and 3 but fail to make 2 at an unwritable path
 #### When
 ```shell
@@ -7680,6 +8254,7 @@ mkdir -p mkdir && mkdir ${workdir}/mkdir/1 /mkdir/2 ${workdir}/mkdir/3; ls ${wor
 #### Then
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7696,6 +8271,7 @@ mkdir -p mkfifo && chmod 775 mkfifo && mkfifo ${workdir}/mkfifo/1 && ls -al ${wo
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: make three named pipes with mode prw-r--r--
 #### When
 ```shell
@@ -7709,6 +8285,7 @@ ls -al ${workdir}/mkfifo/3 | cut -f 1 -d " "
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7724,6 +8301,7 @@ mkfifo /no_exist_path/fifo
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: print error when the same name already exists
 #### When
 ```shell
@@ -7734,6 +8312,7 @@ mkfifo ${workdir}/mkfifo/1
 - after `mkfifo ${workdir}/mkfifo/1`:
   - exit code is not `0`
   - stderr equals an exact value
+
 ### Scenario: make two pipes and report the one that failed
 #### When
 ```shell
@@ -7745,6 +8324,7 @@ ls ${workdir}/mkfifo
 #### Then
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7761,6 +8341,7 @@ mountpoint /
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox mv
 Source: `test/e2e/tools/mimixbox/fileutils/mv.atago.yaml`
 ### Scenario: rename a file
@@ -7773,6 +8354,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/rename.txt && ls ${workdir}/mv/rename.txt
 - after `mv ${workdir}/mv/1.txt ${workdir}/mv/rename.txt && ls ${workdir}/mv/rename.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: move a file into an inner directory
 #### When
 ```shell
@@ -7783,6 +8365,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/inner && ls ${workdir}/mv/inner
 - after `mv ${workdir}/mv/1.txt ${workdir}/mv/inner && ls ${workdir}/mv/inner`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7799,6 +8382,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/2.txt ${workdir}/mv/3.txt ${workdir}/mv/inn
 - after `mv ${workdir}/mv/1.txt ${workdir}/mv/2.txt ${workdir}/mv/3.txt ${workdir}/mv/inner && ls ${workdir}/mv/inner`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7817,6 +8401,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/no_exist_file ${workdir}/mv/3.txt ${workdir
 - after `mv ${workdir}/mv/1.txt ${workdir}/mv/no_exist_file ${workdir}/mv/3.txt ${workdir}/mv/inner; ls ${workdir}/mv/inner`:
   - stdout equals an exact value
   - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7834,6 +8419,7 @@ mv ${workdir}/mv2 ${workdir}/mv && ls ${workdir}/mv
 - after `mv ${workdir}/mv2 ${workdir}/mv && ls ${workdir}/mv`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7853,6 +8439,7 @@ mv ${workdir}/mv2 ${workdir}/mv3 ${workdir}/mv4 ${workdir}/mv && ls ${workdir}/m
 - after `mv ${workdir}/mv2 ${workdir}/mv3 ${workdir}/mv4 ${workdir}/mv && ls ${workdir}/mv`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7874,6 +8461,7 @@ mv ${workdir}/mv2 ${workdir}/mv/no_exist_dir ${workdir}/mv4 ${workdir}/mv/inner;
 - after `mv ${workdir}/mv2 ${workdir}/mv/no_exist_dir ${workdir}/mv4 ${workdir}/mv/inner; ls ${workdir}/mv/inner`:
   - stdout equals an exact value
   - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7891,6 +8479,7 @@ mv ${workdir}/mv/1.txt ${workdir}/mv/1.txt
 - after `mv ${workdir}/mv/1.txt ${workdir}/mv/1.txt`:
   - exit code is not `0`
   - stderr equals an exact value
+
 #### Expected output
 _expected stderr:_
 ```text
@@ -7906,6 +8495,7 @@ touch ${workdir}/mv/inner.txt && mv ${workdir}/mv/inner.txt ${workdir}/mv/inner/
 - after `touch ${workdir}/mv/inner.txt && mv ${workdir}/mv/inner.txt ${workdir}/mv/inner/inner.txt && ls ${workdir}/mv && ls ${workdir}/mv/inner`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7925,6 +8515,7 @@ touch ${workdir}/mv/inner.txt && mv -b ${workdir}/mv/inner.txt ${workdir}/mv/inn
 - after `touch ${workdir}/mv/inner.txt && mv -b ${workdir}/mv/inner.txt ${workdir}/mv/inner && ls ${workdir}/mv/inner`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7946,6 +8537,7 @@ mv --target-directory ${workdir}/mv_gnu/dst ${workdir}/mv_gnu/a.txt ${workdir}/m
 - after `mv --target-directory ${workdir}/mv_gnu/dst ${workdir}/mv_gnu/a.txt ${workdir}/mv_gnu/b.txt && ls ${workdir}/mv_gnu/dst`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -7966,6 +8558,7 @@ cat ${workdir}/mv_gnu/dest.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox readlink
 Source: `test/e2e/tools/mimixbox/fileutils/readlink.atago.yaml`
 ### Scenario: prints the symlink target
@@ -7978,12 +8571,14 @@ readlink ${workdir}/rl_link
 - after `readlink ${workdir}/rl_link`:
   - exit code is `0`
   - stdout equals an exact value
+
 ## mimixbox readlink_gnu
 Source: `test/e2e/tools/mimixbox/fileutils/readlink_gnu.atago.yaml`
 ### Scenario: fails when -e is given a missing path
 #### Given
 - Fixture file `target` is created.
 - Fixture file `link` is created.
+
 #### When
 ```shell
 readlink -e ${workdir}/does-not-exist
@@ -7991,10 +8586,12 @@ readlink -e ${workdir}/does-not-exist
 #### Then
 - exit code is not `0`
 - stdout is empty
+
 ### Scenario: succeeds when -e is given an existing symlink
 #### Given
 - Fixture file `target` is created.
 - Fixture file `link` is created.
+
 #### When
 ```shell
 readlink -e ${workdir}/link
@@ -8002,10 +8599,12 @@ readlink -e ${workdir}/link
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: succeeds with -m on a missing path
 #### Given
 - Fixture file `target` is created.
 - Fixture file `link` is created.
+
 #### When
 ```shell
 readlink -m ${workdir}/a/b/c
@@ -8013,10 +8612,12 @@ readlink -m ${workdir}/a/b/c
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: terminates output with NUL under -z
 #### Given
 - Fixture file `target` is created.
 - Fixture file `link` is created.
+
 #### When
 ```shell
 readlink -z ${workdir}/link
@@ -8024,6 +8625,7 @@ readlink -z ${workdir}/link
 #### Then
 - exit code is `0`
 - stdout matches `/target\x00$/`
+
 ## mimixbox rm
 Source: `test/e2e/tools/mimixbox/fileutils/rm.atago.yaml`
 ### Scenario: remove one file
@@ -8036,6 +8638,7 @@ rm ${workdir}/rm/1.txt && ls ${workdir}/rm
 - after `rm ${workdir}/rm/1.txt && ls ${workdir}/rm`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8053,6 +8656,7 @@ rm ${workdir}/rm/*.txt && ls ${workdir}/rm
 - after `rm ${workdir}/rm/*.txt && ls ${workdir}/rm`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: remove three files at the same time
 #### When
 ```shell
@@ -8063,6 +8667,7 @@ rm ${workdir}/rm/1.txt ${workdir}/rm/2.txt ${workdir}/rm/3.txt && ls ${workdir}/
 - after `rm ${workdir}/rm/1.txt ${workdir}/rm/2.txt ${workdir}/rm/3.txt && ls ${workdir}/rm`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: remove two files and report the missing one
 #### When
 ```shell
@@ -8073,6 +8678,7 @@ rm ${workdir}/rm/1.txt ${workdir}/rm/no_exist_file.txt ${workdir}/rm/3.txt; ls $
 - after `rm ${workdir}/rm/1.txt ${workdir}/rm/no_exist_file.txt ${workdir}/rm/3.txt; ls ${workdir}/rm`:
   - stdout equals an exact value
   - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8093,6 +8699,7 @@ rm ${workdir}/rm; ls ${workdir}/rm
 - after `rm ${workdir}/rm; ls ${workdir}/rm`:
   - stdout equals an exact value
   - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8110,6 +8717,7 @@ rm -rf ${workdir}/rm && ls ${workdir}
 #### Then
 - after `rm -rf ${workdir}/rm && ls ${workdir}`:
   - exit code is `0`
+
 ## mimixbox rm GNU flags
 Source: `test/e2e/tools/mimixbox/fileutils/rm_gnu.atago.yaml`
 ### Scenario: refuses to recurse on / by default (--preserve-root)
@@ -8120,6 +8728,7 @@ rm -r /
 #### Then
 - exit code is not `0`
 - stderr contains `it is dangerous to operate recursively on '/'`, `use --no-preserve-root to override this failsafe`
+
 ### Scenario: removes an ordinary directory recursively (guard does not interfere)
 #### When
 ```shell
@@ -8128,6 +8737,7 @@ mkdir -p tree/sub && : > tree/sub/leaf.txt && rm -r tree && [ ! -e tree ] && pri
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: removes a single-filesystem tree with --one-file-system
 #### When
 ```shell
@@ -8136,6 +8746,7 @@ mkdir -p ofs/a/b && : > ofs/a/b/leaf.txt && : > ofs/top.txt && rm -r --one-file-
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: removes a tree when --no-preserve-root is given (safe target)
 #### When
 ```shell
@@ -8144,6 +8755,7 @@ mkdir -p victim/sub && : > victim/sub/f && rm -r --no-preserve-root victim && [ 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox rmdir
 Source: `test/e2e/tools/mimixbox/fileutils/rmdir.atago.yaml`
 ### Scenario: removes an empty directory
@@ -8154,6 +8766,7 @@ mkdir -p ${workdir}/rmdir/empty && rmdir ${workdir}/rmdir/empty && test ! -d ${w
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails on a non-empty directory
 #### When
 ```shell
@@ -8164,6 +8777,7 @@ rmdir ${workdir}/rmdir/full
 - after `rmdir ${workdir}/rmdir/full`:
   - exit code is not `0`
   - stderr equals an exact value
+
 #### Expected output
 _expected stderr:_
 ```text
@@ -8181,6 +8795,7 @@ test ! -d ${workdir}/rmdir/a && echo "removed"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rmdir with no operand reports an error
 #### When
 ```shell
@@ -8189,6 +8804,7 @@ rmdir
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox serial
 Source: `test/e2e/tools/mimixbox/fileutils/serial.atago.yaml`
 ### Scenario: adds a serial-number prefix to each file
@@ -8201,6 +8817,7 @@ serial ${workdir}/serial > /dev/null && ls ${workdir}/serial
 - after `serial ${workdir}/serial > /dev/null && ls ${workdir}/serial`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8218,6 +8835,7 @@ serial -d ${workdir}/serial > /dev/null && ls ${workdir}/serial
 - after `serial -d ${workdir}/serial > /dev/null && ls ${workdir}/serial`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8233,11 +8851,13 @@ serial
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox shred
 Source: `test/e2e/tools/mimixbox/fileutils/shred.atago.yaml`
 ### Scenario: overwrites and removes the file
 #### Given
 - Fixture file `shred_file` is created.
+
 #### Inputs
 _Fixture `shred_file`:_
 ```text
@@ -8250,11 +8870,13 @@ shred -u ${workdir}/shred_file && test ! -e ${workdir}/shred_file && echo gone
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox stat
 Source: `test/e2e/tools/mimixbox/fileutils/stat.atago.yaml`
 ### Scenario: prints the size with a custom format
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8267,11 +8889,13 @@ stat -c %s ${workdir}/stat_file
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox stat GNU flags
 Source: `test/e2e/tools/mimixbox/fileutils/stat_gnu.atago.yaml`
 ### Scenario: prints name and size via --printf with no trailing newline
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8284,9 +8908,11 @@ stat --printf '%n=%s' ${workdir}/stat_file
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: interprets backslash escapes in --printf
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8299,9 +8925,11 @@ stat --printf '%n %s\n' ${workdir}/stat_file
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: appends a trailing newline for --format
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8314,9 +8942,11 @@ stat --format '%s' ${workdir}/stat_file | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints a single space-separated terse line
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8329,9 +8959,11 @@ stat --terse ${workdir}/stat_file | awk '{print NF}'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports the size as the second terse field
 #### Given
 - Fixture file `stat_file` is created.
+
 #### Inputs
 _Fixture `stat_file`:_
 ```text
@@ -8344,6 +8976,7 @@ stat --terse ${workdir}/stat_file | awk '{print $2}'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox touch
 Source: `test/e2e/tools/mimixbox/fileutils/touch.atago.yaml`
 ### Scenario: make one file
@@ -8354,6 +8987,7 @@ mkdir -p touch && touch ${workdir}/touch/touch.txt && ls ${workdir}/touch/touch.
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: make three files at the same time
 #### When
 ```shell
@@ -8367,6 +9001,7 @@ ls ${workdir}/touch/3.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8386,6 +9021,7 @@ ls ${workdir}/touch/3.txt
 #### Then
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8402,6 +9038,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/touch_gnu.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: sets a known time with --date
 #### When
 ```shell
@@ -8410,6 +9047,7 @@ Source: `test/e2e/tools/mimixbox/fileutils/touch_gnu.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: accepts --time=atime without error
 #### When
 ```shell
@@ -8418,8 +9056,10 @@ touch --time=atime g
 #### Then
 - exit code is `0`
 - file `g` exists
+
 #### Generated artifacts
 - `g`
+
 ### Scenario: rejects an invalid --time word
 #### When
 ```shell
@@ -8428,6 +9068,7 @@ touch --time=bogus h
 #### Then
 - exit code is not `0`
 - stderr contains `invalid argument`
+
 ### Scenario: changes the symlink itself with --no-dereference (-h)
 #### When
 ```shell
@@ -8436,6 +9077,7 @@ touch --time=bogus h
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox truncate
 Source: `test/e2e/tools/mimixbox/fileutils/truncate.atago.yaml`
 ### Scenario: sets the file to the given size
@@ -8446,11 +9088,13 @@ truncate -s 7 ${workdir}/tr_file && wc -c < ${workdir}/tr_file | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox unlink
 Source: `test/e2e/tools/mimixbox/fileutils/unlink.atago.yaml`
 ### Scenario: removes a single file
 #### Given
 - Fixture file `unlink.txt` is created.
+
 #### Inputs
 _Fixture `unlink.txt`:_
 ```text
@@ -8463,11 +9107,13 @@ unlink ${workdir}/unlink.txt && test ! -e ${workdir}/unlink.txt && echo gone
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox alias parity
 Source: `test/e2e/tools/mimixbox/findutils/alias_parity.atago.yaml`
 ### Scenario: egrep matches the same lines as grep -E over the same file
 #### Given
 - Fixture file `fixture.txt` is created.
+
 #### Inputs
 _Fixture `fixture.txt`:_
 ```text
@@ -8483,6 +9129,7 @@ egrep 'a(p|x)' fixture.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8492,6 +9139,7 @@ axb
 ### Scenario: fgrep matches the same lines as grep -F over the same file
 #### Given
 - Fixture file `fixture.txt` is created.
+
 #### Inputs
 _Fixture `fixture.txt`:_
 ```text
@@ -8507,6 +9155,7 @@ fgrep 'a.b' fixture.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: netcat answers --help with exit 0 and an Examples section
 #### When
 ```shell
@@ -8516,6 +9165,7 @@ netcat --help
 - exit code is `0`
 - stdout contains `Usage: netcat`, `Examples:`
 - stderr is empty
+
 ### Scenario: nc answers --help with exit 0 and an Examples section
 #### When
 ```shell
@@ -8525,6 +9175,7 @@ nc --help
 - exit code is `0`
 - stdout contains `Usage: nc`, `Examples:`
 - stderr is empty
+
 ## mimixbox egrep
 Source: `test/e2e/tools/mimixbox/findutils/egrep.atago.yaml`
 ### Scenario: describes itself with --help
@@ -8536,6 +9187,7 @@ egrep --help
 - exit code is `0`
 - stdout contains `Usage: egrep`
 - stderr is empty
+
 ## mimixbox fgrep
 Source: `test/e2e/tools/mimixbox/findutils/fgrep.atago.yaml`
 ### Scenario: describes itself with --help
@@ -8547,6 +9199,7 @@ fgrep --help
 - exit code is `0`
 - stdout contains `Usage: fgrep`
 - stderr is empty
+
 ## mimixbox find
 Source: `test/e2e/tools/mimixbox/findutils/find.atago.yaml`
 ### Scenario: finds a file by -name
@@ -8559,6 +9212,7 @@ find ${workdir}/find -name a.txt
 - after `find ${workdir}/find -name a.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: lists directories with -type d
 #### When
 ```shell
@@ -8569,6 +9223,7 @@ find ${workdir}/find -type d | wc -l | tr -d ' '
 - after `find ${workdir}/find -type d | wc -l | tr -d ' '`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: rejects an unknown predicate
 #### When
 ```shell
@@ -8579,6 +9234,7 @@ find ${workdir}/find -bogus
 - after `find ${workdir}/find -bogus`:
   - exit code is not `0`
   - stderr contains `unknown predicate`
+
 ### Scenario: prints usage for --help
 #### When
 ```shell
@@ -8587,6 +9243,7 @@ find --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: find`
+
 ### Scenario: lists an Options block with --help and --version in --help
 #### When
 ```shell
@@ -8595,6 +9252,7 @@ find --help
 #### Then
 - exit code is `0`
 - stdout contains `Options:`, `--help`, `--version`
+
 ### Scenario: documents the supported subset tokens in --help
 #### When
 ```shell
@@ -8603,6 +9261,7 @@ find --help
 #### Then
 - exit code is `0`
 - stdout contains `-name`, `-type`, `-print0`, `-maxdepth`, `-mindepth`
+
 ### Scenario: prints the version line for --version
 #### When
 ```shell
@@ -8611,6 +9270,7 @@ find --version
 #### Then
 - exit code is `0`
 - stdout contains `find (mimixbox)`
+
 ## mimixbox grep
 Source: `test/e2e/tools/mimixbox/findutils/grep.atago.yaml`
 ### Scenario: matches lines from stdin
@@ -8621,9 +9281,11 @@ printf 'one\ntwo\nthree\n' | grep two
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: matches lines from a file
 #### Given
 - Fixture file `fruits.txt` is created.
+
 #### Inputs
 _Fixture `fruits.txt`:_
 ```text
@@ -8638,9 +9300,11 @@ grep an ${workdir}/fruits.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: counts matching lines with -c
 #### Given
 - Fixture file `fruits.txt` is created.
+
 #### Inputs
 _Fixture `fruits.txt`:_
 ```text
@@ -8655,6 +9319,7 @@ grep -c a ${workdir}/fruits.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: exits 1 when nothing matches
 #### When
 ```shell
@@ -8662,11 +9327,13 @@ printf 'x\n' | grep zzz
 ```
 #### Then
 - exit code is `1`
+
 ## mimixbox grep GNU flags
 Source: `test/e2e/tools/mimixbox/findutils/grep_gnu.atago.yaml`
 ### Scenario: prints trailing context with -A1
 #### Given
 - Fixture file `grep_gnu/ctx.txt` is created.
+
 #### Inputs
 _Fixture `grep_gnu/ctx.txt`:_
 ```text
@@ -8683,6 +9350,7 @@ grep -A1 MATCH ${workdir}/grep_gnu/ctx.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8692,6 +9360,7 @@ b
 ### Scenario: prints leading context with -B1
 #### Given
 - Fixture file `grep_gnu/ctx2.txt` is created.
+
 #### Inputs
 _Fixture `grep_gnu/ctx2.txt`:_
 ```text
@@ -8706,6 +9375,7 @@ grep -B1 MATCH ${workdir}/grep_gnu/ctx2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8715,6 +9385,7 @@ MATCH
 ### Scenario: prints surrounding context with -C1
 #### Given
 - Fixture file `grep_gnu/ctx2.txt` is created.
+
 #### Inputs
 _Fixture `grep_gnu/ctx2.txt`:_
 ```text
@@ -8729,6 +9400,7 @@ grep -C1 MATCH ${workdir}/grep_gnu/ctx2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -8739,6 +9411,7 @@ b
 ### Scenario: separates non-contiguous groups with --
 #### Given
 - Fixture file `grep_gnu/groups.txt` is created.
+
 #### Inputs
 _Fixture `grep_gnu/groups.txt`:_
 ```text
@@ -8757,6 +9430,7 @@ grep -A1 MATCH ${workdir}/grep_gnu/groups.txt
 #### Then
 - exit code is `0`
 - stdout line `3` equals an exact value
+
 ### Scenario: searches only included files with --include
 #### When
 ```shell
@@ -8771,6 +9445,7 @@ grep -r --include=*.go needle ${workdir}/grep_gnu
   - exit code is `0`
   - stdout contains `keep.go`
   - stdout does not contain `skip.txt`
+
 ### Scenario: skips excluded files with --exclude
 #### When
 ```shell
@@ -8784,6 +9459,7 @@ grep -r --exclude=*.log needle ${workdir}/grep_gnu
 - after `grep -r --exclude=*.log needle ${workdir}/grep_gnu`:
   - exit code is `0`
   - stdout does not contain `app.log`
+
 ### Scenario: skips excluded directories with --exclude-dir
 #### When
 ```shell
@@ -8797,6 +9473,7 @@ grep -r --exclude-dir=vendor needle ${workdir}/grep_gnu
 - after `grep -r --exclude-dir=vendor needle ${workdir}/grep_gnu`:
   - exit code is `0`
   - stdout does not contain `vendor`
+
 ### Scenario: highlights matches with --color=always
 #### When
 ```shell
@@ -8805,9 +9482,11 @@ printf 'hello world\n' | grep --color=always world
 #### Then
 - exit code is `0`
 - stdout contains `world`
+
 ### Scenario: prints byte offsets with -b
 #### Given
 - Fixture file `grep_gnu/off.txt` is created.
+
 #### Inputs
 _Fixture `grep_gnu/off.txt`:_
 ```text
@@ -8822,6 +9501,7 @@ grep -b bbb ${workdir}/grep_gnu/off.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints files without a match with -L
 #### When
 ```shell
@@ -8836,6 +9516,7 @@ grep -L needle ${workdir}/grep_gnu/hit.txt ${workdir}/grep_gnu/miss.txt
   - exit code is `0`
   - stdout contains `miss.txt`
   - stdout does not contain `hit.txt`
+
 ## mimixbox findutils help helpers
 Source: `test/e2e/tools/mimixbox/findutils/help_helpers_findutils.atago.yaml`
 ### Scenario: egrep --help is structured
@@ -8846,6 +9527,7 @@ egrep --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: fgrep --help is structured
 #### When
 ```shell
@@ -8854,6 +9536,7 @@ fgrep --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox xargs
 Source: `test/e2e/tools/mimixbox/findutils/xargs.atago.yaml`
 ### Scenario: appends stdin items to the command
@@ -8864,6 +9547,7 @@ printf 'a b c\n' | xargs echo
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: splits into groups with -n
 #### When
 ```shell
@@ -8872,6 +9556,7 @@ printf '1 2 3 4\n' | xargs -n 2 echo | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: substitutes with -I
 #### When
 ```shell
@@ -8880,6 +9565,7 @@ printf 'world\n' | xargs -I {} echo hello {}
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox xargs GNU flags
 Source: `test/e2e/tools/mimixbox/findutils/xargs_gnu.atago.yaml`
 ### Scenario: runs once per input line with -L 1
@@ -8890,6 +9576,7 @@ printf 'a b\nc d\ne f\n' | xargs -L 1 echo | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: groups two input lines per invocation with -L 2
 #### When
 ```shell
@@ -8898,6 +9585,7 @@ printf 'a\nb\nc\n' | xargs -L 2 echo | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: splits a long input into multiple invocations with -s
 #### When
 ```shell
@@ -8906,6 +9594,7 @@ printf '1 2 3 4 5 6 7 8\n' | xargs -s 8 echo | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: keeps every item across the -s split invocations
 #### When
 ```shell
@@ -8914,6 +9603,7 @@ printf '1 2 3 4 5 6 7 8\n' | xargs -s 8 echo | tr ' ' '\n' | grep -c .
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs all batches concurrently with -P 4
 #### When
 ```shell
@@ -8922,6 +9612,7 @@ printf 'a\nb\nc\nd\n' | xargs -P 4 -n 1 echo | sort | tr '\n' ' ' | sed 's/ $//'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs all batches with -P 0
 #### When
 ```shell
@@ -8930,6 +9621,7 @@ printf 'a\nb\nc\nd\n' | xargs -P 0 -n 1 echo | sort | tr '\n' ' ' | sed 's/ $//'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox lifegame CLI contract
 Source: `test/e2e/tools/mimixbox/games/lifegame.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -8940,6 +9632,7 @@ lifegame --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: lifegame`
+
 ## mimixbox banner
 Source: `test/e2e/tools/mimixbox/jokeutils/banner.atago.yaml`
 ### Scenario: prints five rows of art
@@ -8950,6 +9643,7 @@ banner HI | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cmatrix
 Source: `test/e2e/tools/mimixbox/jokeutils/cmatrix.atago.yaml`
 ### Scenario: exits gracefully without a terminal
@@ -8962,6 +9656,7 @@ echo "rc:$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cowsay
 Source: `test/e2e/tools/mimixbox/jokeutils/cowsay.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -8972,6 +9667,7 @@ cowsay --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: cowsay`
+
 ### Scenario: renders the message in the speech bubble
 #### When
 ```shell
@@ -8980,6 +9676,7 @@ cowsay hello
 #### Then
 - exit code is `0`
 - stdout contains `hello`
+
 ## mimixbox cowthink
 Source: `test/e2e/tools/mimixbox/jokeutils/cowthink.atago.yaml`
 ### Scenario: draws the thought-bubble connector
@@ -8990,6 +9687,7 @@ cowthink hi | head -n 4 | tail -n 1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox fakemovie
 Source: `test/e2e/tools/mimixbox/jokeutils/fakemovie.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -9000,6 +9698,7 @@ fakemovie --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fakemovie`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -9008,6 +9707,7 @@ fakemovie
 #### Then
 - exit code is not `0`
 - stderr contains `fakemovie`
+
 ## mimixbox fortune
 Source: `test/e2e/tools/mimixbox/jokeutils/fortune.atago.yaml`
 ### Scenario: prints a single adage line
@@ -9018,6 +9718,7 @@ fortune | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox jokeutils --help contract
 Source: `test/e2e/tools/mimixbox/jokeutils/help_helpers.atago.yaml`
 ### Scenario: sl --help is structured
@@ -9028,6 +9729,7 @@ sl --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox nyancat
 Source: `test/e2e/tools/mimixbox/jokeutils/nyancat.atago.yaml`
 ### Scenario: exits gracefully without a terminal
@@ -9040,6 +9742,7 @@ echo "rc:$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox sl
 Source: `test/e2e/tools/mimixbox/jokeutils/sl.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9051,6 +9754,7 @@ sl --help
 - exit code is `0`
 - stdout contains `Usage: sl`
 - stderr is empty
+
 ## mimixbox acpid
 Source: `test/e2e/tools/mimixbox/loginutils/acpid.atago.yaml`
 ### Scenario: requires foreground mode
@@ -9060,6 +9764,7 @@ acpid
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9068,6 +9773,7 @@ acpid --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: acpid`, `ACPI`
+
 ## mimixbox addgroup
 Source: `test/e2e/tools/mimixbox/loginutils/addgroup.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9079,6 +9785,7 @@ addgroup --help
 - exit code is `0`
 - stdout contains `Usage: addgroup`
 - stderr is empty
+
 ## mimixbox adduser
 Source: `test/e2e/tools/mimixbox/loginutils/adduser.atago.yaml`
 ### Scenario: requires a user name
@@ -9088,6 +9795,7 @@ adduser
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9096,6 +9804,7 @@ adduser --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: adduser`, `account`
+
 ## mimixbox bootchartd
 Source: `test/e2e/tools/mimixbox/loginutils/bootchartd.atago.yaml`
 ### Scenario: records a proc_stat sample
@@ -9106,6 +9815,7 @@ bootchartd -o "${workdir}/bc" >/dev/null && grep -c '^cpu ' "${workdir}/bc/proc_
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox chpasswd
 Source: `test/e2e/tools/mimixbox/loginutils/chpasswd.atago.yaml`
 ### Scenario: rejects an unknown method
@@ -9120,6 +9830,7 @@ chpasswd -c bogus
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9128,6 +9839,7 @@ chpasswd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: chpasswd`, `password`
+
 ## mimixbox chsh
 Source: `test/e2e/tools/mimixbox/loginutils/chsh.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9138,6 +9850,7 @@ chsh --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: chsh`, `login shell`
+
 ### Scenario: lists shells and exits successfully
 #### When
 ```shell
@@ -9145,6 +9858,7 @@ chsh -l
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: rejects an unknown user
 #### When
 ```shell
@@ -9152,6 +9866,7 @@ chsh -s /bin/sh mimixbox-no-such-user-xyz
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects a relative shell path
 #### When
 ```shell
@@ -9159,6 +9874,7 @@ chsh -s relative/shell root
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox crond
 Source: `test/e2e/tools/mimixbox/loginutils/crond.atago.yaml`
 ### Scenario: requires foreground mode
@@ -9168,6 +9884,7 @@ crond
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9176,6 +9893,7 @@ crond --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: crond`, `cron`
+
 ## mimixbox crontab
 Source: `test/e2e/tools/mimixbox/loginutils/crontab.atago.yaml`
 ### Scenario: reports that interactive edit is unsupported
@@ -9185,6 +9903,7 @@ crontab -e
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9193,6 +9912,7 @@ crontab --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: crontab`, `crontab`
+
 ## mimixbox cryptpw
 Source: `test/e2e/tools/mimixbox/loginutils/cryptpw.atago.yaml`
 ### Scenario: hashes a stdin password with sha-512
@@ -9208,6 +9928,7 @@ cryptpw -S abcdefgh
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -9226,6 +9947,7 @@ cryptpw -m md5 -S abcdefgh
 #### Then
 - exit code is `0`
 - stdout contains `$1$abcdefgh$`
+
 ## mimixbox delgroup
 Source: `test/e2e/tools/mimixbox/loginutils/delgroup.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9237,6 +9959,7 @@ delgroup --help
 - exit code is `0`
 - stdout contains `Usage: delgroup`
 - stderr is empty
+
 ## mimixbox deluser
 Source: `test/e2e/tools/mimixbox/loginutils/deluser.atago.yaml`
 ### Scenario: requires a user name
@@ -9246,6 +9969,7 @@ deluser
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9254,6 +9978,7 @@ deluser --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: deluser`, `user`
+
 ## mimixbox getty
 Source: `test/e2e/tools/mimixbox/loginutils/getty.atago.yaml`
 ### Scenario: prints the login prompt
@@ -9265,6 +9990,7 @@ printf '\n' | getty tty1 2>/dev/null | grep -c 'login: '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a TTY argument
 #### Inputs
 _stdin for `getty`:_
@@ -9277,6 +10003,7 @@ getty
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox addgroup / delgroup
 Source: `test/e2e/tools/mimixbox/loginutils/group.atago.yaml`
 ### Scenario: addgroup requires a group name
@@ -9286,6 +10013,7 @@ addgroup
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: delgroup requires a group name
 #### When
 ```shell
@@ -9293,6 +10021,7 @@ delgroup
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox loginutils --help helpers
 Source: `test/e2e/tools/mimixbox/loginutils/help_helpers_loginutils.atago.yaml`
 ### Scenario: addgroup --help is structured
@@ -9303,6 +10032,7 @@ addgroup --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: delgroup --help is structured
 #### When
 ```shell
@@ -9311,6 +10041,7 @@ delgroup --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: linuxrc --help is structured
 #### When
 ```shell
@@ -9319,6 +10050,7 @@ linuxrc --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: run-init --help is structured
 #### When
 ```shell
@@ -9327,6 +10059,7 @@ run-init --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: run-parts --help is structured
 #### When
 ```shell
@@ -9335,6 +10068,7 @@ run-parts --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: start-stop-daemon --help is structured
 #### When
 ```shell
@@ -9343,11 +10077,13 @@ start-stop-daemon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox init
 Source: `test/e2e/tools/mimixbox/loginutils/init.atago.yaml`
 ### Scenario: runs the inittab sysinit and wait actions
 #### Given
 - Fixture file `inittab` is created.
+
 #### Inputs
 _Fixture `inittab`:_
 ```text
@@ -9362,6 +10098,7 @@ init -t inittab
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: fails on a missing inittab
 #### When
 ```shell
@@ -9369,6 +10106,7 @@ init -t no_such_inittab
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox login
 Source: `test/e2e/tools/mimixbox/loginutils/login.atago.yaml`
 ### Scenario: fails for an unknown user
@@ -9383,6 +10121,7 @@ login nonexistent_user_xyz
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9391,6 +10130,7 @@ login --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: login`, `login shell`
+
 ## mimixbox mkpasswd
 Source: `test/e2e/tools/mimixbox/loginutils/mkpasswd.atago.yaml`
 ### Scenario: hashes with sha-512 and a fixed salt
@@ -9401,6 +10141,7 @@ mkpasswd -m sha-512 -S abcdefgh secret
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -9419,6 +10160,7 @@ mkpasswd -m md5 -S abcdefgh
 #### Then
 - exit code is `0`
 - stdout contains `$1$abcdefgh$`
+
 ## mimixbox nologin
 Source: `test/e2e/tools/mimixbox/loginutils/nologin.atago.yaml`
 ### Scenario: prints a refusal and exits non-zero
@@ -9429,6 +10171,7 @@ nologin
 #### Then
 - exit code is not `0`
 - stdout contains `not available`
+
 ### Scenario: never runs a passed command
 #### When
 ```shell
@@ -9437,6 +10180,7 @@ count=$(nologin -c "echo pwned" 2>/dev/null | grep -c pwned); echo "$count"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox passwd
 Source: `test/e2e/tools/mimixbox/loginutils/passwd.atago.yaml`
 ### Scenario: rejects conflicting flags
@@ -9446,6 +10190,7 @@ passwd -l -u alice
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9454,6 +10199,7 @@ passwd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: passwd`, `password`
+
 ## mimixbox run-init
 Source: `test/e2e/tools/mimixbox/loginutils/run-init.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9465,6 +10211,7 @@ run-init --help
 - exit code is `0`
 - stdout contains `Usage: run-init`
 - stderr is empty
+
 ## mimixbox run-parts
 Source: `test/e2e/tools/mimixbox/loginutils/run-parts.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9476,6 +10223,7 @@ run-parts --help
 - exit code is `0`
 - stdout contains `Usage: run-parts`
 - stderr is empty
+
 ## mimixbox run-init
 Source: `test/e2e/tools/mimixbox/loginutils/run_init.atago.yaml`
 ### Scenario: requires NEW_ROOT and INIT
@@ -9485,6 +10233,7 @@ run-init /tmp
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects a non-directory NEW_ROOT
 #### When
 ```shell
@@ -9492,12 +10241,14 @@ run-init /no/such/dir /init
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox run-parts
 Source: `test/e2e/tools/mimixbox/loginutils/run_parts.atago.yaml`
 ### Scenario: runs executables in alphabetical order
 #### Given
 - Fixture file `parts/20-b` is created.
 - Fixture file `parts/10-a` is created.
+
 #### Inputs
 _Fixture `parts/20-b`:_
 ```text
@@ -9517,6 +10268,7 @@ run-parts parts
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: requires a directory
 #### When
 ```shell
@@ -9524,6 +10276,7 @@ run-parts
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox runlevel
 Source: `test/e2e/tools/mimixbox/loginutils/runlevel.atago.yaml`
 ### Scenario: reports a runlevel or unknown
@@ -9533,6 +10286,7 @@ runlevel
 ```
 #### Then
 - stdout line `1` matches `/.+/`
+
 ## mimixbox start-stop-daemon
 Source: `test/e2e/tools/mimixbox/loginutils/start-stop-daemon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9544,6 +10298,7 @@ start-stop-daemon --help
 - exit code is `0`
 - stdout contains `Usage: start-stop-daemon`
 - stderr is empty
+
 ## mimixbox start-stop-daemon
 Source: `test/e2e/tools/mimixbox/loginutils/start_stop_daemon.atago.yaml`
 ### Scenario: starts and stops a background program
@@ -9564,6 +10319,7 @@ if kill -0 "$pid" 2>/dev/null; then echo alive; else echo "stopped"; fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a start or stop mode
 #### When
 ```shell
@@ -9571,6 +10327,7 @@ start-stop-daemon -p /tmp/x
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox su
 Source: `test/e2e/tools/mimixbox/loginutils/su.atago.yaml`
 ### Scenario: fails for an unknown user
@@ -9582,6 +10339,7 @@ su nonexistent_user_xyz
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9590,6 +10348,7 @@ su --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: su`, `user`
+
 ## mimixbox sulogin
 Source: `test/e2e/tools/mimixbox/loginutils/sulogin.atago.yaml`
 ### Scenario: rejects a wrong root password
@@ -9604,6 +10363,7 @@ sulogin
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9612,6 +10372,7 @@ sulogin --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: sulogin`, `root`
+
 ## mimixbox vlock
 Source: `test/e2e/tools/mimixbox/loginutils/vlock.atago.yaml`
 ### Scenario: fails on a wrong password
@@ -9626,6 +10387,7 @@ vlock
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -9634,6 +10396,7 @@ vlock --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: vlock`, `terminal`
+
 ## mimixbox mailutils commands expose a dedicated --help helper
 Source: `test/e2e/tools/mimixbox/mailutils/help_helpers_mailutils.atago.yaml`
 ### Scenario: makemime --help is structured
@@ -9644,6 +10407,7 @@ makemime --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: popmaildir --help is structured
 #### When
 ```shell
@@ -9652,6 +10416,7 @@ popmaildir --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: reformime --help is structured
 #### When
 ```shell
@@ -9660,6 +10425,7 @@ reformime --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sendmail --help is structured
 #### When
 ```shell
@@ -9668,6 +10434,7 @@ sendmail --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox makemime
 Source: `test/e2e/tools/mimixbox/mailutils/makemime.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9679,6 +10446,7 @@ makemime --help
 - exit code is `0`
 - stdout contains `Usage: makemime`
 - stderr is empty
+
 ## mimixbox popmaildir
 Source: `test/e2e/tools/mimixbox/mailutils/popmaildir.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9690,6 +10458,7 @@ popmaildir --help
 - exit code is `0`
 - stdout contains `Usage: popmaildir`
 - stderr is empty
+
 ## mimixbox reformime
 Source: `test/e2e/tools/mimixbox/mailutils/reformime.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9701,6 +10470,7 @@ reformime --help
 - exit code is `0`
 - stdout contains `Usage: reformime`
 - stderr is empty
+
 ## mimixbox sendmail
 Source: `test/e2e/tools/mimixbox/mailutils/sendmail.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9712,6 +10482,7 @@ sendmail --help
 - exit code is `0`
 - stdout contains `Usage: sendmail`
 - stderr is empty
+
 ## mimixbox arp
 Source: `test/e2e/tools/mimixbox/netutils/arp.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9723,6 +10494,7 @@ arp --help
 - exit code is `0`
 - stdout contains `Usage: arp`
 - stderr is empty
+
 ## mimixbox arping
 Source: `test/e2e/tools/mimixbox/netutils/arping.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9734,6 +10506,7 @@ arping --help
 - exit code is `0`
 - stdout contains `Usage: arping`
 - stderr is empty
+
 ## mimixbox brctl
 Source: `test/e2e/tools/mimixbox/netutils/brctl.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9745,6 +10518,7 @@ brctl --help
 - exit code is `0`
 - stdout contains `Usage: brctl`
 - stderr is empty
+
 ## mimixbox dhcprelay
 Source: `test/e2e/tools/mimixbox/netutils/dhcprelay.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9756,6 +10530,7 @@ dhcprelay --help
 - exit code is `0`
 - stdout contains `Usage: dhcprelay`
 - stderr is empty
+
 ## mimixbox dnsd
 Source: `test/e2e/tools/mimixbox/netutils/dnsd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9767,6 +10542,7 @@ dnsd --help
 - exit code is `0`
 - stdout contains `Usage: dnsd`
 - stderr is empty
+
 ## mimixbox dnsdomainname
 Source: `test/e2e/tools/mimixbox/netutils/dnsdomainname.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9778,6 +10554,7 @@ dnsdomainname --help
 - exit code is `0`
 - stdout contains `Usage: dnsdomainname`
 - stderr is empty
+
 ## mimixbox dumpleases
 Source: `test/e2e/tools/mimixbox/netutils/dumpleases.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9789,6 +10566,7 @@ dumpleases --help
 - exit code is `0`
 - stdout contains `Usage: dumpleases`
 - stderr is empty
+
 ## mimixbox ether-wake
 Source: `test/e2e/tools/mimixbox/netutils/ether-wake.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9800,6 +10578,7 @@ ether-wake --help
 - exit code is `0`
 - stdout contains `Usage: ether-wake`
 - stderr is empty
+
 ## mimixbox fakeidentd
 Source: `test/e2e/tools/mimixbox/netutils/fakeidentd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9811,6 +10590,7 @@ fakeidentd --help
 - exit code is `0`
 - stdout contains `Usage: fakeidentd`
 - stderr is empty
+
 ## mimixbox ftpd
 Source: `test/e2e/tools/mimixbox/netutils/ftpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9822,6 +10602,7 @@ ftpd --help
 - exit code is `0`
 - stdout contains `Usage: ftpd`
 - stderr is empty
+
 ## mimixbox ftpget
 Source: `test/e2e/tools/mimixbox/netutils/ftpget.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9833,6 +10614,7 @@ ftpget --help
 - exit code is `0`
 - stdout contains `Usage: ftpget`
 - stderr is empty
+
 ## mimixbox ftpput
 Source: `test/e2e/tools/mimixbox/netutils/ftpput.atago.yaml`
 ### Scenario: describes itself with --help
@@ -9844,6 +10626,7 @@ ftpput --help
 - exit code is `0`
 - stdout contains `Usage: ftpput`
 - stderr is empty
+
 ## mimixbox netutils --help helpers
 Source: `test/e2e/tools/mimixbox/netutils/help_helpers_netutils.atago.yaml`
 ### Scenario: arp --help is structured
@@ -9854,6 +10637,7 @@ arp --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: arping --help is structured
 #### When
 ```shell
@@ -9862,6 +10646,7 @@ arping --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: brctl --help is structured
 #### When
 ```shell
@@ -9870,6 +10655,7 @@ brctl --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dhcprelay --help is structured
 #### When
 ```shell
@@ -9878,6 +10664,7 @@ dhcprelay --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dnsd --help is structured
 #### When
 ```shell
@@ -9886,6 +10673,7 @@ dnsd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dnsdomainname --help is structured
 #### When
 ```shell
@@ -9894,6 +10682,7 @@ dnsdomainname --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: dumpleases --help is structured
 #### When
 ```shell
@@ -9902,6 +10691,7 @@ dumpleases --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ether-wake --help is structured
 #### When
 ```shell
@@ -9910,6 +10700,7 @@ ether-wake --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: fakeidentd --help is structured
 #### When
 ```shell
@@ -9918,6 +10709,7 @@ fakeidentd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ftpd --help is structured
 #### When
 ```shell
@@ -9926,6 +10718,7 @@ ftpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ftpget --help is structured
 #### When
 ```shell
@@ -9934,6 +10727,7 @@ ftpget --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ftpput --help is structured
 #### When
 ```shell
@@ -9942,6 +10736,7 @@ ftpput --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: http-status-code --help is structured
 #### When
 ```shell
@@ -9950,6 +10745,7 @@ http-status-code --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: httpd --help is structured
 #### When
 ```shell
@@ -9958,6 +10754,7 @@ httpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ifconfig --help is structured
 #### When
 ```shell
@@ -9966,6 +10763,7 @@ ifconfig --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ifdown --help is structured
 #### When
 ```shell
@@ -9974,6 +10772,7 @@ ifdown --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ifenslave --help is structured
 #### When
 ```shell
@@ -9982,6 +10781,7 @@ ifenslave --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ifplugd --help is structured
 #### When
 ```shell
@@ -9990,6 +10790,7 @@ ifplugd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ifup --help is structured
 #### When
 ```shell
@@ -9998,6 +10799,7 @@ ifup --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: inetd --help is structured
 #### When
 ```shell
@@ -10006,6 +10808,7 @@ inetd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ip --help is structured
 #### When
 ```shell
@@ -10014,6 +10817,7 @@ ip --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ipaddr --help is structured
 #### When
 ```shell
@@ -10022,6 +10826,7 @@ ipaddr --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: iplink --help is structured
 #### When
 ```shell
@@ -10030,6 +10835,7 @@ iplink --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ipneigh --help is structured
 #### When
 ```shell
@@ -10038,6 +10844,7 @@ ipneigh --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: iproute --help is structured
 #### When
 ```shell
@@ -10046,6 +10853,7 @@ iproute --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: iprule --help is structured
 #### When
 ```shell
@@ -10054,6 +10862,7 @@ iprule --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: iptunnel --help is structured
 #### When
 ```shell
@@ -10062,6 +10871,7 @@ iptunnel --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: nameif --help is structured
 #### When
 ```shell
@@ -10070,6 +10880,7 @@ nameif --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: nbd-client --help is structured
 #### When
 ```shell
@@ -10078,6 +10889,7 @@ nbd-client --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: netcat --help is structured
 #### When
 ```shell
@@ -10086,6 +10898,7 @@ netcat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: netstat --help is structured
 #### When
 ```shell
@@ -10094,6 +10907,7 @@ netstat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: nslookup --help is structured
 #### When
 ```shell
@@ -10102,6 +10916,7 @@ nslookup --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ntpd --help is structured
 #### When
 ```shell
@@ -10110,6 +10925,7 @@ ntpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ping6 --help is structured
 #### When
 ```shell
@@ -10118,6 +10934,7 @@ ping6 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: pscan --help is structured
 #### When
 ```shell
@@ -10126,6 +10943,7 @@ pscan --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: route --help is structured
 #### When
 ```shell
@@ -10134,6 +10952,7 @@ route --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: slattach --help is structured
 #### When
 ```shell
@@ -10142,6 +10961,7 @@ slattach --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ssl_client --help is structured
 #### When
 ```shell
@@ -10150,6 +10970,7 @@ ssl_client --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: ssl_server --help is structured
 #### When
 ```shell
@@ -10158,6 +10979,7 @@ ssl_server --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: tc --help is structured
 #### When
 ```shell
@@ -10166,6 +10988,7 @@ tc --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: tcpsvd --help is structured
 #### When
 ```shell
@@ -10174,6 +10997,7 @@ tcpsvd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: telnet --help is structured
 #### When
 ```shell
@@ -10182,6 +11006,7 @@ telnet --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: telnetd --help is structured
 #### When
 ```shell
@@ -10190,6 +11015,7 @@ telnetd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: tftp --help is structured
 #### When
 ```shell
@@ -10198,6 +11024,7 @@ tftp --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: tftpd --help is structured
 #### When
 ```shell
@@ -10206,6 +11033,7 @@ tftpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: traceroute --help is structured
 #### When
 ```shell
@@ -10214,6 +11042,7 @@ traceroute --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: traceroute6 --help is structured
 #### When
 ```shell
@@ -10222,6 +11051,7 @@ traceroute6 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: tunctl --help is structured
 #### When
 ```shell
@@ -10230,6 +11060,7 @@ tunctl --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: udhcpc --help is structured
 #### When
 ```shell
@@ -10238,6 +11069,7 @@ udhcpc --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: udhcpc6 --help is structured
 #### When
 ```shell
@@ -10246,6 +11078,7 @@ udhcpc6 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: udhcpd --help is structured
 #### When
 ```shell
@@ -10254,6 +11087,7 @@ udhcpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: udpsvd --help is structured
 #### When
 ```shell
@@ -10262,6 +11096,7 @@ udpsvd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: vconfig --help is structured
 #### When
 ```shell
@@ -10270,6 +11105,7 @@ vconfig --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: whois --help is structured
 #### When
 ```shell
@@ -10278,6 +11114,7 @@ whois --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: zcip --help is structured
 #### When
 ```shell
@@ -10286,6 +11123,7 @@ zcip --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox http-status-code
 Source: `test/e2e/tools/mimixbox/netutils/http-status-code.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10297,6 +11135,7 @@ http-status-code --help
 - exit code is `0`
 - stdout contains `Usage: http-status-code`
 - stderr is empty
+
 ### Scenario: looks up a status code by number
 #### When
 ```shell
@@ -10305,6 +11144,7 @@ http-status-code search 404
 #### Then
 - exit code is `0`
 - stdout contains `404 Not Found`
+
 ## mimixbox httpd
 Source: `test/e2e/tools/mimixbox/netutils/httpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10316,6 +11156,7 @@ httpd --help
 - exit code is `0`
 - stdout contains `Usage: httpd`
 - stderr is empty
+
 ## mimixbox http-status-code
 Source: `test/e2e/tools/mimixbox/netutils/httpstatus.atago.yaml`
 ### Scenario: explains a status code
@@ -10326,6 +11167,7 @@ http-status-code search 404
 #### Then
 - exit code is `0`
 - stdout contains `404 Not Found`
+
 ## mimixbox ifconfig
 Source: `test/e2e/tools/mimixbox/netutils/ifconfig.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10337,6 +11179,7 @@ ifconfig --help
 - exit code is `0`
 - stdout contains `Usage: ifconfig`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -10345,6 +11188,7 @@ ifconfig --help
 #### Then
 - exit code is `0`
 - stdout contains `network interfaces`
+
 ## mimixbox ifdown
 Source: `test/e2e/tools/mimixbox/netutils/ifdown.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10356,6 +11200,7 @@ ifdown --help
 - exit code is `0`
 - stdout contains `Usage: ifdown`
 - stderr is empty
+
 ## mimixbox ifenslave
 Source: `test/e2e/tools/mimixbox/netutils/ifenslave.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10367,6 +11212,7 @@ ifenslave --help
 - exit code is `0`
 - stdout contains `Usage: ifenslave`
 - stderr is empty
+
 ## mimixbox ifplugd
 Source: `test/e2e/tools/mimixbox/netutils/ifplugd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10378,6 +11224,7 @@ ifplugd --help
 - exit code is `0`
 - stdout contains `Usage: ifplugd`
 - stderr is empty
+
 ## mimixbox inetd
 Source: `test/e2e/tools/mimixbox/netutils/inetd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10389,6 +11236,7 @@ inetd --help
 - exit code is `0`
 - stdout contains `Usage: inetd`
 - stderr is empty
+
 ## mimixbox ipcalc
 Source: `test/e2e/tools/mimixbox/netutils/ipcalc.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10400,6 +11248,7 @@ ipcalc --help
 - exit code is `0`
 - stdout contains `Usage: ipcalc`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -10408,6 +11257,7 @@ ipcalc --help
 #### Then
 - exit code is `0`
 - stdout contains `IPv4 network parameters`
+
 ## mimixbox nc loopback
 Source: `test/e2e/tools/mimixbox/netutils/nc.atago.yaml`
 ### Scenario: transfers data over TCP
@@ -10438,6 +11288,7 @@ head -n 1 "$recv"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox netcat
 Source: `test/e2e/tools/mimixbox/netutils/netcat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10449,6 +11300,7 @@ netcat --help
 - exit code is `0`
 - stdout contains `Usage: netcat`
 - stderr is empty
+
 ## mimixbox netstat
 Source: `test/e2e/tools/mimixbox/netutils/netstat.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10460,6 +11312,7 @@ netstat --help
 - exit code is `0`
 - stdout contains `Usage: netstat`
 - stderr is empty
+
 ## mimixbox nslookup
 Source: `test/e2e/tools/mimixbox/netutils/nslookup.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10471,6 +11324,7 @@ nslookup --help
 - exit code is `0`
 - stdout contains `Usage: nslookup`
 - stderr is empty
+
 ## mimixbox ntpd
 Source: `test/e2e/tools/mimixbox/netutils/ntpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10482,6 +11336,7 @@ ntpd --help
 - exit code is `0`
 - stdout contains `Usage: ntpd`
 - stderr is empty
+
 ## mimixbox ping usage
 Source: `test/e2e/tools/mimixbox/netutils/ping.atago.yaml`
 ### Scenario: reports an error when no host is given
@@ -10491,6 +11346,7 @@ ping
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox pscan
 Source: `test/e2e/tools/mimixbox/netutils/pscan.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10502,6 +11358,7 @@ pscan --help
 - exit code is `0`
 - stdout contains `Usage: pscan`
 - stderr is empty
+
 ## mimixbox route
 Source: `test/e2e/tools/mimixbox/netutils/route.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10513,6 +11370,7 @@ route --help
 - exit code is `0`
 - stdout contains `Usage: route`
 - stderr is empty
+
 ## mimixbox slattach
 Source: `test/e2e/tools/mimixbox/netutils/slattach.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10524,6 +11382,7 @@ slattach --help
 - exit code is `0`
 - stdout contains `Usage: slattach`
 - stderr is empty
+
 ## mimixbox ssl_client
 Source: `test/e2e/tools/mimixbox/netutils/ssl_client.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10535,6 +11394,7 @@ ssl_client --help
 - exit code is `0`
 - stdout contains `Usage: ssl_client`
 - stderr is empty
+
 ## mimixbox ssl_server
 Source: `test/e2e/tools/mimixbox/netutils/ssl_server.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10546,6 +11406,7 @@ ssl_server --help
 - exit code is `0`
 - stdout contains `Usage: ssl_server`
 - stderr is empty
+
 ## mimixbox tc
 Source: `test/e2e/tools/mimixbox/netutils/tc.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10557,6 +11418,7 @@ tc --help
 - exit code is `0`
 - stdout contains `Usage: tc`
 - stderr is empty
+
 ## mimixbox tcpsvd
 Source: `test/e2e/tools/mimixbox/netutils/tcpsvd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10568,6 +11430,7 @@ tcpsvd --help
 - exit code is `0`
 - stdout contains `Usage: tcpsvd`
 - stderr is empty
+
 ## mimixbox telnet
 Source: `test/e2e/tools/mimixbox/netutils/telnet.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10579,6 +11442,7 @@ telnet --help
 - exit code is `0`
 - stdout contains `Usage: telnet`
 - stderr is empty
+
 ## mimixbox telnetd
 Source: `test/e2e/tools/mimixbox/netutils/telnetd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10590,6 +11454,7 @@ telnetd --help
 - exit code is `0`
 - stdout contains `Usage: telnetd`
 - stderr is empty
+
 ## mimixbox tftp
 Source: `test/e2e/tools/mimixbox/netutils/tftp.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10601,6 +11466,7 @@ tftp --help
 - exit code is `0`
 - stdout contains `Usage: tftp`
 - stderr is empty
+
 ## mimixbox tftpd
 Source: `test/e2e/tools/mimixbox/netutils/tftpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10612,6 +11478,7 @@ tftpd --help
 - exit code is `0`
 - stdout contains `Usage: tftpd`
 - stderr is empty
+
 ## mimixbox traceroute
 Source: `test/e2e/tools/mimixbox/netutils/traceroute.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10623,6 +11490,7 @@ traceroute --help
 - exit code is `0`
 - stdout contains `Usage: traceroute`
 - stderr is empty
+
 ## mimixbox traceroute6
 Source: `test/e2e/tools/mimixbox/netutils/traceroute6.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10634,6 +11502,7 @@ traceroute6 --help
 - exit code is `0`
 - stdout contains `Usage: traceroute6`
 - stderr is empty
+
 ## mimixbox tunctl
 Source: `test/e2e/tools/mimixbox/netutils/tunctl.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10645,6 +11514,7 @@ tunctl --help
 - exit code is `0`
 - stdout contains `Usage: tunctl`
 - stderr is empty
+
 ## mimixbox udhcpc
 Source: `test/e2e/tools/mimixbox/netutils/udhcpc.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10656,6 +11526,7 @@ udhcpc --help
 - exit code is `0`
 - stdout contains `Usage: udhcpc`
 - stderr is empty
+
 ## mimixbox udhcpc6
 Source: `test/e2e/tools/mimixbox/netutils/udhcpc6.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10667,6 +11538,7 @@ udhcpc6 --help
 - exit code is `0`
 - stdout contains `Usage: udhcpc6`
 - stderr is empty
+
 ## mimixbox udhcpd
 Source: `test/e2e/tools/mimixbox/netutils/udhcpd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10678,6 +11550,7 @@ udhcpd --help
 - exit code is `0`
 - stdout contains `Usage: udhcpd`
 - stderr is empty
+
 ## mimixbox udpsvd
 Source: `test/e2e/tools/mimixbox/netutils/udpsvd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10689,6 +11562,7 @@ udpsvd --help
 - exit code is `0`
 - stdout contains `Usage: udpsvd`
 - stderr is empty
+
 ## mimixbox vconfig
 Source: `test/e2e/tools/mimixbox/netutils/vconfig.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10700,6 +11574,7 @@ vconfig --help
 - exit code is `0`
 - stdout contains `Usage: vconfig`
 - stderr is empty
+
 ## mimixbox whois
 Source: `test/e2e/tools/mimixbox/netutils/whois.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10711,6 +11586,7 @@ whois --help
 - exit code is `0`
 - stdout contains `Usage: whois`
 - stderr is empty
+
 ## mimixbox whris usage
 Source: `test/e2e/tools/mimixbox/netutils/whris.atago.yaml`
 ### Scenario: reports an error when no domain is given
@@ -10720,6 +11596,7 @@ whris
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox zcip
 Source: `test/e2e/tools/mimixbox/netutils/zcip.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10731,6 +11608,7 @@ zcip --help
 - exit code is `0`
 - stdout contains `Usage: zcip`
 - stderr is empty
+
 ## mimixbox halt
 Source: `test/e2e/tools/mimixbox/pmutils/halt.atago.yaml`
 ### Scenario: halt --help prints usage and lists the options
@@ -10741,6 +11619,7 @@ halt --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: halt`, `--poweroff`, `--wtmp-only`
+
 ### Scenario: poweroff --help prints usage
 #### When
 ```shell
@@ -10749,6 +11628,7 @@ poweroff --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: poweroff`
+
 ### Scenario: reboot --help prints usage
 #### When
 ```shell
@@ -10757,6 +11637,7 @@ reboot --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: reboot`
+
 ### Scenario: halt --version prints the version
 #### When
 ```shell
@@ -10765,6 +11646,7 @@ halt --version
 #### Then
 - exit code is `0`
 - stdout contains `halt (mimixbox)`
+
 ## mimixbox pmutils --help contract
 Source: `test/e2e/tools/mimixbox/pmutils/help_helpers.atago.yaml`
 ### Scenario: poweroff --help is structured
@@ -10775,6 +11657,7 @@ poweroff --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: reboot --help is structured
 #### When
 ```shell
@@ -10783,6 +11666,7 @@ reboot --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox printutils commands expose a dedicated --help helper
 Source: `test/e2e/tools/mimixbox/printutils/help_helpers_printutils.atago.yaml`
 ### Scenario: lpd --help is structured
@@ -10793,6 +11677,7 @@ lpd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lpq --help is structured
 #### When
 ```shell
@@ -10801,6 +11686,7 @@ lpq --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lpr --help is structured
 #### When
 ```shell
@@ -10809,6 +11695,7 @@ lpr --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox depmod
 Source: `test/e2e/tools/mimixbox/procps/depmod.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10820,6 +11707,7 @@ depmod --help
 - exit code is `0`
 - stdout contains `Usage: depmod`
 - stderr is empty
+
 ## mimixbox fuser
 Source: `test/e2e/tools/mimixbox/procps/fuser.atago.yaml`
 ### Scenario: finds processes using the current directory
@@ -10830,6 +11718,7 @@ fuser .
 #### Then
 - exit code is `0`
 - stdout matches `/[0-9]/`
+
 ### Scenario: exits non-zero when nothing uses the file
 #### When
 ```shell
@@ -10837,6 +11726,7 @@ fuser /no/such/fuser/file
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox procps --help contract
 Source: `test/e2e/tools/mimixbox/procps/help_helpers_procps.atago.yaml`
 ### Scenario: depmod --help is structured
@@ -10847,6 +11737,7 @@ depmod --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: insmod --help is structured
 #### When
 ```shell
@@ -10855,6 +11746,7 @@ insmod --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: lsmod --help is structured
 #### When
 ```shell
@@ -10863,6 +11755,7 @@ lsmod --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: modinfo --help is structured
 #### When
 ```shell
@@ -10871,6 +11764,7 @@ modinfo --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: modprobe --help is structured
 #### When
 ```shell
@@ -10879,6 +11773,7 @@ modprobe --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: pkill --help is structured
 #### When
 ```shell
@@ -10887,6 +11782,7 @@ pkill --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: pwdx --help is structured
 #### When
 ```shell
@@ -10895,6 +11791,7 @@ pwdx --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: rmmod --help is structured
 #### When
 ```shell
@@ -10903,6 +11800,7 @@ rmmod --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: uptime --help is structured
 #### When
 ```shell
@@ -10911,6 +11809,7 @@ uptime --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox iostat
 Source: `test/e2e/tools/mimixbox/procps/iostat.atago.yaml`
 ### Scenario: prints the avg-cpu header
@@ -10921,6 +11820,7 @@ iostat
 #### Then
 - exit code is `0`
 - stdout contains `avg-cpu`, `%idle`
+
 ### Scenario: prints the device table header
 #### When
 ```shell
@@ -10929,6 +11829,7 @@ iostat
 #### Then
 - exit code is `0`
 - stdout contains `Device`
+
 ## mimixbox killall5
 Source: `test/e2e/tools/mimixbox/procps/killall5.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10939,6 +11840,7 @@ killall5 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: killall5`, `signal`
+
 ## mimixbox klogd
 Source: `test/e2e/tools/mimixbox/procps/klogd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10949,6 +11851,7 @@ klogd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: klogd`, `kernel`
+
 ## mimixbox logger
 Source: `test/e2e/tools/mimixbox/procps/logger.atago.yaml`
 ### Scenario: rejects an unknown facility
@@ -10958,11 +11861,13 @@ logger -p nosuchfacility.info msg
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox logread
 Source: `test/e2e/tools/mimixbox/procps/logread.atago.yaml`
 ### Scenario: prints a given log file
 #### Given
 - Fixture file `sys.log` is created.
+
 #### Inputs
 _Fixture `sys.log`:_
 ```text
@@ -10977,6 +11882,7 @@ logread sys.log
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: fails when no readable log is found
 #### When
 ```shell
@@ -10984,6 +11890,7 @@ logread nope.log
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox lsmod
 Source: `test/e2e/tools/mimixbox/procps/lsmod.atago.yaml`
 ### Scenario: describes itself with --help
@@ -10995,6 +11902,7 @@ lsmod --help
 - exit code is `0`
 - stdout contains `Usage: lsmod`
 - stderr is empty
+
 ## mimixbox lsof
 Source: `test/e2e/tools/mimixbox/procps/lsof.atago.yaml`
 ### Scenario: lists the working directory of a process
@@ -11005,6 +11913,7 @@ lsof -p $$
 #### Then
 - exit code is `0`
 - stdout contains `cwd`
+
 ### Scenario: prints the column header
 #### When
 ```shell
@@ -11014,6 +11923,7 @@ lsof -p $$
 - exit code is `0`
 - stdout line `1` contains `COMMAND`
 - stdout line `1` contains `NAME`
+
 ## mimixbox minips
 Source: `test/e2e/tools/mimixbox/procps/minips.atago.yaml`
 ### Scenario: prints the PID/USER/COMMAND header
@@ -11024,6 +11934,7 @@ minips
 #### Then
 - exit code is `0`
 - stdout line `1` contains `COMMAND`
+
 ### Scenario: lists processes
 #### When
 ```shell
@@ -11032,6 +11943,7 @@ minips
 #### Then
 - exit code is `0`
 - stdout matches `/(?m)^[0-9]+/`
+
 ## mimixbox modinfo
 Source: `test/e2e/tools/mimixbox/procps/modinfo.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11043,6 +11955,7 @@ modinfo --help
 - exit code is `0`
 - stdout contains `Usage: modinfo`
 - stderr is empty
+
 ## mimixbox mpstat
 Source: `test/e2e/tools/mimixbox/procps/mpstat.atago.yaml`
 ### Scenario: prints the CPU column header
@@ -11053,6 +11966,7 @@ mpstat
 #### Then
 - exit code is `0`
 - stdout contains `%usr`, `%idle`
+
 ### Scenario: prints the aggregate all row
 #### When
 ```shell
@@ -11061,6 +11975,7 @@ mpstat
 #### Then
 - exit code is `0`
 - stdout matches `/(?m)^all /`
+
 ## mimixbox nmeter
 Source: `test/e2e/tools/mimixbox/procps/nmeter.atago.yaml`
 ### Scenario: expands a literal percent and copies text
@@ -11071,6 +11986,7 @@ nmeter "hello %% world"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: expands the total-memory directive
 #### When
 ```shell
@@ -11079,6 +11995,7 @@ nmeter "mem:%M"
 #### Then
 - exit code is `0`
 - stdout matches `/mem:[0-9]+M/`
+
 ## mimixbox pgrep / pkill
 Source: `test/e2e/tools/mimixbox/procps/pgrep.atago.yaml`
 ### Scenario: finds a running process by name
@@ -11089,6 +12006,7 @@ sleep 30 & p=$!; pgrep sleep | grep -c "^${p}$"; kill $p 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `1`
+
 ### Scenario: exits non-zero when nothing matches
 #### When
 ```shell
@@ -11096,6 +12014,7 @@ pgrep zzz_no_such_proc_zzz
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox pmap
 Source: `test/e2e/tools/mimixbox/procps/pmap.atago.yaml`
 ### Scenario: prints a total line for a process map
@@ -11106,6 +12025,7 @@ pmap $$
 #### Then
 - exit code is `0`
 - stdout contains `total`
+
 ### Scenario: rejects an invalid PID
 #### When
 ```shell
@@ -11113,6 +12033,7 @@ pmap notapid
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox powertop
 Source: `test/e2e/tools/mimixbox/procps/powertop.atago.yaml`
 ### Scenario: runs and exits zero
@@ -11122,6 +12043,7 @@ powertop
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -11130,6 +12052,7 @@ powertop --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: powertop`, `power`
+
 ## mimixbox ps
 Source: `test/e2e/tools/mimixbox/procps/ps.atago.yaml`
 ### Scenario: prints the standard header
@@ -11140,6 +12063,7 @@ ps
 #### Then
 - exit code is `0`
 - stdout line `1` equals an exact value
+
 ### Scenario: lists running processes
 #### When
 ```shell
@@ -11148,6 +12072,7 @@ ps
 #### Then
 - exit code is `0`
 - stdout matches `/(?m)^ *[0-9]+ /`
+
 ## mimixbox pstree
 Source: `test/e2e/tools/mimixbox/procps/pstree.atago.yaml`
 ### Scenario: builds a tree containing PID 1
@@ -11158,6 +12083,7 @@ pstree
 #### Then
 - exit code is `0`
 - stdout contains `(1)`
+
 ## mimixbox pwdx
 Source: `test/e2e/tools/mimixbox/procps/pwdx.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11169,6 +12095,7 @@ pwdx --help
 - exit code is `0`
 - stdout contains `Usage: pwdx`
 - stderr is empty
+
 ## mimixbox rmmod
 Source: `test/e2e/tools/mimixbox/procps/rmmod.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11180,6 +12107,7 @@ rmmod --help
 - exit code is `0`
 - stdout contains `Usage: rmmod`
 - stderr is empty
+
 ## mimixbox smemcap
 Source: `test/e2e/tools/mimixbox/procps/smemcap.atago.yaml`
 ### Scenario: captures a tar containing meminfo
@@ -11190,6 +12118,7 @@ smemcap > cap.tar; tar -tf cap.tar
 #### Then
 - exit code is `0`
 - stdout matches `/(?m)^meminfo$/`
+
 ## mimixbox sysctl
 Source: `test/e2e/tools/mimixbox/procps/sysctl.atago.yaml`
 ### Scenario: reads a kernel parameter
@@ -11200,6 +12129,7 @@ sysctl kernel.ostype
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: lists parameters with -a
 #### When
 ```shell
@@ -11208,6 +12138,7 @@ sysctl -a
 #### Then
 - exit code is `0`
 - stdout contains ` = `
+
 ## mimixbox syslogd
 Source: `test/e2e/tools/mimixbox/procps/syslogd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11218,6 +12149,7 @@ syslogd --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: syslogd`, `log`
+
 ## mimixbox top
 Source: `test/e2e/tools/mimixbox/procps/top.atago.yaml`
 ### Scenario: prints the top summary line
@@ -11228,6 +12160,7 @@ top -bn1
 #### Then
 - exit code is `0`
 - stdout line `1` matches `/^top -/`
+
 ### Scenario: prints the tasks line
 #### When
 ```shell
@@ -11236,6 +12169,7 @@ top -bn1
 #### Then
 - exit code is `0`
 - stdout matches `/(?m)^Tasks:/`
+
 ## mimixbox uptime
 Source: `test/e2e/tools/mimixbox/procps/uptime.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11247,6 +12181,7 @@ uptime --help
 - exit code is `0`
 - stdout contains `Usage: uptime`
 - stderr is empty
+
 ### Scenario: prints an uptime/load line
 #### When
 ```shell
@@ -11255,6 +12190,7 @@ uptime
 #### Then
 - exit code is `0`
 - stdout contains `load average:`
+
 ## mimixbox uptime / pwdx
 Source: `test/e2e/tools/mimixbox/procps/uptime_pwdx.atago.yaml`
 ### Scenario: uptime shows the load averages
@@ -11265,6 +12201,7 @@ uptime
 #### Then
 - exit code is `0`
 - stdout contains `load average`
+
 ### Scenario: pwdx prints a process working directory
 #### When
 ```shell
@@ -11273,6 +12210,7 @@ pwdx $$
 #### Then
 - exit code is `0`
 - stdout matches `/^[0-9]+: //`
+
 ## mimixbox vmstat
 Source: `test/e2e/tools/mimixbox/procps/vmstat.atago.yaml`
 ### Scenario: prints the column header
@@ -11283,6 +12221,7 @@ vmstat
 #### Then
 - exit code is `0`
 - stdout contains `swpd`, `free`
+
 ### Scenario: prints a numeric data row
 #### When
 ```shell
@@ -11291,11 +12230,13 @@ vmstat
 #### Then
 - exit code is `0`
 - stdout line `3` matches `/^[ 0-9]+$/`
+
 ## mimixbox chpst
 Source: `test/e2e/tools/mimixbox/runit/chpst.atago.yaml`
 ### Scenario: loads an environment directory
 #### Given
 - Fixture file `env/HELLO` is created.
+
 #### Inputs
 _Fixture `env/HELLO`:_
 ```text
@@ -11308,6 +12249,7 @@ chpst -e env sh -c 'echo "$HELLO"'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a program
 #### When
 ```shell
@@ -11315,11 +12257,13 @@ chpst -o 64
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox envdir
 Source: `test/e2e/tools/mimixbox/runit/envdir.atago.yaml`
 ### Scenario: sets a variable from a directory file
 #### Given
 - Fixture file `env/GREETING` is created.
+
 #### Inputs
 _Fixture `env/GREETING`:_
 ```text
@@ -11332,6 +12276,7 @@ envdir env sh -c 'echo "$GREETING"'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a directory and a program
 #### When
 ```shell
@@ -11339,6 +12284,7 @@ envdir /only
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox envuidgid
 Source: `test/e2e/tools/mimixbox/runit/envuidgid.atago.yaml`
 ### Scenario: exports root uid and gid
@@ -11349,6 +12295,7 @@ envuidgid root sh -c 'echo "$UID:$GID"'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails for an unknown user
 #### When
 ```shell
@@ -11356,6 +12303,7 @@ envuidgid nonexistent_xyz true
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox runsv
 Source: `test/e2e/tools/mimixbox/runit/runsv.atago.yaml`
 ### Scenario: requires a service directory
@@ -11365,6 +12313,7 @@ runsv
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -11373,6 +12322,7 @@ runsv --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: runsv`, `service`
+
 ## mimixbox runsvdir
 Source: `test/e2e/tools/mimixbox/runit/runsvdir.atago.yaml`
 ### Scenario: requires a services directory
@@ -11382,6 +12332,7 @@ runsvdir
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -11390,6 +12341,7 @@ runsvdir --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: runsvdir`, `service`
+
 ## mimixbox setuidgid
 Source: `test/e2e/tools/mimixbox/runit/setuidgid.atago.yaml`
 ### Scenario: fails for an unknown user
@@ -11399,6 +12351,7 @@ setuidgid nonexistent_user_xyz true
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: requires a program
 #### When
 ```shell
@@ -11406,6 +12359,7 @@ setuidgid root
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox softlimit
 Source: `test/e2e/tools/mimixbox/runit/softlimit.atago.yaml`
 ### Scenario: runs a program under the limits
@@ -11415,6 +12369,7 @@ softlimit -o 64 true
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: requires a program
 #### When
 ```shell
@@ -11422,12 +12377,14 @@ softlimit -o 64
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox sv
 Source: `test/e2e/tools/mimixbox/runit/sv.atago.yaml`
 ### Scenario: writes the up control character
 #### Given
 - Fixture file `svc/supervise/control` is created.
 - Fixture file `svc/supervise/ok` is created.
+
 #### When
 ```shell
 sv up svc && cat svc/supervise/control
@@ -11435,10 +12392,12 @@ sv up svc && cat svc/supervise/control
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports a running service
 #### Given
 - Fixture file `svc2/supervise/ok` is created.
 - Fixture file `svc2/supervise/pid` is created.
+
 #### Inputs
 _Fixture `svc2/supervise/pid`:_
 ```text
@@ -11451,11 +12410,13 @@ sv status svc2
 #### Then
 - exit code is `0`
 - stdout contains `run`
+
 ## mimixbox svc
 Source: `test/e2e/tools/mimixbox/runit/svc.atago.yaml`
 ### Scenario: writes the down control character
 #### Given
 - Fixture file `svc/supervise/control` is created.
+
 #### When
 ```shell
 svc -d svc && cat svc/supervise/control
@@ -11463,15 +12424,18 @@ svc -d svc && cat svc/supervise/control
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: requires a control command
 #### Given
 - Fixture file `s2/supervise/control` is created.
+
 #### When
 ```shell
 svc s2
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox svlogd
 Source: `test/e2e/tools/mimixbox/runit/svlogd.atago.yaml`
 ### Scenario: appends stdin to the current log
@@ -11485,6 +12449,7 @@ cat log/current
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: requires a directory
 #### Inputs
 _stdin for `svlogd`:_
@@ -11497,26 +12462,31 @@ svlogd
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox svok
 Source: `test/e2e/tools/mimixbox/runit/svok.atago.yaml`
 ### Scenario: succeeds for a supervised service
 #### Given
 - Fixture file `svc/supervise/ok` is created.
+
 #### When
 ```shell
 svok svc
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: returns 100 for an unsupervised service
 #### Given
 - Fixture file `down/.keep` is created.
+
 #### When
 ```shell
 svok down
 ```
 #### Then
 - exit code is `100`
+
 ## mimixbox chcon
 Source: `test/e2e/tools/mimixbox/securityutils/chcon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11528,6 +12498,7 @@ chcon --help
 - exit code is `0`
 - stdout contains `Usage: chcon`
 - stderr is empty
+
 ## mimixbox getenforce
 Source: `test/e2e/tools/mimixbox/securityutils/getenforce.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11539,6 +12510,7 @@ getenforce --help
 - exit code is `0`
 - stdout contains `Usage: getenforce`
 - stderr is empty
+
 ## mimixbox getsebool
 Source: `test/e2e/tools/mimixbox/securityutils/getsebool.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11550,6 +12522,7 @@ getsebool --help
 - exit code is `0`
 - stdout contains `Usage: getsebool`
 - stderr is empty
+
 ## mimixbox securityutils --help contract
 Source: `test/e2e/tools/mimixbox/securityutils/help_helpers.atago.yaml`
 ### Scenario: chcon --help is structured
@@ -11560,6 +12533,7 @@ chcon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: getenforce --help is structured
 #### When
 ```shell
@@ -11568,6 +12542,7 @@ getenforce --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: getsebool --help is structured
 #### When
 ```shell
@@ -11576,6 +12551,7 @@ getsebool --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: load_policy --help is structured
 #### When
 ```shell
@@ -11584,6 +12560,7 @@ load_policy --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: matchpathcon --help is structured
 #### When
 ```shell
@@ -11592,6 +12569,7 @@ matchpathcon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: restorecon --help is structured
 #### When
 ```shell
@@ -11600,6 +12578,7 @@ restorecon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: runcon --help is structured
 #### When
 ```shell
@@ -11608,6 +12587,7 @@ runcon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: selinuxenabled --help is structured
 #### When
 ```shell
@@ -11616,6 +12596,7 @@ selinuxenabled --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sestatus --help is structured
 #### When
 ```shell
@@ -11624,6 +12605,7 @@ sestatus --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: setenforce --help is structured
 #### When
 ```shell
@@ -11632,6 +12614,7 @@ setenforce --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: setfiles --help is structured
 #### When
 ```shell
@@ -11640,6 +12623,7 @@ setfiles --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: setsebool --help is structured
 #### When
 ```shell
@@ -11648,6 +12632,7 @@ setsebool --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: zip-pwcrack --help is structured
 #### When
 ```shell
@@ -11656,11 +12641,13 @@ zip-pwcrack --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox pwcrack
 Source: `test/e2e/tools/mimixbox/securityutils/pwcrack.atago.yaml`
 ### Scenario: finds a weak password in the wordlist
 #### Given
 - Fixture file `words.txt` is created.
+
 #### Inputs
 _Fixture `words.txt`:_
 ```text
@@ -11675,6 +12662,7 @@ pwcrack -w words.txt $6$abcdefgh$ltjgWl6579NluT/Vi1nwEvcil.G5Nbc4NiXZaNGStk8PSwG
 #### Then
 - exit code is `0`
 - stdout contains `: secret`
+
 ## mimixbox pwgen
 Source: `test/e2e/tools/mimixbox/securityutils/pwgen.atago.yaml`
 ### Scenario: generates the requested number of passwords
@@ -11685,6 +12673,7 @@ pwgen -n 3 -l 8 | wc -l | tr -d ' '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox pwscore
 Source: `test/e2e/tools/mimixbox/securityutils/pwscore.atago.yaml`
 ### Scenario: scores a common password as zero
@@ -11695,6 +12684,7 @@ pwscore password | head -n 1
 #### Then
 - exit code is `0`
 - stdout contains `Score: 0/100`
+
 ## mimixbox runcon
 Source: `test/e2e/tools/mimixbox/securityutils/runcon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11706,6 +12696,7 @@ runcon --help
 - exit code is `0`
 - stdout contains `Usage: runcon`
 - stderr is empty
+
 ## mimixbox selinuxenabled
 Source: `test/e2e/tools/mimixbox/securityutils/selinuxenabled.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11717,6 +12708,7 @@ selinuxenabled --help
 - exit code is `0`
 - stdout contains `Usage: selinuxenabled`
 - stderr is empty
+
 ## mimixbox sestatus
 Source: `test/e2e/tools/mimixbox/securityutils/sestatus.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11728,6 +12720,7 @@ sestatus --help
 - exit code is `0`
 - stdout contains `Usage: sestatus`
 - stderr is empty
+
 ## mimixbox setenforce
 Source: `test/e2e/tools/mimixbox/securityutils/setenforce.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11739,6 +12732,7 @@ setenforce --help
 - exit code is `0`
 - stdout contains `Usage: setenforce`
 - stderr is empty
+
 ## mimixbox setfiles
 Source: `test/e2e/tools/mimixbox/securityutils/setfiles.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11750,6 +12744,7 @@ setfiles --help
 - exit code is `0`
 - stdout contains `Usage: setfiles`
 - stderr is empty
+
 ## mimixbox setsebool
 Source: `test/e2e/tools/mimixbox/securityutils/setsebool.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11761,12 +12756,14 @@ setsebool --help
 - exit code is `0`
 - stdout contains `Usage: setsebool`
 - stderr is empty
+
 ## mimixbox unshadow
 Source: `test/e2e/tools/mimixbox/securityutils/unshadow.atago.yaml`
 ### Scenario: merges the shadow hash into the passwd line
 #### Given
 - Fixture file `passwd` is created.
 - Fixture file `shadow` is created.
+
 #### Inputs
 _Fixture `passwd`:_
 ```text
@@ -11783,6 +12780,7 @@ unshadow passwd shadow
 #### Then
 - exit code is `0`
 - stdout contains `alice:$6$abc$HASH:1000:1000`
+
 ## mimixbox zip-pwcrack
 Source: `test/e2e/tools/mimixbox/securityutils/zip-pwcrack.atago.yaml`
 ### Scenario: describes itself with --help
@@ -11794,12 +12792,14 @@ zip-pwcrack --help
 - exit code is `0`
 - stdout contains `Usage: zip-pwcrack`
 - stderr is empty
+
 ## mimixbox zip-pwcrack
 Source: `test/e2e/tools/mimixbox/securityutils/zippwcrack.atago.yaml`
 ### Scenario: recovers the ZIP password from the wordlist
 #### Given
 - Fixture file `words.txt` is created.
 - Fixture file `enc.zip` is created.
+
 #### Inputs
 _Fixture `words.txt`:_
 ```text
@@ -11814,6 +12814,7 @@ zip-pwcrack enc.zip -w words.txt
 #### Then
 - exit code is `0`
 - stdout contains `password found: hunter2`
+
 ## mimixbox arch
 Source: `test/e2e/tools/mimixbox/shellutils/arch.atago.yaml`
 ### Scenario: prints a non-empty machine name
@@ -11824,6 +12825,7 @@ arch
 #### Then
 - exit code is `0`
 - stdout is not empty
+
 ## mimixbox base64
 Source: `test/e2e/tools/mimixbox/shellutils/base64.atago.yaml`
 ### Scenario: encodes standard input
@@ -11834,9 +12836,11 @@ printf 'hello\n' | base64
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: encodes the file contents
 #### Given
 - Fixture file `base64.txt` is created.
+
 #### Inputs
 _Fixture `base64.txt`:_
 ```text
@@ -11849,6 +12853,7 @@ base64 base64.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: decodes standard input
 #### When
 ```shell
@@ -11857,6 +12862,7 @@ printf 'aGVsbG8K\n' | base64 -d
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: returns the original text (round trip)
 #### When
 ```shell
@@ -11865,6 +12871,7 @@ printf 'MimixBox\n' | base64 | base64 -d
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error for a non-existent file
 #### When
 ```shell
@@ -11873,6 +12880,7 @@ base64 /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox basename
 Source: `test/e2e/tools/mimixbox/shellutils/basename.atago.yaml`
 ### Scenario: show test.txt
@@ -11883,6 +12891,7 @@ basename "/home/nao/test.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show test
 #### When
 ```shell
@@ -11891,6 +12900,7 @@ basename "/home/nao/test"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show .test
 #### When
 ```shell
@@ -11899,6 +12909,7 @@ basename "/home/nao/.test"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show nao for a trailing slash
 #### When
 ```shell
@@ -11907,6 +12918,7 @@ basename "/home/nao/"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show error without operand
 #### When
 ```shell
@@ -11915,6 +12927,7 @@ basename
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: show / for root
 #### When
 ```shell
@@ -11923,6 +12936,7 @@ basename "/"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show empty string
 #### When
 ```shell
@@ -11931,6 +12945,7 @@ basename ""
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ### Scenario: show error for extra operand
 #### When
 ```shell
@@ -11939,6 +12954,7 @@ basename /bin/basename /home/nao /home
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: show three basenames with -a
 #### When
 ```shell
@@ -11947,6 +12963,7 @@ basename -a /bin/basename /home/nao /home
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -11962,6 +12979,7 @@ basename -a -z /bin/basename /home/nao /home
 #### Then
 - exit code is `0`
 - stdout matches `/^basename\x00nao\x00home\x00$/`
+
 ### Scenario: show basename without the suffix
 #### When
 ```shell
@@ -11970,6 +12988,7 @@ basename -s .txt /home/nao/test.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: show basename built from an environment variable
 #### When
 ```shell
@@ -11978,6 +12997,7 @@ TEST_DIR="/aaa/bbb/ccc"; basename "$TEST_DIR/ddd.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox bc
 Source: `test/e2e/tools/mimixbox/shellutils/bc.atago.yaml`
 ### Scenario: respects operator precedence
@@ -11988,6 +13008,7 @@ echo '2 + 3 * 4' | bc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: honors scale for division
 #### When
 ```shell
@@ -11996,6 +13017,7 @@ echo 'scale=2; 7/3' | bc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: supports variables
 #### When
 ```shell
@@ -12004,6 +13026,7 @@ printf 'x = 5\nx * x\n' | bc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: computes powers
 #### When
 ```shell
@@ -12012,6 +13035,7 @@ echo '2^10' | bc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cal
 Source: `test/e2e/tools/mimixbox/shellutils/cal.atago.yaml`
 ### Scenario: prints the month calendar
@@ -12022,6 +13046,7 @@ cal 11 2023
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -12043,6 +13068,7 @@ mkdir -p chmod && touch chmod/file.txt && chmod 600 chmod/file.txt && chmod 644 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: adds owner execute to mode 600 with a symbolic mode
 #### When
 ```shell
@@ -12051,6 +13077,7 @@ mkdir -p chmod && touch chmod/file.txt && chmod 600 chmod/file.txt && chmod u+x 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error on a missing file
 #### When
 ```shell
@@ -12059,6 +13086,7 @@ chmod 644 /no_such_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 #### Expected output
 _expected stderr:_
 ```text
@@ -12074,6 +13102,7 @@ chroot --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: chroot`
+
 ### Scenario: documents the --userspec identity option in --help
 #### When
 ```shell
@@ -12082,6 +13111,7 @@ chroot --help
 #### Then
 - exit code is `0`
 - stdout contains `--userspec`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -12090,12 +13120,14 @@ chroot
 #### Then
 - exit code is not `0`
 - stderr contains `chroot`
+
 ## mimixbox cmp
 Source: `test/e2e/tools/mimixbox/shellutils/cmp.atago.yaml`
 ### Scenario: prints nothing and succeeds on identical files
 #### Given
 - Fixture file `cmp/a.txt` is created.
 - Fixture file `cmp/same.txt` is created.
+
 #### Inputs
 _Fixture `cmp/a.txt`:_
 ```text
@@ -12112,10 +13144,12 @@ cmp cmp/a.txt cmp/same.txt; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports the first differing byte and line on differing files
 #### Given
 - Fixture file `cmp/a.txt` is created.
 - Fixture file `cmp/diff.txt` is created.
+
 #### Inputs
 _Fixture `cmp/a.txt`:_
 ```text
@@ -12132,6 +13166,7 @@ cmp ${workdir}/cmp/a.txt ${workdir}/cmp/diff.txt
 #### Then
 - exit code is not `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -12141,6 +13176,7 @@ ${workdir}/cmp/a.txt ${workdir}/cmp/diff.txt differ: byte 3, line 1
 #### Given
 - Fixture file `cmp/a.txt` is created.
 - Fixture file `cmp/diff.txt` is created.
+
 #### Inputs
 _Fixture `cmp/a.txt`:_
 ```text
@@ -12157,12 +13193,14 @@ cmp -s cmp/a.txt cmp/diff.txt; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cmp (GNU options)
 Source: `test/e2e/tools/mimixbox/shellutils/cmp_gnu.atago.yaml`
 ### Scenario: -n reports equality when the difference is past the byte limit
 #### Given
 - Fixture file `cmp_gnu/a.txt` is created.
 - Fixture file `cmp_gnu/b.txt` is created.
+
 #### Inputs
 _Fixture `cmp_gnu/a.txt`:_
 ```text
@@ -12179,10 +13217,12 @@ cmp -n 3 cmp_gnu/a.txt cmp_gnu/b.txt; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --bytes reports the difference within the byte limit
 #### Given
 - Fixture file `cmp_gnu/a.txt` is created.
 - Fixture file `cmp_gnu/b.txt` is created.
+
 #### Inputs
 _Fixture `cmp_gnu/a.txt`:_
 ```text
@@ -12199,10 +13239,12 @@ cmp --bytes=4 ${workdir}/cmp_gnu/a.txt ${workdir}/cmp_gnu/b.txt
 #### Then
 - exit code is not `0`
 - stdout contains `differ: byte 4, line 1`
+
 ### Scenario: -i skips the first N bytes of both files
 #### Given
 - Fixture file `cmp_gnu/skip_a.txt` is created.
 - Fixture file `cmp_gnu/skip_b.txt` is created.
+
 #### Inputs
 _Fixture `cmp_gnu/skip_a.txt`:_
 ```text
@@ -12219,10 +13261,12 @@ cmp -i 3 cmp_gnu/skip_a.txt cmp_gnu/skip_b.txt; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -i N:M skips N bytes of file1 and M of file2
 #### Given
 - Fixture file `cmp_gnu/pair_a.txt` is created.
 - Fixture file `cmp_gnu/pair_b.txt` is created.
+
 #### Inputs
 _Fixture `cmp_gnu/pair_a.txt`:_
 ```text
@@ -12239,10 +13283,12 @@ cmp -i 1:3 ${workdir}/cmp_gnu/pair_a.txt ${workdir}/cmp_gnu/pair_b.txt
 #### Then
 - exit code is not `0`
 - stdout contains `differ: byte 3, line 1`
+
 ### Scenario: -b prints the differing byte values in the message
 #### Given
 - Fixture file `cmp_gnu/pb_a.txt` is created.
 - Fixture file `cmp_gnu/pb_b.txt` is created.
+
 #### Inputs
 _Fixture `cmp_gnu/pb_a.txt`:_
 ```text
@@ -12261,6 +13307,7 @@ cmp -b ${workdir}/cmp_gnu/pb_a.txt ${workdir}/cmp_gnu/pb_b.txt
 #### Then
 - exit code is not `0`
 - stdout contains `differ: byte 7, line 2 is 163 s 123 S`
+
 ## mimixbox cp (permission preservation)
 Source: `test/e2e/tools/mimixbox/shellutils/cp_perm.atago.yaml`
 ### Scenario: keeps the source file mode (execute bit)
@@ -12271,6 +13318,7 @@ printf '#!/bin/sh\necho hi\n' > script.sh && chmod 755 script.sh && cp script.sh
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: keeps a private directory mode
 #### When
 ```shell
@@ -12279,6 +13327,7 @@ mkdir -m 700 private && cp -r private private_copy && stat -c '%a' private_copy
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: overwrites a read-only destination with -f
 #### When
 ```shell
@@ -12287,6 +13336,7 @@ printf 'old\n' > dst.txt && chmod 444 dst.txt && printf 'new\n' > src.txt && cp 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cut
 Source: `test/e2e/tools/mimixbox/shellutils/cut.atago.yaml`
 ### Scenario: prints the chosen field
@@ -12297,6 +13347,7 @@ printf 'a,b,c\n' | cut -f 2 -d ,
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the chosen fields joined by the delimiter
 #### When
 ```shell
@@ -12305,6 +13356,7 @@ printf 'a,b,c,d\n' | cut -f 1,3 -d ,
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints from the field to the end
 #### When
 ```shell
@@ -12313,6 +13365,7 @@ printf 'a,b,c,d\n' | cut -f 2- -d ,
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the chosen character range
 #### When
 ```shell
@@ -12321,6 +13374,7 @@ printf 'abcdef\n' | cut -c 1-3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error without a list
 #### When
 ```shell
@@ -12329,6 +13383,7 @@ printf 'a,b\n' | cut -d ,
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox cut (GNU options)
 Source: `test/e2e/tools/mimixbox/shellutils/cut_gnu.atago.yaml`
 ### Scenario: --complement keeps the fields not selected
@@ -12339,6 +13394,7 @@ printf 'a,b,c\n' | cut -f 2 -d , --complement
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --complement keeps the bytes not selected
 #### When
 ```shell
@@ -12347,6 +13403,7 @@ printf 'abcde\n' | cut -b 2-3 --complement
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -z splits and joins records on NUL (fields)
 #### When
 ```shell
@@ -12355,6 +13412,7 @@ printf 'a,b,c\000d,e,f\000' | cut -f 2 -d , -z | tr '\000' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -z cuts bytes from each NUL-delimited record
 #### When
 ```shell
@@ -12363,6 +13421,7 @@ printf 'abc\000def\000' | cut -b 1-2 -z | tr '\000' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox date
 Source: `test/e2e/tools/mimixbox/shellutils/date.atago.yaml`
 ### Scenario: formats the date portion of an epoch
@@ -12373,6 +13432,7 @@ date -u -d @0 +%F
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: formats the time portion of an epoch
 #### When
 ```shell
@@ -12381,6 +13441,7 @@ date -u -d @0 +%T
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints a literal percent sign
 #### When
 ```shell
@@ -12389,6 +13450,7 @@ date +%%
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints a four-digit year
 #### When
 ```shell
@@ -12397,6 +13459,7 @@ date +%Y | grep -E '^[0-9]{4}$' > /dev/null && echo "ok"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox dc
 Source: `test/e2e/tools/mimixbox/shellutils/dc.atago.yaml`
 ### Scenario: performs integer division
@@ -12407,6 +13470,7 @@ echo '6 3 / p' | dc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: honors the precision register
 #### When
 ```shell
@@ -12415,6 +13479,7 @@ echo '2k 7 3 / p' | dc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: evaluates -e expressions
 #### When
 ```shell
@@ -12423,6 +13488,7 @@ dc -e '2 10 ^ p'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: stores and loads registers
 #### When
 ```shell
@@ -12431,6 +13497,7 @@ echo '5 sa 3 la + p' | dc
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox dd
 Source: `test/e2e/tools/mimixbox/shellutils/dd.atago.yaml`
 ### Scenario: reproduces the input (stdin to stdout)
@@ -12441,6 +13508,7 @@ printf 'hello world' | dd status=none
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: copies only the requested blocks with count
 #### When
 ```shell
@@ -12449,6 +13517,7 @@ printf 'hello world' | dd bs=1 count=5 status=none
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: conv=ucase upper-cases the data
 #### When
 ```shell
@@ -12457,6 +13526,7 @@ printf 'abc' | dd conv=ucase status=none
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox df
 Source: `test/e2e/tools/mimixbox/shellutils/df.atago.yaml`
 ### Scenario: shows the column header
@@ -12467,6 +13537,7 @@ df . | head -n 1
 #### Then
 - exit code is `0`
 - stdout contains `Filesystem`
+
 ### Scenario: exits zero for the current directory
 #### When
 ```shell
@@ -12475,6 +13546,7 @@ df . > /dev/null; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox df GNU flags
 Source: `test/e2e/tools/mimixbox/shellutils/df_gnu.atago.yaml`
 ### Scenario: --output prints the selected column headers in order
@@ -12491,6 +13563,7 @@ df --output=source,fstype,size,used,avail,pcent,target
 - stdout line `1` contains `Avail`
 - stdout line `1` contains `Use%`
 - stdout line `1` contains `Mounted on`
+
 ### Scenario: --output honors a reordered field list
 #### When
 ```shell
@@ -12499,6 +13572,7 @@ df --output=target,source
 #### Then
 - exit code is `0`
 - stdout line `1` matches `/Mounted on.*Filesystem.*/`
+
 ### Scenario: --output rejects an unknown field
 #### When
 ```shell
@@ -12507,6 +13581,7 @@ df --output=bogus
 #### Then
 - exit code is not `0`
 - stderr contains `bogus`
+
 ### Scenario: --total emits a row labeled total
 #### When
 ```shell
@@ -12515,6 +13590,7 @@ df --total --output=source,size,used,avail,target
 #### Then
 - exit code is `0`
 - stdout contains `total`
+
 ### Scenario: --total works with the classic layout too
 #### When
 ```shell
@@ -12523,6 +13599,7 @@ df --total
 #### Then
 - exit code is `0`
 - stdout contains `total`
+
 ### Scenario: --type accepts a type filter and exits cleanly
 #### When
 ```shell
@@ -12531,6 +13608,7 @@ df --type=tmpfs --output=fstype,target
 #### Then
 - exit code is `0`
 - stdout line `1` contains `Type`
+
 ### Scenario: --type is repeatable
 #### When
 ```shell
@@ -12539,6 +13617,7 @@ df -t tmpfs -t ext4 --output=fstype
 #### Then
 - exit code is `0`
 - stdout line `1` contains `Type`
+
 ### Scenario: --block-size labels the block-size in the classic header
 #### When
 ```shell
@@ -12547,6 +13626,7 @@ df --block-size=1M
 #### Then
 - exit code is `0`
 - stdout line `1` contains `1048576-blocks`
+
 ### Scenario: --block-size rejects an invalid size
 #### When
 ```shell
@@ -12555,6 +13635,7 @@ df --block-size=1Z
 #### Then
 - exit code is not `0`
 - stderr contains `block-size`
+
 ### Scenario: --all lists at least as many rows with -a as without
 #### When
 ```shell
@@ -12562,6 +13643,7 @@ test "$(df -a --output=target | wc -l)" -ge "$(df --output=target | wc -l)"
 ```
 #### Then
 - exit code is `0`
+
 ## mimixbox dirname
 Source: `test/e2e/tools/mimixbox/shellutils/dirname.atago.yaml`
 ### Scenario: print /home/nao for an absolute file path
@@ -12572,6 +13654,7 @@ dirname "/home/nao/test.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print /home/nao for a filename without extension
 #### When
 ```shell
@@ -12580,6 +13663,7 @@ dirname "/home/nao/test"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print /home/nao for a hidden file
 #### When
 ```shell
@@ -12588,6 +13672,7 @@ dirname "/home/nao/.test"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print error without operand
 #### When
 ```shell
@@ -12596,6 +13681,7 @@ dirname
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: print / for the root directory
 #### When
 ```shell
@@ -12604,6 +13690,7 @@ dirname "/"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print . for an empty string
 #### When
 ```shell
@@ -12612,6 +13699,7 @@ dirname ""
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print /bin /home / with line feed for three arguments
 #### When
 ```shell
@@ -12620,6 +13708,7 @@ dirname /bin/dirname /home/nao /home
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -12635,6 +13724,7 @@ dirname -z /bin/dirname /home/nao /home
 #### Then
 - exit code is `0`
 - stdout matches `/^/bin\x00/home\x00/\x00$/`
+
 ### Scenario: print /aaa/bbb/ccc built from an environment variable
 #### When
 ```shell
@@ -12643,6 +13733,7 @@ TEST_DIR="/aaa/bbb/ccc"; dirname $TEST_DIR/ddd.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox du
 Source: `test/e2e/tools/mimixbox/shellutils/du.atago.yaml`
 ### Scenario: -b reports the total apparent byte size
@@ -12653,6 +13744,7 @@ mkdir -p du/sub && printf '%0.s.' $(seq 1 100) > du/a.txt && printf '%0.s.' $(se
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -s reports the total in 1K blocks
 #### When
 ```shell
@@ -12661,6 +13753,7 @@ mkdir -p du/sub && printf '%0.s.' $(seq 1 100) > du/a.txt && printf '%0.s.' $(se
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox du GNU flags
 Source: `test/e2e/tools/mimixbox/shellutils/du_gnu.atago.yaml`
 ### Scenario: omits directories deeper than --max-depth
@@ -12673,6 +13766,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 - exit code is `0`
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
+
 ### Scenario: prints only the operand total with --max-depth=0
 #### When
 ```shell
@@ -12682,6 +13776,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: skips entries matching --exclude
 #### When
 ```shell
@@ -12691,6 +13786,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: skips glob-matching files under -a
 #### When
 ```shell
@@ -12700,6 +13796,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports exact bytes with --apparent-size
 #### When
 ```shell
@@ -12709,6 +13806,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports block counts by default
 #### When
 ```shell
@@ -12718,6 +13816,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: matches a plain run on a single filesystem with -x
 #### When
 ```shell
@@ -12727,6 +13826,7 @@ mkdir -p sub/deep && head -c 1000 /dev/zero > a.txt && head -c 2000 /dev/zero > 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox echo
 Source: `test/e2e/tools/mimixbox/shellutils/echo.atago.yaml`
 ### Scenario: says Hello World!
@@ -12737,6 +13837,7 @@ echo "Hello World!"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: says Hello World! (helper ignores the positional argument)
 #### When
 ```shell
@@ -12745,6 +13846,7 @@ echo "Hello World!"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: expands an environment variable
 #### When
 ```shell
@@ -12753,6 +13855,7 @@ export TEST_ENV="TEST_ENV_VAR"; echo ${TEST_ENV}
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: pipes data through xargs
 #### When
 ```shell
@@ -12761,6 +13864,7 @@ echo "pipe" | xargs echo
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: says nothing with no arguments
 #### When
 ```shell
@@ -12769,6 +13873,7 @@ echo
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ### Scenario: redirects data to a file and shows it
 #### When
 ```shell
@@ -12777,6 +13882,7 @@ echo "MimixBox" > echo.txt && cat echo.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --help as the first argument prints usage instead of the literal text
 #### When
 ```shell
@@ -12785,6 +13891,7 @@ echo --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: echo`
+
 ### Scenario: --version as the first argument prints the version line
 #### When
 ```shell
@@ -12793,6 +13900,7 @@ echo --version
 #### Then
 - exit code is `0`
 - stdout contains `echo (mimixbox)`
+
 ### Scenario: --help that is not the first argument stays literal
 #### When
 ```shell
@@ -12801,6 +13909,7 @@ echo foo --help
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox env
 Source: `test/e2e/tools/mimixbox/shellutils/env.atago.yaml`
 ### Scenario: adds the assignment to the printed environment
@@ -12811,6 +13920,7 @@ env FOO=bar | grep '^FOO=bar$'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -i prints only the given assignment
 #### When
 ```shell
@@ -12819,6 +13929,7 @@ env -i ONLY=here
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: passes the variable to the run command
 #### When
 ```shell
@@ -12827,6 +13938,7 @@ env GREETING=hi sh -c 'echo $GREETING'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox env GNU flags
 Source: `test/e2e/tools/mimixbox/shellutils/env_gnu.atago.yaml`
 ### Scenario: --chdir reports the chdir target via pwd (long flag with =)
@@ -12837,6 +13949,7 @@ env --chdir=/tmp pwd
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --chdir reports the chdir target via pwd (-C short flag)
 #### When
 ```shell
@@ -12845,6 +13958,7 @@ mkdir -p sub && env -C "${workdir}/sub" pwd
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --chdir fails when the directory does not exist
 #### When
 ```shell
@@ -12853,6 +13967,7 @@ env --chdir=${workdir}/nope pwd
 #### Then
 - exit code is `125`
 - stderr contains `cannot change directory`
+
 ### Scenario: --split-string splits the command and its arguments (-S)
 #### When
 ```shell
@@ -12861,6 +13976,7 @@ env -S 'printf %s-%s a b'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --split-string splits with the long flag and whitespace runs
 #### When
 ```shell
@@ -12869,6 +13985,7 @@ env --split-string='printf   %s   hi'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --ignore-signal accepts known names and still runs the command
 #### When
 ```shell
@@ -12877,6 +13994,7 @@ env --ignore-signal=INT,TERM printf '%s' ok
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --ignore-signal rejects an unknown signal name
 #### When
 ```shell
@@ -12885,6 +14003,7 @@ env --ignore-signal=BOGUS printf x
 #### Then
 - exit code is `125`
 - stderr contains `invalid signal`
+
 ## mimixbox expr
 Source: `test/e2e/tools/mimixbox/shellutils/expr.atago.yaml`
 ### Scenario: adds two numbers
@@ -12895,6 +14014,7 @@ expr 6 + 7
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: multiplies two numbers
 #### When
 ```shell
@@ -12903,6 +14023,7 @@ expr 3 \* 4
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: respects parentheses
 #### When
 ```shell
@@ -12911,6 +14032,7 @@ expr \( 1 + 2 \) \* 3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the string length
 #### When
 ```shell
@@ -12919,6 +14041,7 @@ expr length abcd
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints 0 and exits non-zero for a zero result
 #### When
 ```shell
@@ -12927,6 +14050,7 @@ expr 0
 #### Then
 - exit code is not `0`
 - stdout equals an exact value
+
 ## mimixbox factor
 Source: `test/e2e/tools/mimixbox/shellutils/factor.atago.yaml`
 ### Scenario: describes itself with --help
@@ -12938,6 +14062,7 @@ factor --help
 - exit code is `0`
 - stdout contains `Usage: factor`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -12946,6 +14071,7 @@ factor --help
 #### Then
 - exit code is `0`
 - stdout contains `Print the prime factors`
+
 ### Scenario: factors a small integer
 #### When
 ```shell
@@ -12954,6 +14080,7 @@ factor 12
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails on a non-numeric operand
 #### When
 ```shell
@@ -12962,6 +14089,7 @@ factor notanumber
 #### Then
 - exit code is not `0`
 - stderr contains `factor:`
+
 ## mimixbox false
 Source: `test/e2e/tools/mimixbox/shellutils/false.atago.yaml`
 ### Scenario: prints nothing and exits 1
@@ -12972,6 +14100,7 @@ false
 #### Then
 - exit code is not `0`
 - stdout is empty
+
 ## mimixbox free
 Source: `test/e2e/tools/mimixbox/shellutils/free.atago.yaml`
 ### Scenario: prints the column header
@@ -12982,6 +14111,7 @@ free | head -n 1
 #### Then
 - exit code is `0`
 - stdout contains `total`, `available`
+
 ## mimixbox fsync
 Source: `test/e2e/tools/mimixbox/shellutils/fsync.atago.yaml`
 ### Scenario: describes itself with --help
@@ -12993,6 +14123,7 @@ fsync --help
 - exit code is `0`
 - stdout contains `Usage: fsync`
 - stderr is empty
+
 ## mimixbox ghrdc
 Source: `test/e2e/tools/mimixbox/shellutils/ghrdc.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -13003,6 +14134,7 @@ ghrdc --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: ghrdc`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -13011,6 +14143,7 @@ ghrdc
 #### Then
 - exit code is not `0`
 - stderr contains `ghrdc`
+
 ## mimixbox groups
 Source: `test/e2e/tools/mimixbox/shellutils/groups.atago.yaml`
 ### Scenario: describes itself with --help
@@ -13022,6 +14155,7 @@ groups --help
 - exit code is `0`
 - stdout contains `Usage: groups`
 - stderr is empty
+
 ### Scenario: prints the groups of a named user
 #### When
 ```shell
@@ -13030,11 +14164,13 @@ groups root
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox gzip
 Source: `test/e2e/tools/mimixbox/shellutils/gzip.atago.yaml`
 ### Scenario: compresses and decompresses back to the original
 #### Given
 - Fixture file `g.txt` is created.
+
 #### Inputs
 _Fixture `g.txt`:_
 ```text
@@ -13047,6 +14183,7 @@ gzip ${workdir}/g.txt && gunzip ${workdir}/g.txt.gz && cat ${workdir}/g.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox shellutils --help helpers
 Source: `test/e2e/tools/mimixbox/shellutils/help_helpers_shellutils.atago.yaml`
 ### Scenario: fsync --help is structured
@@ -13057,6 +14194,7 @@ env -- fsync --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: log-collect --help is structured
 #### When
 ```shell
@@ -13065,6 +14203,7 @@ env -- log-collect --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sddf --help is structured
 #### When
 ```shell
@@ -13073,6 +14212,7 @@ env -- sddf --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: time --help is structured
 #### When
 ```shell
@@ -13081,6 +14221,7 @@ env -- time --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: usleep --help is structured
 #### When
 ```shell
@@ -13089,6 +14230,7 @@ env -- usleep --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox hermetic harness
 Source: `test/e2e/tools/mimixbox/shellutils/hermetic.atago.yaml`
 ### Scenario: resolves cat to the MimixBox binary, not the host command
@@ -13099,6 +14241,7 @@ path=$(command -v cat) && basename "$(readlink -f "${path}")"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: resolves head to the MimixBox binary, not the host command
 #### When
 ```shell
@@ -13107,6 +14250,7 @@ path=$(command -v head) && basename "$(readlink -f "${path}")"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: resolves base64 to the MimixBox binary, not the host command
 #### When
 ```shell
@@ -13115,6 +14259,7 @@ path=$(command -v base64) && basename "$(readlink -f "${path}")"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox hostid
 Source: `test/e2e/tools/mimixbox/shellutils/hostid.atago.yaml`
 ### Scenario: prints 8 hexadecimal digits
@@ -13125,6 +14270,7 @@ hostid
 #### Then
 - exit code is `0`
 - stdout matches `/^[0-9a-f]{8}/`
+
 ### Scenario: prints the same value on repeated calls
 #### When
 ```shell
@@ -13133,6 +14279,7 @@ a=$(hostid); b=$(hostid); test "$a" = "$b" && echo "stable"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox hostname
 Source: `test/e2e/tools/mimixbox/shellutils/hostname.atago.yaml`
 ### Scenario: prints a non-empty host name
@@ -13143,6 +14290,7 @@ hostname
 #### Then
 - exit code is `0`
 - stdout is not empty
+
 ## mimixbox id
 Source: `test/e2e/tools/mimixbox/shellutils/id.atago.yaml`
 ### Scenario: describes itself with --help
@@ -13154,6 +14302,7 @@ id --help
 - exit code is `0`
 - stdout contains `Usage: id`
 - stderr is empty
+
 ### Scenario: prints the current uid/gid line
 #### When
 ```shell
@@ -13162,11 +14311,13 @@ id
 #### Then
 - exit code is `0`
 - stdout contains `uid=`, `gid=`
+
 ## mimixbox install
 Source: `test/e2e/tools/mimixbox/shellutils/install.atago.yaml`
 ### Scenario: copies the file content
 #### Given
 - Fixture file `install/src` is created.
+
 #### Inputs
 _Fixture `install/src`:_
 ```text
@@ -13179,9 +14330,11 @@ install -m 640 install/src install/dst && printf '%s' "$(cat install/dst)"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: sets the requested mode
 #### Given
 - Fixture file `install/src` is created.
+
 #### Inputs
 _Fixture `install/src`:_
 ```text
@@ -13194,6 +14347,7 @@ install -m 640 install/src install/dst2 && stat -c '%a' install/dst2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: creates directories with -d
 #### When
 ```shell
@@ -13202,6 +14356,7 @@ install -d install/a/b/c && [ -d install/a/b/c ] && echo ok
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails without a destination
 #### When
 ```shell
@@ -13210,6 +14365,7 @@ install only-source
 #### Then
 - exit code is not `0`
 - stderr contains `missing destination`
+
 ## mimixbox install_gnu
 Source: `test/e2e/tools/mimixbox/shellutils/install_gnu.atago.yaml`
 ### Scenario: makes a simple backup before overwriting with --backup=simple
@@ -13224,6 +14380,7 @@ cat dst dst~
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13242,6 +14399,7 @@ cat dst.bak
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: makes numbered backups with --backup=numbered
 #### When
 ```shell
@@ -13256,6 +14414,7 @@ cat dst dst.~1~ dst.~2~
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13275,6 +14434,7 @@ cat dst~
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: attempts chown and fails as non-root with --owner/--group
 #### When
 ```shell
@@ -13286,8 +14446,10 @@ install -o 0 -g 0 src dst
 - exit code is not `0`
 - stderr contains `ownership`
 - file `dst` exists
+
 #### Generated artifacts
 - `dst`
+
 ### Scenario: rejects an invalid owner name
 #### When
 ```shell
@@ -13298,6 +14460,7 @@ install -o no-such-user-xyz src dst
 #### Then
 - exit code is not `0`
 - stderr contains `invalid user`
+
 ### Scenario: rejects an invalid --backup control
 #### When
 ```shell
@@ -13308,6 +14471,7 @@ install --backup=bogus src dst
 #### Then
 - exit code is not `0`
 - stderr contains `invalid argument`
+
 ## mimixbox kill
 Source: `test/e2e/tools/mimixbox/shellutils/kill.atago.yaml`
 ### Scenario: lists signal names with -l
@@ -13318,6 +14482,7 @@ kill -l | grep -q KILL && echo ok
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox killall
 Source: `test/e2e/tools/mimixbox/shellutils/killall.atago.yaml`
 ### Scenario: kills a process by name
@@ -13328,6 +14493,7 @@ sleep 30 & sleep 0.2; killall sleep; echo "killed:$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox leadtime
 Source: `test/e2e/tools/mimixbox/shellutils/leadtime.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -13338,6 +14504,7 @@ leadtime --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: leadtime`, `LT_GITHUB_ACCESS_TOKEN`
+
 ### Scenario: fails when no subcommand is given
 #### When
 ```shell
@@ -13346,6 +14513,7 @@ leadtime
 #### Then
 - exit code is not `0`
 - stderr contains `stat`
+
 ### Scenario: fails on an unknown subcommand
 #### When
 ```shell
@@ -13354,6 +14522,7 @@ leadtime bogus --owner=a --repo=b
 #### Then
 - exit code is not `0`
 - stderr contains `unknown subcommand`
+
 ### Scenario: fails with a deterministic error when no token is set
 #### When
 ```shell
@@ -13362,6 +14531,7 @@ LT_GITHUB_ACCESS_TOKEN= GITHUB_TOKEN= leadtime stat --owner=acme --repo=demo
 #### Then
 - exit code is not `0`
 - stderr contains `no GitHub token`
+
 ### Scenario: fails when --owner/--repo are missing
 #### When
 ```shell
@@ -13370,6 +14540,7 @@ LT_GITHUB_ACCESS_TOKEN=x leadtime stat
 #### Then
 - exit code is not `0`
 - stderr contains `--owner and --repo are required`
+
 ### Scenario: rejects --json with --markdown
 #### When
 ```shell
@@ -13378,6 +14549,7 @@ LT_GITHUB_ACCESS_TOKEN=x leadtime stat --owner=a --repo=b --json --markdown
 #### Then
 - exit code is not `0`
 - stderr contains `mutually exclusive`
+
 ## mimixbox top-level list/suggestion CLI
 Source: `test/e2e/tools/mimixbox/shellutils/list_topcli.atago.yaml`
 ### Scenario: --list --json emits a JSON array containing cat and ls on stdout
@@ -13388,6 +14560,7 @@ mimixbox --list --json
 #### Then
 - exit code is `0`
 - stdout contains `"name": "cat"`, `"name": "ls"`, `"subsystem":`, `"stability":`, `[`, `]`
+
 ### Scenario: --list --filter=cat includes cat and excludes ls
 #### When
 ```shell
@@ -13397,6 +14570,7 @@ mimixbox --list --filter=cat
 - exit code is `0`
 - stdout contains `cat`
 - stdout line `1` contains `cat`
+
 ### Scenario: --list --subsystem=textutils includes cat and excludes ls
 #### When
 ```shell
@@ -13406,6 +14580,7 @@ mimixbox --list --subsystem=textutils
 - exit code is `0`
 - stdout contains `cat`
 - stdout does not contain ` ls -`
+
 ### Scenario: an unknown command suggests the nearest applet, error-first
 #### When
 ```shell
@@ -13415,11 +14590,13 @@ mimixbox lss
 - exit code is not `0`
 - stdout is empty
 - stderr contains `'lss' is not a mimixbox command.`, `Did you mean:`, `ls`
+
 ## mimixbox log-collect
 Source: `test/e2e/tools/mimixbox/shellutils/logcollect.atago.yaml`
 ### Scenario: copies log files into the output directory
 #### Given
 - Fixture file `src/a.log` is created.
+
 #### Inputs
 _Fixture `src/a.log`:_
 ```text
@@ -13432,6 +14609,7 @@ log-collect -o ${workdir}/out ${workdir}/src >/dev/null && cat ${workdir}/out/a.
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox logname
 Source: `test/e2e/tools/mimixbox/shellutils/logname.atago.yaml`
 ### Scenario: prints the login name from LOGNAME
@@ -13442,6 +14620,7 @@ LOGNAME=mimixuser logname
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox mbsh
 Source: `test/e2e/tools/mimixbox/shellutils/mbsh.atago.yaml`
 ### Scenario: runs an external command and shows a cwd-aware prompt
@@ -13452,6 +14631,7 @@ printf 'echo hello\nexit\n' | mbsh 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `hello`, `mbsh:`
+
 ### Scenario: ignores comment lines
 #### When
 ```shell
@@ -13460,6 +14640,7 @@ printf '# a comment\necho ok\nexit\n' | mbsh 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `ok`
+
 ### Scenario: expands $? to the last exit status
 #### When
 ```shell
@@ -13468,6 +14649,7 @@ printf 'false\necho status=$?\nexit\n' | mbsh 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `status=1`
+
 ### Scenario: lets a stdin-consuming command read the remaining script input
 #### When
 ```shell
@@ -13476,6 +14658,7 @@ printf 'cat\nhello\nexit\n' | mbsh 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `hello`
+
 ### Scenario: does not reparse command-consumed stdin as later commands
 #### When
 ```shell
@@ -13489,6 +14672,7 @@ esac
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: keeps double-quoted spaces in one argument
 #### When
 ```shell
@@ -13497,6 +14681,7 @@ printf 'echo "a b"\nexit\n' | mbsh 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout contains `a b`
+
 ### Scenario: expands $HOME
 #### When
 ```shell
@@ -13510,6 +14695,7 @@ esac
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: passes a NAME=value prefix to the command environment
 #### When
 ```shell
@@ -13518,6 +14704,7 @@ printf 'FOO=bar env\nexit\n' | mbsh 2>/dev/null | grep '^FOO=bar$'
 #### Then
 - exit code is `0`
 - stdout contains `FOO=bar`
+
 ### Scenario: runs commands in sequence and redirects output
 #### When
 ```shell
@@ -13530,6 +14717,7 @@ rm -rf "$d"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13548,6 +14736,7 @@ rm -rf "$d"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: redirects input with <
 #### When
 ```shell
@@ -13561,6 +14750,7 @@ rm -rf "$d"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: changes directory with cd
 #### When
 ```shell
@@ -13569,6 +14759,7 @@ mkdir -p ${workdir}/mbsh && printf 'cd %s\npwd\nexit\n' "${workdir}/mbsh" | mbsh
 #### Then
 - exit code is `0`
 - stdout contains `${workdir}/mbsh`
+
 ## mimixbox top-level CLI
 Source: `test/e2e/tools/mimixbox/shellutils/mimixbox.atago.yaml`
 ### Scenario: prints usage to stdout with --help and exits success
@@ -13579,6 +14770,7 @@ mimixbox --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: mimixbox`, `Examples:`
+
 ### Scenario: lists the applets with --list
 #### When
 ```shell
@@ -13587,6 +14779,7 @@ mimixbox --list
 #### Then
 - exit code is `0`
 - stdout contains `cat`, `pidof`
+
 ### Scenario: rejects an unknown option on stderr without polluting stdout
 #### When
 ```shell
@@ -13596,6 +14789,7 @@ mimixbox --definitely-not-an-option
 - exit code is not `0`
 - stdout is empty
 - stderr contains `is not a mimixbox command or option`
+
 ### Scenario: installs and removes applet symlinks in a temp directory
 #### When
 ```shell
@@ -13613,6 +14807,7 @@ echo ok
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox mknod
 Source: `test/e2e/tools/mimixbox/shellutils/mknod.atago.yaml`
 ### Scenario: creates a FIFO with type p
@@ -13623,6 +14818,7 @@ mknod ${workdir}/pipe p && [ -p ${workdir}/pipe ] && echo fifo
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects an invalid device type
 #### When
 ```shell
@@ -13631,6 +14827,7 @@ mknod ${workdir}/x z
 #### Then
 - exit code is not `0`
 - stderr contains `invalid device type`
+
 ## mimixbox nice
 Source: `test/e2e/tools/mimixbox/shellutils/nice.atago.yaml`
 ### Scenario: describes itself with --help
@@ -13642,6 +14839,7 @@ nice --help
 - exit code is `0`
 - stdout contains `Usage: nice`
 - stderr is empty
+
 ## mimixbox nohup
 Source: `test/e2e/tools/mimixbox/shellutils/nohup.atago.yaml`
 ### Scenario: runs the command and passes output through
@@ -13652,6 +14850,7 @@ nohup echo hello
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox nproc
 Source: `test/e2e/tools/mimixbox/shellutils/nproc.atago.yaml`
 ### Scenario: prints a positive number
@@ -13662,6 +14861,7 @@ nproc
 #### Then
 - exit code is `0`
 - stdout matches `/^[0-9]+\n?$/`
+
 ## mimixbox od
 Source: `test/e2e/tools/mimixbox/shellutils/od.atago.yaml`
 ### Scenario: dumps characters with C escapes
@@ -13672,6 +14872,7 @@ printf 'ABC\n' | od -c
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13686,6 +14887,7 @@ printf 'AB' | od -A x -t x1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13700,6 +14902,7 @@ printf 'A' | od -A n -t o1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox path
 Source: `test/e2e/tools/mimixbox/shellutils/path.atago.yaml`
 ### Scenario: prints the base name with --basename
@@ -13710,6 +14913,7 @@ path -b /home/nao/test.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the directory with --dirname
 #### When
 ```shell
@@ -13718,6 +14922,7 @@ path -d /home/nao/test.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the extension with --extension
 #### When
 ```shell
@@ -13726,6 +14931,7 @@ path -e /home/nao/test.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the cleaned path with --canonical
 #### When
 ```shell
@@ -13734,6 +14940,7 @@ path -c /home/nao/../nao/./test.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error with no operand
 #### When
 ```shell
@@ -13742,6 +14949,7 @@ path
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox pidof
 Source: `test/e2e/tools/mimixbox/shellutils/pidof.atago.yaml`
 ### Scenario: finds the PID of a running process via MimixBox pidof
@@ -13758,6 +14966,7 @@ echo "${RESULT}" | grep -q "${SLEEP_PID}" && echo found
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: resolves bare pidof to the MimixBox-installed symlink
 #### When
 ```shell
@@ -13773,6 +14982,7 @@ esac
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox posixer
 Source: `test/e2e/tools/mimixbox/shellutils/posixer.atago.yaml`
 ### Scenario: prints a table header
@@ -13783,6 +14993,7 @@ posixer | head -n 1
 #### Then
 - exit code is `0`
 - stdout contains `NAME`, `INSTALLED`
+
 ## mimixbox printenv
 Source: `test/e2e/tools/mimixbox/shellutils/printenv.atago.yaml`
 ### Scenario: prints an environment variable
@@ -13793,6 +15004,7 @@ MB_TEST_VAR=hello printenv MB_TEST_VAR
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox printf
 Source: `test/e2e/tools/mimixbox/shellutils/printf.atago.yaml`
 ### Scenario: formats arguments
@@ -13803,6 +15015,7 @@ printf %s-%s\n foo bar
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox printf_meta
 Source: `test/e2e/tools/mimixbox/shellutils/printf_meta.atago.yaml`
 ### Scenario: prints help for a leading --help
@@ -13814,6 +15027,7 @@ printf --help
 - exit code is `0`
 - stdout contains `Examples:`
 - stdout line `1` matches `/^Usage: printf/`
+
 ### Scenario: prints the version banner for a leading --version
 #### When
 ```shell
@@ -13822,6 +15036,7 @@ printf --version
 #### Then
 - exit code is `0`
 - stdout contains `printf (mimixbox)`
+
 ### Scenario: treats a later --help as an ordinary operand
 #### When
 ```shell
@@ -13830,6 +15045,7 @@ printf 'foo --help\n'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox pwd
 Source: `test/e2e/tools/mimixbox/shellutils/pwd.atago.yaml`
 ### Scenario: prints the working directory
@@ -13840,11 +15056,13 @@ cd /tmp && pwd
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox realpath
 Source: `test/e2e/tools/mimixbox/shellutils/realpath.atago.yaml`
 ### Scenario: resolves an existing file to its absolute path
 #### Given
 - Fixture file `file.txt` is created.
+
 #### When
 ```shell
 realpath file.txt
@@ -13852,6 +15070,7 @@ realpath file.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints the cleaned absolute path with -m on a missing path
 #### When
 ```shell
@@ -13860,6 +15079,7 @@ realpath -m ${workdir}/does/not/exist
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error with no operand
 #### When
 ```shell
@@ -13868,11 +15088,13 @@ realpath
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox realpath_gnu
 Source: `test/e2e/tools/mimixbox/shellutils/realpath_gnu.atago.yaml`
 ### Scenario: prints a path relative to --relative-to
 #### Given
 - Fixture file `a/b/.keep` is created.
+
 #### When
 ```shell
 realpath --relative-to ${workdir}/a ${workdir}/a/b
@@ -13880,6 +15102,7 @@ realpath --relative-to ${workdir}/a ${workdir}/a/b
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: resolves .. lexically with -L -m
 #### When
 ```shell
@@ -13888,6 +15111,7 @@ realpath -L -m /tmp/../etc/./hosts
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox richhelp
 Source: `test/e2e/tools/mimixbox/shellutils/richhelp.atago.yaml`
 ### Scenario: cp --help has a description, examples, and exit status
@@ -13898,6 +15122,7 @@ cp --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`, `Exit status:`
+
 ### Scenario: tail --help documents follow mode with examples
 #### When
 ```shell
@@ -13906,6 +15131,7 @@ tail --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`, `Follow the file`
+
 ### Scenario: wget --help has examples and compatibility notes
 #### When
 ```shell
@@ -13914,6 +15140,7 @@ wget --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`, `Notes:`
+
 ### Scenario: mbsh --help describes the shell and its limits
 #### When
 ```shell
@@ -13922,6 +15149,7 @@ mbsh --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`, `Notes:`
+
 ### Scenario: vi --help lists the supported keys
 #### When
 ```shell
@@ -13930,6 +15158,7 @@ vi --help
 #### Then
 - exit code is `0`
 - stdout contains `Motions:`
+
 ### Scenario: find --help has examples and notes
 #### When
 ```shell
@@ -13938,6 +15167,7 @@ find --help
 #### Then
 - exit code is `0`
 - stdout contains `Examples:`, `Notes:`
+
 ## mimixbox sddf
 Source: `test/e2e/tools/mimixbox/shellutils/sddf.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -13948,6 +15178,7 @@ sddf --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: sddf`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -13956,6 +15187,7 @@ sddf
 #### Then
 - exit code is not `0`
 - stderr contains `sddf`
+
 ## mimixbox seq
 Source: `test/e2e/tools/mimixbox/shellutils/seq.atago.yaml`
 ### Scenario: counts from 1 to LAST
@@ -13966,6 +15198,7 @@ seq 3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13981,6 +15214,7 @@ seq 2 5
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -13997,6 +15231,7 @@ seq 1 2 9
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14014,6 +15249,7 @@ seq -s , 1 3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: pads numbers with leading zeros
 #### When
 ```shell
@@ -14022,6 +15258,7 @@ seq -w 8 10
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14037,6 +15274,7 @@ seq abc
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox sleep
 Source: `test/e2e/tools/mimixbox/shellutils/sleep.atago.yaml`
 ### Scenario: sleeps then returns
@@ -14047,6 +15285,7 @@ sleep 0.1 && echo slept
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox sort
 Source: `test/e2e/tools/mimixbox/shellutils/sort.atago.yaml`
 ### Scenario: sorts lines alphabetically
@@ -14057,6 +15296,7 @@ printf 'banana\napple\ncherry\n' | sort
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14072,6 +15312,7 @@ printf '10\n2\n1\n' | sort -n
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14087,6 +15328,7 @@ printf 'a\nb\nc\n' | sort -r
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14102,6 +15344,7 @@ printf 'a\na\nb\n' | sort -u
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14118,6 +15361,7 @@ printf '1.10\n1.2\n1.1\n' | sort -V
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14133,6 +15377,7 @@ printf '1e3\n2.5\n100\n0.5\n' | sort -g
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14149,6 +15394,7 @@ printf '1G\n2K\n1M\n' | sort -h
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14164,6 +15410,7 @@ printf '5 zebra\n5 apple\n5 mango\n' | sort -s -n
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14179,6 +15426,7 @@ printf 'banana\000apple\000cherry\000' | sort -z | tr '\000' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -m merges already-sorted input
 #### When
 ```shell
@@ -14187,6 +15435,7 @@ printf 'apple\nbanana\ncherry\n' | sort -m
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14202,6 +15451,7 @@ printf 'b\na\n' | sort --parallel=4
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14216,6 +15466,7 @@ printf 'b\na\n' | sort --temporary-directory=/tmp
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14232,6 +15483,7 @@ speaker 2>&1; echo "rc:$?"
 #### Then
 - exit code is `0`
 - stdout contains `rc:1`
+
 ## mimixbox sync
 Source: `test/e2e/tools/mimixbox/shellutils/sync.atago.yaml`
 ### Scenario: flushes filesystem buffers
@@ -14242,6 +15494,7 @@ sync && echo synced
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox tee
 Source: `test/e2e/tools/mimixbox/shellutils/tee.atago.yaml`
 ### Scenario: echoes standard input to stdout
@@ -14252,6 +15505,7 @@ printf 'hello\n' | tee ${workdir}/out.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: also writes the input to the file
 #### When
 ```shell
@@ -14260,6 +15514,7 @@ printf 'hello\n' | tee ${workdir}/out.txt > /dev/null; cat ${workdir}/out.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: appends to a file with -a keeping the existing content
 #### When
 ```shell
@@ -14271,6 +15526,7 @@ cat ${workdir}/log.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14287,6 +15543,7 @@ printf 'hello\n' | tee --output-error=warn ${workdir}/good.txt > /dev/null; cat 
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: warn mode still writes the good file but exits nonzero
 #### When
 ```shell
@@ -14300,6 +15557,7 @@ exit ${rc}
 #### Then
 - exit code is not `0`
 - stdout equals an exact value
+
 ### Scenario: exit mode does not create the later good file and exits nonzero
 #### When
 ```shell
@@ -14317,6 +15575,7 @@ exit ${rc}
 #### Then
 - exit code is not `0`
 - stdout equals an exact value
+
 ## mimixbox test
 Source: `test/e2e/tools/mimixbox/shellutils/test.atago.yaml`
 ### Scenario: string equality is true for equal strings
@@ -14327,6 +15586,7 @@ test abc = abc; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: integer comparison is true when 2 > 1
 #### When
 ```shell
@@ -14335,6 +15595,7 @@ test 2 -gt 1; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: integer comparison is false when 1 > 2
 #### When
 ```shell
@@ -14343,9 +15604,11 @@ test 1 -gt 2; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: file existence is true for an existing file
 #### Given
 - Fixture file `file.txt` is created.
+
 #### When
 ```shell
 test -f ${workdir}/file.txt; echo "rc=$?"
@@ -14353,6 +15616,7 @@ test -f ${workdir}/file.txt; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: negation negates the expression
 #### When
 ```shell
@@ -14361,6 +15625,7 @@ test ! -f /no_such_file; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox test (meta)
 Source: `test/e2e/tools/mimixbox/shellutils/test_meta.atago.yaml`
 ### Scenario: prints help for a sole --help
@@ -14371,6 +15636,7 @@ env test --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: test`
+
 ### Scenario: prints the version banner for a sole --version
 #### When
 ```shell
@@ -14379,6 +15645,7 @@ env test --version
 #### Then
 - exit code is `0`
 - stdout contains `test (mimixbox)`
+
 ### Scenario: evaluates an expression when --help is not the sole argument
 #### When
 ```shell
@@ -14387,6 +15654,7 @@ env test foo = --help
 #### Then
 - exit code is not `0`
 - stdout does not contain `Usage: test`
+
 ## mimixbox time
 Source: `test/e2e/tools/mimixbox/shellutils/time.atago.yaml`
 ### Scenario: describes itself with --help
@@ -14398,6 +15666,7 @@ time --help
 - exit code is `0`
 - stdout contains `Usage: time`
 - stderr is empty
+
 ## mimixbox time / fsync
 Source: `test/e2e/tools/mimixbox/shellutils/timefsync.atago.yaml`
 ### Scenario: time runs the command and passes its output through
@@ -14408,6 +15677,7 @@ env time echo timed 2>/dev/null
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: time reports the real elapsed time on stderr
 #### When
 ```shell
@@ -14416,9 +15686,11 @@ env time echo x 2>&1 1>/dev/null | grep -c real
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fsync succeeds on an existing file
 #### Given
 - Fixture file `f.txt` is created.
+
 #### Inputs
 _Fixture `f.txt`:_
 ```text
@@ -14431,6 +15703,7 @@ fsync ${workdir}/f.txt; echo $?
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fsync fails on a missing file
 #### When
 ```shell
@@ -14439,6 +15712,7 @@ fsync /no/such/mimixbox/file 2>/dev/null; echo $?
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox timeout
 Source: `test/e2e/tools/mimixbox/shellutils/timeout.atago.yaml`
 ### Scenario: runs the command to completion
@@ -14449,6 +15723,7 @@ timeout 5 echo done
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: returns exit code 124 on timeout
 #### When
 ```shell
@@ -14457,12 +15732,14 @@ timeout 0.1 sleep 5; echo "exit:$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox tree / nice
 Source: `test/e2e/tools/mimixbox/shellutils/tree.atago.yaml`
 ### Scenario: tree counts directories and files in its summary
 #### Given
 - Fixture file `sub/leaf.txt` is created.
 - Fixture file `root.txt` is created.
+
 #### When
 ```shell
 tree ${workdir} | grep directories
@@ -14470,10 +15747,12 @@ tree ${workdir} | grep directories
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: tree exits successfully on a readable directory
 #### Given
 - Fixture file `sub/leaf.txt` is created.
 - Fixture file `root.txt` is created.
+
 #### When
 ```shell
 tree ${workdir} > /dev/null; echo $?
@@ -14481,6 +15760,7 @@ tree ${workdir} > /dev/null; echo $?
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: nice prints a numeric niceness
 #### When
 ```shell
@@ -14489,6 +15769,7 @@ nice
 #### Then
 - exit code is `0`
 - stdout matches `/[0-9]/`
+
 ## mimixbox true
 Source: `test/e2e/tools/mimixbox/shellutils/true.atago.yaml`
 ### Scenario: prints nothing and exits 0
@@ -14499,6 +15780,7 @@ true
 #### Then
 - exit code is `0`
 - stdout is empty
+
 ## mimixbox tsort
 Source: `test/e2e/tools/mimixbox/shellutils/tsort.atago.yaml`
 ### Scenario: describes itself with --help
@@ -14510,6 +15792,7 @@ tsort --help
 - exit code is `0`
 - stdout contains `Usage: tsort`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -14518,6 +15801,7 @@ tsort --help
 #### Then
 - exit code is `0`
 - stdout contains `total ordering`
+
 ### Scenario: produces a topological order
 #### Inputs
 _stdin for `tsort`:_
@@ -14532,6 +15816,7 @@ tsort
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14549,6 +15834,7 @@ echo "" | tty
 #### Then
 - exit code is not `0`
 - stdout equals an exact value
+
 ## mimixbox uname
 Source: `test/e2e/tools/mimixbox/shellutils/uname.atago.yaml`
 ### Scenario: prints the kernel name
@@ -14559,6 +15845,7 @@ uname -s
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox uniq
 Source: `test/e2e/tools/mimixbox/shellutils/uniq.atago.yaml`
 ### Scenario: collapses repeated adjacent lines
@@ -14569,6 +15856,7 @@ printf 'a\na\nb\nc\nc\nc\n' | uniq
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14584,6 +15872,7 @@ printf 'a\na\nb\nc\nc\nc\n' | uniq -c
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14599,6 +15888,7 @@ printf 'a\na\nb\nc\nc\n' | uniq -d
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14613,6 +15903,7 @@ printf 'a\na\nb\nc\nc\n' | uniq -u
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox users
 Source: `test/e2e/tools/mimixbox/shellutils/users.atago.yaml`
 ### Scenario: runs and exits successfully
@@ -14623,6 +15914,7 @@ users >/dev/null 2>&1; echo $?
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: treats a missing utmp as nobody logged in
 #### When
 ```shell
@@ -14631,6 +15923,7 @@ out=$(users /no/such/mimixbox/utmp); echo "[$out] rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox usleep
 Source: `test/e2e/tools/mimixbox/shellutils/usleep.atago.yaml`
 ### Scenario: describes itself with --help
@@ -14642,6 +15935,7 @@ usleep --help
 - exit code is `0`
 - stdout contains `Usage: usleep`
 - stderr is empty
+
 ### Scenario: rejects a non-numeric microsecond count
 #### When
 ```shell
@@ -14650,6 +15944,7 @@ usleep notanumber
 #### Then
 - exit code is not `0`
 - stderr contains `usleep:`
+
 ## mimixbox uuidgen
 Source: `test/e2e/tools/mimixbox/shellutils/uuidgen.atago.yaml`
 ### Scenario: prints a well-formed UUID
@@ -14660,6 +15955,7 @@ uuidgen | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox w
 Source: `test/e2e/tools/mimixbox/shellutils/w.atago.yaml`
 ### Scenario: prints a summary header with the load averages
@@ -14670,6 +15966,7 @@ w | sed -n '1p'
 #### Then
 - exit code is `0`
 - stdout contains `load average:`, `up `
+
 ### Scenario: prints the column header
 #### When
 ```shell
@@ -14678,6 +15975,7 @@ w | sed -n '2p'
 #### Then
 - exit code is `0`
 - stdout contains `USER`, `LOGIN@`
+
 ## mimixbox watch
 Source: `test/e2e/tools/mimixbox/shellutils/watch.atago.yaml`
 ### Scenario: runs the command and shows its output
@@ -14688,6 +15986,7 @@ timeout 0.6 watch -t -n 0.2 echo tick 2>/dev/null
 #### Then
 - exit code is not `0`
 - stdout contains `tick`
+
 ## mimixbox wget
 Source: `test/e2e/tools/mimixbox/shellutils/wget.atago.yaml`
 ### Scenario: prints usage with --help and exits 0
@@ -14698,6 +15997,7 @@ wget --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: wget`
+
 ### Scenario: fails with a message when given no operand
 #### When
 ```shell
@@ -14706,6 +16006,7 @@ wget
 #### Then
 - exit code is not `0`
 - stderr contains `wget`
+
 ### Scenario: documents the added download options
 #### When
 ```shell
@@ -14714,6 +16015,7 @@ wget --help
 #### Then
 - exit code is `0`
 - stdout contains `--directory-prefix`, `--continue`, `--timeout`, `--tries`, `--user-agent`
+
 ## mimixbox which
 Source: `test/e2e/tools/mimixbox/shellutils/which.atago.yaml`
 ### Scenario: prints the MimixBox path
@@ -14724,6 +16026,7 @@ Source: `test/e2e/tools/mimixbox/shellutils/which.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints nothing for a binary that does not exist
 #### When
 ```shell
@@ -14732,6 +16035,7 @@ which no_exist_binary
 #### Then
 - exit code is not `0`
 - stdout is empty
+
 ### Scenario: prints paths of three binaries
 #### When
 ```shell
@@ -14742,6 +16046,7 @@ d=$(dirname "$(command -v mimixbox)")
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: prints paths of two binaries and fails when one of three is missing
 #### When
 ```shell
@@ -14750,6 +16055,7 @@ which mimixbox not_exist_binary tac
 #### Then
 - exit code is not `0`
 - stdout matches `//mimixbox\n.*/tac\n?$/`
+
 ### Scenario: prints nothing without an operand
 #### When
 ```shell
@@ -14758,6 +16064,7 @@ which
 #### Then
 - exit code is not `0`
 - stdout is empty
+
 ### Scenario: prints nothing when data comes from a pipe
 #### When
 ```shell
@@ -14766,6 +16073,7 @@ echo "test" | which
 #### Then
 - exit code is not `0`
 - stdout is empty
+
 ## mimixbox who
 Source: `test/e2e/tools/mimixbox/shellutils/who.atago.yaml`
 ### Scenario: prints nothing and succeeds on an empty utmp
@@ -14776,6 +16084,7 @@ who /dev/null; echo "rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -q reports zero users on an empty utmp
 #### When
 ```shell
@@ -14784,6 +16093,7 @@ who -q /dev/null
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --help prints usage
 #### When
 ```shell
@@ -14792,6 +16102,7 @@ who --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: who`
+
 ## mimixbox whoami
 Source: `test/e2e/tools/mimixbox/shellutils/whoami.atago.yaml`
 ### Scenario: prints the current user name
@@ -14802,6 +16113,7 @@ Source: `test/e2e/tools/mimixbox/shellutils/whoami.atago.yaml`
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error with an extra operand
 #### When
 ```shell
@@ -14810,6 +16122,7 @@ whoami extra
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox yes
 Source: `test/e2e/tools/mimixbox/shellutils/yes.atago.yaml`
 ### Scenario: repeats y until the reader closes
@@ -14820,6 +16133,7 @@ yes | head -n 3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14835,6 +16149,7 @@ yes mimix | head -n 2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14851,6 +16166,7 @@ printf 'hello\n' | base32
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: decodes standard input
 #### When
 ```shell
@@ -14859,11 +16175,13 @@ printf 'NBSWY3DPBI======\n' | base32 -d
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox cat
 Source: `test/e2e/tools/mimixbox/textutils/cat.atago.yaml`
 ### Scenario: show shell family name
 #### Given
 - Fixture file `cat.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -14879,6 +16197,7 @@ cat cat.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14890,6 +16209,7 @@ bash
 ### Scenario: show shell family name with line numbers
 #### Given
 - Fixture file `cat.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -14905,6 +16225,7 @@ cat -n cat.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14921,9 +16242,11 @@ echo "${workdir}/cat.txt" | cat
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: cat only the file operand, ignoring pipe data
 #### Given
 - Fixture file `cat.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -14939,6 +16262,7 @@ echo "${workdir}/cat2.txt" | cat cat.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14951,6 +16275,7 @@ bash
 #### Given
 - Fixture file `cat.txt` is created.
 - Fixture file `cat2.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -14971,6 +16296,7 @@ cat cat.txt cat2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -14985,6 +16311,7 @@ zsh
 #### Given
 - Fixture file `cat.txt` is created.
 - Fixture file `cat2.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -15005,6 +16332,7 @@ cat -n cat.txt cat2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15018,6 +16346,7 @@ _expected stdout:_
 ### Scenario: concatenate a heredoc and a file via redirect
 #### Given
 - Fixture file `cat.txt` is created.
+
 #### Inputs
 _Fixture `cat.txt`:_
 ```text
@@ -15038,6 +16367,7 @@ cat cat2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15056,11 +16386,13 @@ cat no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox cat_showall
 Source: `test/e2e/tools/mimixbox/textutils/cat_showall.atago.yaml`
 ### Scenario: -A and --show-all are aliases
 #### Given
 - Fixture file `cat_nonprinting.bin` is created.
+
 #### When
 ```shell
 cat -A "${workdir}/cat_nonprinting.bin" > short.out
@@ -15071,9 +16403,11 @@ if cmp -s short.out long.out; then echo "identical"; else echo "different"; fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: -v and --show-nonprinting are aliases
 #### Given
 - Fixture file `cat_nonprinting.bin` is created.
+
 #### When
 ```shell
 cat -v "${workdir}/cat_nonprinting.bin" > short.out
@@ -15084,9 +16418,11 @@ if cmp -s short.out long.out; then echo "identical"; else echo "different"; fi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: --show-all renders tabs as ^I, non-printing bytes, and $ line ends
 #### Given
 - Fixture file `cat_nonprinting.bin` is created.
+
 #### When
 ```shell
 cat --show-all ${workdir}/cat_nonprinting.bin
@@ -15094,6 +16430,7 @@ cat --show-all ${workdir}/cat_nonprinting.bin
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15104,6 +16441,7 @@ $
 ### Scenario: --show-nonprinting leaves TAB alone and renders ^X, ^?, and M- notation
 #### Given
 - Fixture file `cat_nonprinting.bin` is created.
+
 #### When
 ```shell
 cat --show-nonprinting ${workdir}/cat_nonprinting.bin
@@ -15111,6 +16449,7 @@ cat --show-nonprinting ${workdir}/cat_nonprinting.bin
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15128,6 +16467,7 @@ printf 'hello\n' | sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: crc32 prints the CRC-32 of stdin
 #### When
 ```shell
@@ -15136,6 +16476,7 @@ printf 'hello\n' | crc32
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: sha384sum prints the SHA-384 digest
 #### When
 ```shell
@@ -15144,6 +16485,7 @@ printf 'hello\n' | sha384sum
 #### Then
 - exit code is `0`
 - stdout contains `1d0f284efe3edea4b9ca3bd514fa134b17eae361ccc7a1eefeff801b9bd6604e`
+
 ## mimixbox cksum
 Source: `test/e2e/tools/mimixbox/textutils/cksum.atago.yaml`
 ### Scenario: prints the CRC checksum and byte count
@@ -15154,12 +16496,14 @@ printf 'hello\n' | cksum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox comm
 Source: `test/e2e/tools/mimixbox/textutils/comm.atago.yaml`
 ### Scenario: print lines common to both files
 #### Given
 - Fixture file `comm_a.txt` is created.
 - Fixture file `comm_b.txt` is created.
+
 #### Inputs
 _Fixture `comm_a.txt`:_
 ```text
@@ -15178,12 +16522,14 @@ comm -1 -2 ${workdir}/comm_a.txt ${workdir}/comm_b.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox comm_gnu
 Source: `test/e2e/tools/mimixbox/textutils/comm_gnu.atago.yaml`
 ### Scenario: separate the columns with --output-delimiter
 #### Given
 - Fixture file `comm_gnu/a.txt` is created.
 - Fixture file `comm_gnu/b.txt` is created.
+
 #### Inputs
 _Fixture `comm_gnu/a.txt`:_
 ```text
@@ -15207,10 +16553,12 @@ comm --output-delimiter=, ${workdir}/comm_gnu/a.txt ${workdir}/comm_gnu/b.txt
 - stdout line `2` equals an exact value
 - stdout line `3` equals an exact value
 - stdout line `4` equals an exact value
+
 ### Scenario: read and write NUL-terminated records with -z
 #### Given
 - Fixture file `comm_gnu/za.txt` is created.
 - Fixture file `comm_gnu/zb.txt` is created.
+
 #### When
 ```shell
 comm -z -1 -2 ${workdir}/comm_gnu/za.txt ${workdir}/comm_gnu/zb.txt | tr '\0' '#'
@@ -15218,10 +16566,12 @@ comm -z -1 -2 ${workdir}/comm_gnu/za.txt ${workdir}/comm_gnu/zb.txt | tr '\0' '#
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: report an unsorted input on stderr and fail with --check-order
 #### Given
 - Fixture file `comm_gnu/unsorted.txt` is created.
 - Fixture file `comm_gnu/b.txt` is created.
+
 #### Inputs
 _Fixture `comm_gnu/unsorted.txt`:_
 ```text
@@ -15244,11 +16594,13 @@ echo "rc=$?"
 - exit code is `0`
 - stdout equals an exact value
 - stderr contains `file 1 is not in sorted order`
+
 ## mimixbox convert_mode
 Source: `test/e2e/tools/mimixbox/textutils/convert_mode.atago.yaml`
 ### Scenario: dos2unix keeps the original mode
 #### Given
 - Fixture file `d2u.txt` is created.
+
 #### Inputs
 _Fixture `d2u.txt`:_
 ```text
@@ -15264,9 +16616,11 @@ stat -c '%a' "${workdir}/d2u.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: unix2dos keeps the original mode
 #### Given
 - Fixture file `u2d.txt` is created.
+
 #### Inputs
 _Fixture `u2d.txt`:_
 ```text
@@ -15282,6 +16636,7 @@ stat -c '%a' "${workdir}/u2d.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox crc32
 Source: `test/e2e/tools/mimixbox/textutils/crc32.atago.yaml`
 ### Scenario: describes itself with --help
@@ -15293,6 +16648,7 @@ crc32 --help
 - exit code is `0`
 - stdout contains `Usage: crc32`
 - stderr is empty
+
 ### Scenario: prints the CRC-32 of stdin
 #### Inputs
 _stdin for `crc32`:_
@@ -15306,11 +16662,13 @@ crc32
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox dos2unix
 Source: `test/e2e/tools/mimixbox/textutils/dos2unix.atago.yaml`
 ### Scenario: convert a CRLF file to LF and reclassify it
 #### Given
 - Fixture file `dos2unix/1.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15326,6 +16684,7 @@ file "${workdir}/dos2unix/1.txt"
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15335,6 +16694,7 @@ ${workdir}/dos2unix/1.txt: ASCII text
 ### Scenario: convert a CRLF file and exit success
 #### Given
 - Fixture file `dos2unix/1.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15349,6 +16709,7 @@ dos2unix "${workdir}/dos2unix/1.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15359,6 +16720,7 @@ dos2unix: converting file ${workdir}/dos2unix/1.txt to Unix format...
 - Fixture file `dos2unix/1.txt` is created.
 - Fixture file `dos2unix/2.txt` is created.
 - Fixture file `dos2unix/3.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15388,6 +16750,7 @@ file "${workdir}/dos2unix/3.txt"
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15403,6 +16766,7 @@ ${workdir}/dos2unix/3.txt: ASCII text
 - Fixture file `dos2unix/1.txt` is created.
 - Fixture file `dos2unix/2.txt` is created.
 - Fixture file `dos2unix/3.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15429,6 +16793,7 @@ dos2unix "${workdir}/dos2unix/1.txt" "${workdir}/dos2unix/2.txt" "${workdir}/dos
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15439,6 +16804,7 @@ dos2unix: converting file ${workdir}/dos2unix/3.txt to Unix format...
 ### Scenario: refuse a directory with a not-regular-file error
 #### Given
 - Fixture file `dos2unix/1.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15453,10 +16819,12 @@ dos2unix ${workdir}/dos2unix
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: convert the two files but fail on the directory operand
 #### Given
 - Fixture file `dos2unix/1.txt` is created.
 - Fixture file `dos2unix/3.txt` is created.
+
 #### Inputs
 _Fixture `dos2unix/1.txt`:_
 ```text
@@ -15478,6 +16846,7 @@ dos2unix ${workdir}/dos2unix/1.txt ${workdir}/dos2unix ${workdir}/dos2unix/3.txt
 - exit code is not `0`
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15494,6 +16863,7 @@ printf 'a\tb\n' | expand
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: converts tabs to the given width
 #### When
 ```shell
@@ -15502,9 +16872,11 @@ printf 'a\tb\n' | expand -t 4
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: converts tabs in the file
 #### Given
 - Fixture file `expand.txt` is created.
+
 #### Inputs
 _Fixture `expand.txt`:_
 ```text
@@ -15517,6 +16889,7 @@ expand expand.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reports an error for a non-existent file
 #### When
 ```shell
@@ -15525,6 +16898,7 @@ expand /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox fmt
 Source: `test/e2e/tools/mimixbox/textutils/fmt.atago.yaml`
 ### Scenario: reflows text to the given width
@@ -15535,6 +16909,7 @@ printf 'aa bb cc dd\n' | fmt -w 5
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15551,6 +16926,7 @@ printf 'abcdefgh\n' | fold -w 3
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15563,6 +16939,7 @@ Source: `test/e2e/tools/mimixbox/textutils/head.atago.yaml`
 ### Scenario: print the first 10 lines
 #### Given
 - Fixture file `head.txt` is created.
+
 #### Inputs
 _Fixture `head.txt`:_
 ```text
@@ -15586,6 +16963,7 @@ head head.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15603,6 +16981,7 @@ _expected stdout:_
 ### Scenario: print the first N lines
 #### Given
 - Fixture file `head.txt` is created.
+
 #### Inputs
 _Fixture `head.txt`:_
 ```text
@@ -15626,6 +17005,7 @@ head -n 3 head.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15641,6 +17021,7 @@ printf 'hello world' | head -c 5
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print the first N lines of stdin
 #### When
 ```shell
@@ -15649,6 +17030,7 @@ printf 'a\nb\nc\nd\n' | head -n 2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15663,6 +17045,7 @@ head /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox head --zero-terminated
 Source: `test/e2e/tools/mimixbox/textutils/head_zero.atago.yaml`
 ### Scenario: prints the first NUL-delimited record, preserving the embedded newline
@@ -15673,6 +17056,7 @@ printf 'a\nb\0c\nd\0' | head -z -n 1 | tr '\0' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15687,6 +17071,7 @@ printf 'a\nb\0c\nd\0' | head --zero-terminated -n 2 | tr '\0' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15704,6 +17089,7 @@ env -- crc32 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sha384sum --help is structured
 #### When
 ```shell
@@ -15712,6 +17098,7 @@ env -- sha384sum --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sha3sum --help is structured
 #### When
 ```shell
@@ -15720,6 +17107,7 @@ env -- sha3sum --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sum --help is structured
 #### When
 ```shell
@@ -15728,6 +17116,7 @@ env -- sum --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: uudecode --help is structured
 #### When
 ```shell
@@ -15736,6 +17125,7 @@ env -- uudecode --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: uuencode --help is structured
 #### When
 ```shell
@@ -15744,11 +17134,13 @@ env -- uuencode --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox man
 Source: `test/e2e/tools/mimixbox/textutils/man.atago.yaml`
 ### Scenario: show a plain manual page
 #### Given
 - Fixture file `man/man1/foo.1` is created.
+
 #### Inputs
 _Fixture `man/man1/foo.1`:_
 ```text
@@ -15762,6 +17154,7 @@ man -M "${workdir}/man" foo
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15778,6 +17171,7 @@ man -M "${workdir}/man" bar
 - after `man -M "${workdir}/man" bar`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15787,6 +17181,7 @@ the bar page
 ### Scenario: report a missing page with exit 16
 #### Given
 - Fixture file `man/man1/foo.1` is created.
+
 #### Inputs
 _Fixture `man/man1/foo.1`:_
 ```text
@@ -15800,11 +17195,13 @@ man -M "${workdir}/man" missing 2>/dev/null; echo "exit=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox md5sum
 Source: `test/e2e/tools/mimixbox/textutils/md5sum.atago.yaml`
 ### Scenario: get md5sum of one file
 #### Given
 - Fixture file `md5sum/1.txt` is created.
+
 #### Inputs
 _Fixture `md5sum/1.txt`:_
 ```text
@@ -15817,9 +17214,11 @@ md5sum ${workdir}/md5sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: cannot get md5sum of one directory
 #### Given
 - Fixture file `md5sum/1.txt` is created.
+
 #### Inputs
 _Fixture `md5sum/1.txt`:_
 ```text
@@ -15832,6 +17231,7 @@ md5sum ${workdir}/md5sum
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: cannot get md5sum of not exist file
 #### When
 ```shell
@@ -15840,11 +17240,13 @@ md5sum /not_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: get md5sum of three files
 #### Given
 - Fixture file `md5sum/1.txt` is created.
 - Fixture file `md5sum/2.txt` is created.
 - Fixture file `md5sum/3.txt` is created.
+
 #### Inputs
 _Fixture `md5sum/1.txt`:_
 ```text
@@ -15865,6 +17267,7 @@ md5sum ${workdir}/md5sum/1.txt ${workdir}/md5sum/2.txt ${workdir}/md5sum/3.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15878,6 +17281,7 @@ d0d8ffef81b3c7160ac655d5939548c5  ${workdir}/md5sum/1.txt
 - Fixture file `md5sum/2.txt` is created.
 - Fixture file `md5sum/3.txt` is created.
 - Fixture file `md5sum/checksum.txt` is created.
+
 #### Inputs
 _Fixture `md5sum/1.txt`:_
 ```text
@@ -15904,6 +17308,7 @@ md5sum -c ${workdir}/md5sum/checksum.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15919,9 +17324,11 @@ echo "test" | md5sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: get md5sum for pipe data and file at same time
 #### Given
 - Fixture file `md5sum/1.txt` is created.
+
 #### Inputs
 _Fixture `md5sum/1.txt`:_
 ```text
@@ -15934,11 +17341,13 @@ echo "test" | md5sum ${workdir}/md5sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox nl
 Source: `test/e2e/tools/mimixbox/textutils/nl.atago.yaml`
 ### Scenario: number each line of a file
 #### Given
 - Fixture file `nl.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -15954,6 +17363,7 @@ nl nl.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -15965,6 +17375,7 @@ _expected stdout:_
 ### Scenario: number the single line read from pipe data
 #### Given
 - Fixture file `nl.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -15980,9 +17391,11 @@ echo "${workdir}/nl.txt" | nl
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: number only the file operand, ignoring pipe data
 #### Given
 - Fixture file `nl.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -15998,6 +17411,7 @@ echo "${workdir}/nl.txt" | nl nl.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16010,6 +17424,7 @@ _expected stdout:_
 #### Given
 - Fixture file `nl.txt` is created.
 - Fixture file `nl2.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -16030,6 +17445,7 @@ nl nl.txt nl2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16043,6 +17459,7 @@ _expected stdout:_
 ### Scenario: number heredoc then file via a redirect
 #### Given
 - Fixture file `nl.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -16062,6 +17479,7 @@ cat nl2.txt
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16075,6 +17493,7 @@ _expected stdout:_
 ### Scenario: number heredoc then file via a redirect with success status
 #### Given
 - Fixture file `nl.txt` is created.
+
 #### Inputs
 _Fixture `nl.txt`:_
 ```text
@@ -16095,6 +17514,7 @@ cat nl2.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16113,11 +17533,13 @@ nl no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox nl sections
 Source: `test/e2e/tools/mimixbox/textutils/nl_sections.atago.yaml`
 ### Scenario: number every line in every section with -h a -b a -f a
 #### Given
 - Fixture file `nl_sec.txt` is created.
+
 #### Inputs
 _Fixture `nl_sec.txt`:_
 ```text
@@ -16136,6 +17558,7 @@ nl -h a -b a -f a nl_sec.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16150,6 +17573,7 @@ _expected stdout:_
 ### Scenario: number header (a) and body (t) but not footer (n)
 #### Given
 - Fixture file `nl_sec.txt` is created.
+
 #### Inputs
 _Fixture `nl_sec.txt`:_
 ```text
@@ -16168,6 +17592,7 @@ nl -h a -b t -f n nl_sec.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16182,6 +17607,7 @@ _expected stdout:_
 ### Scenario: number every second blank line with -l 2
 #### Given
 - Fixture file `nl_blank.txt` is created.
+
 #### Inputs
 _Fixture `nl_blank.txt`:_
 ```text
@@ -16199,6 +17625,7 @@ nl -b a -l 2 nl_blank.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16219,6 +17646,7 @@ printf 'a\nb\nc\n' | paste -s -d ,
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox rev
 Source: `test/e2e/tools/mimixbox/textutils/rev.atago.yaml`
 ### Scenario: reverses the characters of a line
@@ -16229,11 +17657,13 @@ printf 'abc\n' | rev
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox sha1sum
 Source: `test/e2e/tools/mimixbox/textutils/sha1sum.atago.yaml`
 ### Scenario: get sha1sum of one file
 #### Given
 - Fixture file `sha1sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
 ```text
@@ -16246,6 +17676,7 @@ sha1sum ${workdir}/sha1sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16254,6 +17685,7 @@ _expected stdout:_
 ### Scenario: cannot get sha1sum of one directory
 #### Given
 - Fixture file `sha1sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
 ```text
@@ -16266,6 +17698,7 @@ sha1sum ${workdir}/sha1sum
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: cannot get sha1sum of not exist file
 #### When
 ```shell
@@ -16274,11 +17707,13 @@ sha1sum /not_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: get sha1sum of three files
 #### Given
 - Fixture file `sha1sum/1.txt` is created.
 - Fixture file `sha1sum/2.txt` is created.
 - Fixture file `sha1sum/3.txt` is created.
+
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
 ```text
@@ -16299,6 +17734,7 @@ sha1sum ${workdir}/sha1sum/1.txt ${workdir}/sha1sum/2.txt ${workdir}/sha1sum/3.t
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16312,6 +17748,7 @@ d4e9619d949de0c0182a09757346ad22e80114b3  ${workdir}/sha1sum/3.txt
 - Fixture file `sha1sum/2.txt` is created.
 - Fixture file `sha1sum/3.txt` is created.
 - Fixture file `sha1sum/checksum.txt` is created.
+
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
 ```text
@@ -16338,6 +17775,7 @@ sha1sum -c ${workdir}/sha1sum/checksum.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16353,9 +17791,11 @@ echo "test" | sha1sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: get sha1sum for pipe data and file at same time
 #### Given
 - Fixture file `sha1sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha1sum/1.txt`:_
 ```text
@@ -16368,6 +17808,7 @@ echo "test" | sha1sum ${workdir}/sha1sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16378,6 +17819,7 @@ Source: `test/e2e/tools/mimixbox/textutils/sha256sum.atago.yaml`
 ### Scenario: get sha256sum of one file
 #### Given
 - Fixture file `sha256sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
 ```text
@@ -16390,6 +17832,7 @@ sha256sum ${workdir}/sha256sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16398,6 +17841,7 @@ _expected stdout:_
 ### Scenario: cannot get sha256sum of one directory
 #### Given
 - Fixture file `sha256sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
 ```text
@@ -16410,6 +17854,7 @@ sha256sum ${workdir}/sha256sum
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: cannot get sha256sum of not exist file
 #### When
 ```shell
@@ -16418,11 +17863,13 @@ sha256sum /not_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: get sha256sum of three files
 #### Given
 - Fixture file `sha256sum/1.txt` is created.
 - Fixture file `sha256sum/2.txt` is created.
 - Fixture file `sha256sum/3.txt` is created.
+
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
 ```text
@@ -16443,6 +17890,7 @@ sha256sum ${workdir}/sha256sum/1.txt ${workdir}/sha256sum/2.txt ${workdir}/sha25
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16456,6 +17904,7 @@ _expected stdout:_
 - Fixture file `sha256sum/2.txt` is created.
 - Fixture file `sha256sum/3.txt` is created.
 - Fixture file `sha256sum/checksum.txt` is created.
+
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
 ```text
@@ -16482,6 +17931,7 @@ sha256sum -c ${workdir}/sha256sum/checksum.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16497,6 +17947,7 @@ echo "test" | sha256sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16505,6 +17956,7 @@ f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2  -
 ### Scenario: get sha256sum for pipe data and file at same time
 #### Given
 - Fixture file `sha256sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha256sum/1.txt`:_
 ```text
@@ -16517,6 +17969,7 @@ echo "test" | sha256sum ${workdir}/sha256sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16533,6 +17986,7 @@ sha384sum --help
 - exit code is `0`
 - stdout contains `Usage: sha384sum`
 - stderr is empty
+
 ### Scenario: prints the SHA-384 digest of stdin
 #### Inputs
 _stdin for `sha384sum`:_
@@ -16546,6 +18000,7 @@ sha384sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16561,6 +18016,7 @@ printf 'hello\n' | sha3sum | cut -d' ' -f1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16574,11 +18030,13 @@ printf 'hello\n' | sha3sum -a 512 | cut -c1-16
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox sha512sum
 Source: `test/e2e/tools/mimixbox/textutils/sha512sum.atago.yaml`
 ### Scenario: get sha512sum of one file
 #### Given
 - Fixture file `sha512sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
 ```text
@@ -16591,6 +18049,7 @@ sha512sum ${workdir}/sha512sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16599,6 +18058,7 @@ _expected stdout:_
 ### Scenario: cannot get sha512sum of one directory
 #### Given
 - Fixture file `sha512sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
 ```text
@@ -16611,6 +18071,7 @@ sha512sum ${workdir}/sha512sum
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: cannot get sha512sum of not exist file
 #### When
 ```shell
@@ -16619,11 +18080,13 @@ sha512sum /not_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: get sha512sum of three files
 #### Given
 - Fixture file `sha512sum/1.txt` is created.
 - Fixture file `sha512sum/2.txt` is created.
 - Fixture file `sha512sum/3.txt` is created.
+
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
 ```text
@@ -16644,6 +18107,7 @@ sha512sum ${workdir}/sha512sum/1.txt ${workdir}/sha512sum/2.txt ${workdir}/sha51
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16657,6 +18121,7 @@ cb2389a103184f607973b1acd073dc15310c8172b03f340a52bdc3843621cf9fbc6263c7dbbd786c
 - Fixture file `sha512sum/2.txt` is created.
 - Fixture file `sha512sum/3.txt` is created.
 - Fixture file `sha512sum/checksum.txt` is created.
+
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
 ```text
@@ -16683,6 +18148,7 @@ sha512sum -c ${workdir}/sha512sum/checksum.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16698,6 +18164,7 @@ echo "test" | sha512sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16706,6 +18173,7 @@ _expected stdout:_
 ### Scenario: get sha512sum for pipe data and file at same time
 #### Given
 - Fixture file `sha512sum/1.txt` is created.
+
 #### Inputs
 _Fixture `sha512sum/1.txt`:_
 ```text
@@ -16718,6 +18186,7 @@ echo "test" | sha512sum ${workdir}/sha512sum/1.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16733,6 +18202,7 @@ shuf -i 1-1
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox split
 Source: `test/e2e/tools/mimixbox/textutils/split.atago.yaml`
 ### Scenario: split input into files of N lines
@@ -16743,6 +18213,7 @@ printf '1\n2\n3\n' | split -l 2 - "${workdir}/part-"; cat "${workdir}/part-aa"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16759,6 +18230,7 @@ printf '1\n2\n3\n4\n5\n' | split -l 2 -d - "${workdir}/num-"; ls "${workdir}"/nu
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: write expected content to the first numeric piece
 #### When
 ```shell
@@ -16767,6 +18239,7 @@ printf '1\n2\n3\n4\n5\n' | split -l 2 -d - "${workdir}/num-"; cat "${workdir}/nu
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16781,6 +18254,7 @@ printf '1\n2\n3\n' | split -l 2 --additional-suffix=.txt - "${workdir}/add-"; ls
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: honor a custom suffix length with -a
 #### When
 ```shell
@@ -16789,6 +18263,7 @@ printf '1\n2\n' | split -l 1 -a 3 - "${workdir}/len-"; ls "${workdir}"/len-* | s
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox sqluv
 Source: `test/e2e/tools/mimixbox/textutils/sqluv.atago.yaml`
 ### Scenario: print usage with --help and exit 0
@@ -16799,6 +18274,7 @@ sqluv --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: sqluv`, `headless`
+
 ### Scenario: print the version and exit 0
 #### When
 ```shell
@@ -16807,6 +18283,7 @@ sqluv --version
 #### Then
 - exit code is `0`
 - stdout contains `sqluv (mimixbox)`
+
 ### Scenario: fail with a message when given no operand
 #### When
 ```shell
@@ -16815,6 +18292,7 @@ sqluv
 #### Then
 - exit code is not `0`
 - stderr contains `sqluv`
+
 ### Scenario: query a CSV fixture in headless mode
 #### When
 ```shell
@@ -16830,6 +18308,7 @@ rm -rf "$dir"
 #### Then
 - exit code is `0`
 - stdout contains `alice`, `bob`
+
 ### Scenario: query a SQLite-style table as JSON
 #### When
 ```shell
@@ -16845,6 +18324,7 @@ rm -rf "$dir"
 #### Then
 - exit code is `0`
 - stdout contains `go-in-action`
+
 ### Scenario: fail deterministically on an unsupported S3 source
 #### When
 ```shell
@@ -16853,6 +18333,7 @@ sqluv --execute 'select 1' 's3://bucket/data.csv'
 #### Then
 - exit code is not `0`
 - stderr contains `S3 sources are not migrated`
+
 ## mimixbox sqluv (compressed input)
 Source: `test/e2e/tools/mimixbox/textutils/sqluv_compressed.atago.yaml`
 ### Scenario: query a gzip-compressed CSV fixture
@@ -16870,6 +18351,7 @@ rm -rf "$dir"
 #### Then
 - exit code is `0`
 - stdout contains `2`
+
 ## mimixbox sqluv (history file)
 Source: `test/e2e/tools/mimixbox/textutils/sqluv_history.atago.yaml`
 ### Scenario: write query history to the path given by --history-file
@@ -16887,6 +18369,7 @@ rm -rf "$dir"
 #### Then
 - exit code is `0`
 - stdout contains `select count(*) from nums`
+
 ## mimixbox sqluv (TUI smoke)
 Source: `test/e2e/tools/mimixbox/textutils/sqluv_tui_smoke.atago.yaml`
 ### Scenario: render the minimal viewer and exit cleanly on quit
@@ -16901,6 +18384,7 @@ rm -rf "$dir"
 #### Then
 - exit code is `0`
 - stdout contains `minimal viewer`, `bye`
+
 ## mimixbox strings
 Source: `test/e2e/tools/mimixbox/textutils/strings.atago.yaml`
 ### Scenario: prints printable sequences
@@ -16911,6 +18395,7 @@ printf 'hi\000hello\000world' | strings
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16928,6 +18413,7 @@ sum --help
 - exit code is `0`
 - stdout contains `Usage: sum`
 - stderr is empty
+
 ### Scenario: documents its purpose in --help
 #### When
 ```shell
@@ -16936,6 +18422,7 @@ sum --help
 #### Then
 - exit code is `0`
 - stdout contains `BSD algorithm`
+
 ### Scenario: prints a BSD checksum and block count for stdin
 #### Inputs
 _stdin for `sum`:_
@@ -16949,11 +18436,13 @@ sum
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox tac
 Source: `test/e2e/tools/mimixbox/textutils/tac.atago.yaml`
 ### Scenario: print the lines in reverse order
 #### Given
 - Fixture file `tac.txt` is created.
+
 #### Inputs
 _Fixture `tac.txt`:_
 ```text
@@ -16968,6 +18457,7 @@ tac tac.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16983,6 +18473,7 @@ printf 'a\nb\nc\n' | tac
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -16998,11 +18489,13 @@ tac /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox tail
 Source: `test/e2e/tools/mimixbox/textutils/tail.atago.yaml`
 ### Scenario: print the last 10 lines
 #### Given
 - Fixture file `tail.txt` is created.
+
 #### Inputs
 _Fixture `tail.txt`:_
 ```text
@@ -17026,6 +18519,7 @@ tail tail.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17043,6 +18537,7 @@ _expected stdout:_
 ### Scenario: print the last N lines
 #### Given
 - Fixture file `tail.txt` is created.
+
 #### Inputs
 _Fixture `tail.txt`:_
 ```text
@@ -17066,6 +18561,7 @@ tail -n 3 tail.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17081,6 +18577,7 @@ printf 'hello world' | tail -c 5
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: print the last N lines of stdin
 #### When
 ```shell
@@ -17089,6 +18586,7 @@ printf 'a\nb\nc\nd\n' | tail -n 2
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17103,9 +18601,11 @@ tail /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: print data appended while following
 #### Given
 - Fixture file `follow.txt` is created.
+
 #### Inputs
 _Fixture `follow.txt`:_
 ```text
@@ -17120,11 +18620,13 @@ timeout 0.5 tail -f -s 0.05 follow.txt
 #### Then
 - exit code is not `0`
 - stdout contains `start`, `appended`
+
 ## mimixbox tail --pid
 Source: `test/e2e/tools/mimixbox/textutils/tail_pid.atago.yaml`
 ### Scenario: stop following once the watched process exits
 #### Given
 - Fixture file `follow_pid.txt` is created.
+
 #### Inputs
 _Fixture `follow_pid.txt`:_
 ```text
@@ -17141,6 +18643,7 @@ timeout 5 tail -f -s 0.1 --pid="${sleeper_pid}" follow_pid.txt
 #### Then
 - exit code is `0`
 - stdout contains `start`, `appended`
+
 ## mimixbox tail --zero-terminated
 Source: `test/e2e/tools/mimixbox/textutils/tail_zero.atago.yaml`
 ### Scenario: prints the last NUL-delimited record, preserving the embedded newline
@@ -17151,6 +18654,7 @@ printf 'a\nb\0c\nd\0' | tail -z -n 1 | tr '\0' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17165,6 +18669,7 @@ printf 'a\nb\0c\nd\0' | tail --zero-terminated -n 2 | tr '\0' '|'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17182,6 +18687,7 @@ printf 'abc\n' | tr a-z A-Z
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox tr --truncate-set1
 Source: `test/e2e/tools/mimixbox/textutils/tr_truncate.atago.yaml`
 ### Scenario: truncates SET1 to SET2 length, leaving extra chars unchanged
@@ -17192,6 +18698,7 @@ printf 'abc\n' | tr --truncate-set1 abc xy
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: accepts the -t short form
 #### When
 ```shell
@@ -17200,6 +18707,7 @@ printf 'abc\n' | tr -t abc xy
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox unexpand
 Source: `test/e2e/tools/mimixbox/textutils/unexpand.atago.yaml`
 ### Scenario: convert leading spaces to a tab
@@ -17210,6 +18718,7 @@ printf '        a\n' | unexpand
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: convert internal space runs to tabs with --all
 #### When
 ```shell
@@ -17218,6 +18727,7 @@ printf 'a        b\n' | unexpand -a
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: report an error for a non-existent file
 #### When
 ```shell
@@ -17226,11 +18736,13 @@ unexpand /no_exist_file
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ## mimixbox unix2dos
 Source: `test/e2e/tools/mimixbox/textutils/unix2dos.atago.yaml`
 ### Scenario: convert an LF file to CRLF and reclassify it
 #### Given
 - Fixture file `unix2dos/1.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17246,6 +18758,7 @@ file "${workdir}/unix2dos/1.txt"
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17255,6 +18768,7 @@ ${workdir}/unix2dos/1.txt: ASCII text, with CRLF line terminators
 ### Scenario: convert an LF file and exit success
 #### Given
 - Fixture file `unix2dos/1.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17269,6 +18783,7 @@ unix2dos "${workdir}/unix2dos/1.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17279,6 +18794,7 @@ unix2dos: converting file ${workdir}/unix2dos/1.txt to DOS format...
 - Fixture file `unix2dos/1.txt` is created.
 - Fixture file `unix2dos/2.txt` is created.
 - Fixture file `unix2dos/3.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17308,6 +18824,7 @@ file "${workdir}/unix2dos/3.txt"
 ```
 #### Then
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17323,6 +18840,7 @@ ${workdir}/unix2dos/3.txt: ASCII text, with CRLF line terminators
 - Fixture file `unix2dos/1.txt` is created.
 - Fixture file `unix2dos/2.txt` is created.
 - Fixture file `unix2dos/3.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17349,6 +18867,7 @@ unix2dos "${workdir}/unix2dos/1.txt" "${workdir}/unix2dos/2.txt" "${workdir}/uni
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17359,6 +18878,7 @@ unix2dos: converting file ${workdir}/unix2dos/3.txt to DOS format...
 ### Scenario: refuse a directory with a not-regular-file error
 #### Given
 - Fixture file `unix2dos/1.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17373,10 +18893,12 @@ unix2dos ${workdir}/unix2dos
 #### Then
 - exit code is not `0`
 - stderr equals an exact value
+
 ### Scenario: convert the two files but fail on the directory operand
 #### Given
 - Fixture file `unix2dos/1.txt` is created.
 - Fixture file `unix2dos/3.txt` is created.
+
 #### Inputs
 _Fixture `unix2dos/1.txt`:_
 ```text
@@ -17398,6 +18920,7 @@ unix2dos ${workdir}/unix2dos/1.txt ${workdir}/unix2dos ${workdir}/unix2dos/3.txt
 - exit code is not `0`
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17417,6 +18940,7 @@ rm -rf "$d"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: uuencode -m then uudecode round-trips (base64)
 #### When
 ```shell
@@ -17428,6 +18952,7 @@ rm -rf "$d"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: usleep waits and exits 0
 #### When
 ```shell
@@ -17436,6 +18961,7 @@ usleep 1000 && echo slept
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox uudecode
 Source: `test/e2e/tools/mimixbox/textutils/uudecode.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17447,6 +18973,7 @@ uudecode --help
 - exit code is `0`
 - stdout contains `Usage: uudecode`
 - stderr is empty
+
 ## mimixbox uuencode
 Source: `test/e2e/tools/mimixbox/textutils/uuencode.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17458,6 +18985,7 @@ uuencode --help
 - exit code is `0`
 - stdout contains `Usage: uuencode`
 - stderr is empty
+
 ### Scenario: uuencodes stdin with a begin header
 #### Inputs
 _stdin for `uuencode`:_
@@ -17471,11 +18999,13 @@ uuencode hi.txt
 #### Then
 - exit code is `0`
 - stdout contains `begin 644 hi.txt`, `end`
+
 ## mimixbox wc
 Source: `test/e2e/tools/mimixbox/textutils/wc.atago.yaml`
 ### Scenario: count lines/words/bytes of one file
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17493,9 +19023,11 @@ wc game.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: count only lines with --lines
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17513,9 +19045,11 @@ wc -l game.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: count only bytes with --bytes
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17533,9 +19067,11 @@ wc -c game.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: report the longest line with --max-line-length
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17553,9 +19089,11 @@ wc -L game.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: count an empty file as all zeros
 #### Given
 - Fixture file `empty.txt` is created.
+
 #### When
 ```shell
 wc empty.txt
@@ -17563,11 +19101,13 @@ wc empty.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: count three files and print a total
 #### Given
 - Fixture file `empty.txt` is created.
 - Fixture file `game.txt` is created.
 - Fixture file `metal.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17591,6 +19131,7 @@ wc empty.txt game.txt metal.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17607,9 +19148,11 @@ echo "${workdir}/game.txt" | wc
 #### Then
 - exit code is `0`
 - stdout matches `/1 +1 +[0-9]+/`
+
 ### Scenario: count only the file operand, ignoring pipe data
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17627,6 +19170,7 @@ echo "${workdir}/game.txt" | wc game.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: report a directory as not a regular file
 #### When
 ```shell
@@ -17636,9 +19180,11 @@ wc "${workdir}"
 - exit code is not `0`
 - stdout equals an exact value
 - stderr equals an exact value
+
 ### Scenario: count the file but zero the directory when given both
 #### Given
 - Fixture file `game.txt` is created.
+
 #### Inputs
 _Fixture `game.txt`:_
 ```text
@@ -17657,6 +19203,7 @@ wc "${workdir}" "${workdir}/game.txt"
 - exit code is not `0`
 - stdout equals an exact value
 - stderr equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17672,12 +19219,14 @@ echo "no_exist_file" | wc -l
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox wc (GNU flags)
 Source: `test/e2e/tools/mimixbox/textutils/wc_gnu.atago.yaml`
 ### Scenario: print only the combined total with --total=only
 #### Given
 - Fixture file `wc_a.txt` is created.
 - Fixture file `wc_b.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17696,10 +19245,12 @@ wc --total=only wc_a.txt wc_b.txt
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: suppress the total line with --total=never
 #### Given
 - Fixture file `wc_a.txt` is created.
 - Fixture file `wc_b.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17718,6 +19269,7 @@ wc --total=never "${workdir}/wc_a.txt" "${workdir}/wc_b.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17727,6 +19279,7 @@ _expected stdout:_
 ### Scenario: print a total even for one file with --total=always
 #### Given
 - Fixture file `wc_a.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17741,6 +19294,7 @@ wc --total=always "${workdir}/wc_a.txt"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17751,6 +19305,7 @@ _expected stdout:_
 #### Given
 - Fixture file `wc_a.txt` is created.
 - Fixture file `wc_b.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17771,6 +19326,7 @@ wc --files0-from=wc_list.nul
 - after `wc --files0-from=wc_list.nul`:
   - exit code is `0`
   - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17782,6 +19338,7 @@ _expected stdout:_
 #### Given
 - Fixture file `wc_a.txt` is created.
 - Fixture file `wc_b.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17800,6 +19357,7 @@ printf '%s\0%s\0' "${workdir}/wc_a.txt" "${workdir}/wc_b.txt" | wc --files0-from
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -17811,6 +19369,7 @@ _expected stdout:_
 #### Given
 - Fixture file `wc_a.txt` is created.
 - Fixture file `wc_b.txt` is created.
+
 #### Inputs
 _Fixture `wc_a.txt`:_
 ```text
@@ -17831,6 +19390,7 @@ wc --files0-from=wc_list.nul --total=only
 - after `wc --files0-from=wc_list.nul --total=only`:
   - exit code is `0`
   - stdout equals an exact value
+
 ## mimixbox xxd
 Source: `test/e2e/tools/mimixbox/textutils/xxd.atago.yaml`
 ### Scenario: prints a hex dump
@@ -17841,6 +19401,7 @@ printf 'hello\n' | xxd
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: reverses a hex dump
 #### When
 ```shell
@@ -17849,6 +19410,7 @@ printf 'hello\n' | xxd | xxd -r
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox blkdiscard
 Source: `test/e2e/tools/mimixbox/util-linux/blkdiscard.atago.yaml`
 ### Scenario: requires a device
@@ -17858,6 +19420,7 @@ blkdiscard
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -17866,6 +19429,7 @@ blkdiscard --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: blkdiscard`, `Discard`
+
 ## mimixbox blkid
 Source: `test/e2e/tools/mimixbox/util-linux/blkid.atago.yaml`
 ### Scenario: identifies an ext filesystem
@@ -17876,6 +19440,7 @@ dd if=/dev/zero of=ext.img bs=1024 count=2 2>/dev/null; printf '\123\357' | dd o
 #### Then
 - exit code is `0`
 - stdout contains `TYPE="ext2"`
+
 ### Scenario: identifies an xfs filesystem
 #### When
 ```shell
@@ -17884,6 +19449,7 @@ printf 'XFSB' > xfs.img; blkid xfs.img
 #### Then
 - exit code is `0`
 - stdout contains `TYPE="xfs"`
+
 ### Scenario: exits 2 when nothing is identified
 #### When
 ```shell
@@ -17891,6 +19457,7 @@ printf 'nothing here' > blank.img; blkid blank.img
 ```
 #### Then
 - exit code is `2`
+
 ## mimixbox blockdev
 Source: `test/e2e/tools/mimixbox/util-linux/blockdev.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17901,6 +19468,7 @@ blockdev --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: blockdev`, `DEVICE`
+
 ### Scenario: fails when no query flag is given
 #### When
 ```shell
@@ -17908,6 +19476,7 @@ blockdev /dev/null
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox chattr
 Source: `test/e2e/tools/mimixbox/util-linux/chattr.atago.yaml`
 ### Scenario: rejects a malformed mode
@@ -17917,6 +19486,7 @@ chattr xi /tmp/f
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects an unknown attribute
 #### When
 ```shell
@@ -17924,6 +19494,7 @@ chattr +Z /tmp/f
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox chrt
 Source: `test/e2e/tools/mimixbox/util-linux/chrt.atago.yaml`
 ### Scenario: prints a process scheduling policy
@@ -17934,6 +19505,7 @@ chrt -p $$ | grep -c 'scheduling policy'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs a command under a scheduling policy
 #### When
 ```shell
@@ -17942,6 +19514,7 @@ chrt -o 0 -- echo scheduled
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox dmesg
 Source: `test/e2e/tools/mimixbox/util-linux/dmesg.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17952,6 +19525,7 @@ dmesg --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: dmesg`, `kernel ring buffer`
+
 ## mimixbox eject
 Source: `test/e2e/tools/mimixbox/util-linux/eject.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17962,6 +19536,7 @@ eject --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: eject`, `media`
+
 ### Scenario: fails on a missing device
 #### When
 ```shell
@@ -17969,6 +19544,7 @@ eject /dev/no_such_cdrom
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox fallocate
 Source: `test/e2e/tools/mimixbox/util-linux/fallocate.atago.yaml`
 ### Scenario: describes itself with --help
@@ -17980,6 +19556,7 @@ fallocate --help
 - exit code is `0`
 - stdout contains `Usage: fallocate`
 - stderr is empty
+
 ## mimixbox fatattr
 Source: `test/e2e/tools/mimixbox/util-linux/fatattr.atago.yaml`
 ### Scenario: requires a file
@@ -17989,6 +19566,7 @@ fatattr
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects an unknown attribute
 #### When
 ```shell
@@ -17996,6 +19574,7 @@ fatattr +Z /tmp/x
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox fbset
 Source: `test/e2e/tools/mimixbox/util-linux/fbset.atago.yaml`
 ### Scenario: fails on a missing framebuffer
@@ -18005,6 +19584,7 @@ fbset -fb /dev/no_such_fb
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18013,6 +19593,7 @@ fbset --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fbset`, `framebuffer`
+
 ## mimixbox fdflush
 Source: `test/e2e/tools/mimixbox/util-linux/fdflush.atago.yaml`
 ### Scenario: requires a device
@@ -18022,6 +19603,7 @@ fdflush
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18030,6 +19612,7 @@ fdflush --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fdflush`, `floppy`
+
 ## mimixbox fdformat
 Source: `test/e2e/tools/mimixbox/util-linux/fdformat.atago.yaml`
 ### Scenario: requires a device
@@ -18039,6 +19622,7 @@ fdformat
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18047,6 +19631,7 @@ fdformat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fdformat`, `floppy`
+
 ## mimixbox fdisk
 Source: `test/e2e/tools/mimixbox/util-linux/fdisk.atago.yaml`
 ### Scenario: lists an MBR Linux partition
@@ -18057,6 +19642,7 @@ dd if=/dev/zero of=disk.img bs=512 count=1 2>/dev/null; printf '\203' | dd of=di
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects an image without an MBR signature
 #### When
 ```shell
@@ -18064,6 +19650,7 @@ dd if=/dev/zero of=n.img bs=512 count=1 2>/dev/null; fdisk -l n.img
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox findfs
 Source: `test/e2e/tools/mimixbox/util-linux/findfs.atago.yaml`
 ### Scenario: fails for an unknown label
@@ -18073,6 +19660,7 @@ findfs LABEL=no_such_label_xyz
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects a malformed tag
 #### When
 ```shell
@@ -18080,6 +19668,7 @@ findfs notatag
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox flock
 Source: `test/e2e/tools/mimixbox/util-linux/flock.atago.yaml`
 ### Scenario: runs a command while holding the lock
@@ -18090,6 +19679,7 @@ flock lock echo locked-run
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails -n when the lock is already held
 #### When
 ```shell
@@ -18097,6 +19687,7 @@ flock lock sleep 1 & sleep 0.2; flock -n lock echo nope
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox freeramdisk
 Source: `test/e2e/tools/mimixbox/util-linux/freeramdisk.atago.yaml`
 ### Scenario: requires a device
@@ -18106,6 +19697,7 @@ freeramdisk
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18114,6 +19706,7 @@ freeramdisk --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: freeramdisk`, `ramdisk`
+
 ## mimixbox fsck
 Source: `test/e2e/tools/mimixbox/util-linux/fsck.atago.yaml`
 ### Scenario: detects a Minix filesystem
@@ -18124,6 +19717,7 @@ dd if=/dev/zero of=m.img bs=1024 count=2048 2>/dev/null; mkfs.minix m.img >/dev/
 #### Then
 - exit code is `0`
 - stdout contains `minix`
+
 ### Scenario: fails on an unrecognized image
 #### When
 ```shell
@@ -18131,6 +19725,7 @@ dd if=/dev/zero of=u.img bs=1024 count=8 2>/dev/null; fsck u.img
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox fsck.minix
 Source: `test/e2e/tools/mimixbox/util-linux/fsck.minix.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18142,6 +19737,7 @@ fsck.minix --help
 - exit code is `0`
 - stdout contains `Usage: fsck.minix`
 - stderr is empty
+
 ## mimixbox fsck.minix
 Source: `test/e2e/tools/mimixbox/util-linux/fsck_minix.atago.yaml`
 ### Scenario: validates a freshly made Minix filesystem
@@ -18152,6 +19748,7 @@ dd if=/dev/zero of=f.img bs=1024 count=2048 2>/dev/null; mkfs.minix f.img >/dev/
 #### Then
 - exit code is `0`
 - stdout contains `Minix v1`
+
 ### Scenario: rejects a non-Minix image
 #### When
 ```shell
@@ -18159,6 +19756,7 @@ dd if=/dev/zero of=b.img bs=1024 count=4 2>/dev/null; fsck.minix b.img
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox fsfreeze
 Source: `test/e2e/tools/mimixbox/util-linux/fsfreeze.atago.yaml`
 ### Scenario: requires a freeze or unfreeze mode
@@ -18168,6 +19766,7 @@ fsfreeze /mnt
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects both modes at once
 #### When
 ```shell
@@ -18175,6 +19774,7 @@ fsfreeze -f -u /mnt
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox fstrim
 Source: `test/e2e/tools/mimixbox/util-linux/fstrim.atago.yaml`
 ### Scenario: requires a mount point
@@ -18184,6 +19784,7 @@ fstrim
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18192,6 +19793,7 @@ fstrim --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: fstrim`, `Discard`
+
 ## mimixbox getopt
 Source: `test/e2e/tools/mimixbox/util-linux/getopt.atago.yaml`
 ### Scenario: normalizes short and long options with quoted args
@@ -18202,6 +19804,7 @@ getopt -o ab: --long alpha,beta: -- -a -b val --alpha pos
 #### Then
 - exit code is `0`
 - stdout contains `-b 'val'`, `--alpha`, `-- 'pos'`
+
 ### Scenario: produces output a script can eval
 #### When
 ```shell
@@ -18210,6 +19813,7 @@ eval set -- "$(getopt -o n: -- -n hello world)"; printf '%s|' "$@"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox hd
 Source: `test/e2e/tools/mimixbox/util-linux/hd.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18221,6 +19825,7 @@ hd --help
 - exit code is `0`
 - stdout contains `Usage: hd`
 - stderr is empty
+
 ### Scenario: hexdumps stdin in canonical form
 #### Inputs
 _stdin for `hd`:_
@@ -18234,6 +19839,7 @@ hd
 #### Then
 - exit code is `0`
 - stdout contains `68 69 0a`, `|hi.|`
+
 ## mimixbox util-linux --help helpers
 Source: `test/e2e/tools/mimixbox/util-linux/help_helpers_util-linux.atago.yaml`
 ### Scenario: fallocate --help is structured
@@ -18244,6 +19850,7 @@ env -- fallocate --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: fsck.minix --help is structured
 #### When
 ```shell
@@ -18252,6 +19859,7 @@ env -- fsck.minix --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: linux32 --help is structured
 #### When
 ```shell
@@ -18260,6 +19868,7 @@ env -- linux32 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: linux64 --help is structured
 #### When
 ```shell
@@ -18268,6 +19877,7 @@ env -- linux64 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: mkdosfs --help is structured
 #### When
 ```shell
@@ -18276,6 +19886,7 @@ env -- mkdosfs --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: mkfs.ext2 --help is structured
 #### When
 ```shell
@@ -18284,6 +19895,7 @@ env -- mkfs.ext2 --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: mkfs.minix --help is structured
 #### When
 ```shell
@@ -18292,6 +19904,7 @@ env -- mkfs.minix --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: mkfs.reiser --help is structured
 #### When
 ```shell
@@ -18300,6 +19913,7 @@ env -- mkfs.reiser --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: mkfs.vfat --help is structured
 #### When
 ```shell
@@ -18308,6 +19922,7 @@ env -- mkfs.vfat --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: scriptreplay --help is structured
 #### When
 ```shell
@@ -18316,6 +19931,7 @@ env -- scriptreplay --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: setsid --help is structured
 #### When
 ```shell
@@ -18324,6 +19940,7 @@ env -- setsid --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: sh --help is structured
 #### When
 ```shell
@@ -18332,6 +19949,7 @@ env -- sh --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: swapoff --help is structured
 #### When
 ```shell
@@ -18340,6 +19958,7 @@ env -- swapoff --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ### Scenario: swapon --help is structured
 #### When
 ```shell
@@ -18348,6 +19967,7 @@ env -- swapon --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage:`
+
 ## mimixbox hexdump / hd
 Source: `test/e2e/tools/mimixbox/util-linux/hexdump.atago.yaml`
 ### Scenario: hd shows the canonical hex+ASCII layout
@@ -18358,6 +19978,7 @@ printf 'hello world\n' | hd
 #### Then
 - exit code is `0`
 - stdout contains `00000000  68 65 6c 6c 6f 20 77 6f  72 6c 64 0a`, `|hello world.|`
+
 ### Scenario: hexdump -C matches hd
 #### When
 ```shell
@@ -18366,6 +19987,7 @@ printf 'hello world\n' | hexdump -C
 #### Then
 - exit code is `0`
 - stdout contains `|hello world.|`
+
 ### Scenario: hexdump default shows two-byte words
 #### When
 ```shell
@@ -18374,6 +19996,7 @@ printf 'hello world\n' | hexdump
 #### Then
 - exit code is `0`
 - stdout contains `6568 6c6c 206f`
+
 ## mimixbox hwclock
 Source: `test/e2e/tools/mimixbox/util-linux/hwclock.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18384,6 +20007,7 @@ hwclock --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: hwclock`, `RTC`
+
 ## mimixbox ionice
 Source: `test/e2e/tools/mimixbox/util-linux/ionice.atago.yaml`
 ### Scenario: prints a process I/O class
@@ -18394,6 +20018,7 @@ ionice -p $$ | grep -cE 'prio|idle'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs a command at a given I/O class
 #### When
 ```shell
@@ -18402,6 +20027,7 @@ ionice -c 3 -- echo idled
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox ipcrm
 Source: `test/e2e/tools/mimixbox/util-linux/ipcrm.atago.yaml`
 ### Scenario: fails when nothing is requested
@@ -18411,6 +20037,7 @@ ipcrm
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: fails to remove a non-existent id
 #### When
 ```shell
@@ -18418,6 +20045,7 @@ ipcrm -q 2147483647
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox ipcs
 Source: `test/e2e/tools/mimixbox/util-linux/ipcs.atago.yaml`
 ### Scenario: shows the IPC facility sections
@@ -18428,6 +20056,7 @@ ipcs | grep -c 'Message Queues'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: limits to shared memory with -m
 #### When
 ```shell
@@ -18437,6 +20066,7 @@ ipcs -m
 - exit code is `0`
 - stdout contains `Shared Memory Segments`
 - stdout does not contain `Message Queues`
+
 ## mimixbox last
 Source: `test/e2e/tools/mimixbox/util-linux/last.atago.yaml`
 ### Scenario: treats an empty wtmp as no history and exits 0
@@ -18447,6 +20077,7 @@ out=$(last /dev/null); echo "[$out] rc=$?"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fails on a missing wtmp file
 #### When
 ```shell
@@ -18454,6 +20085,7 @@ last /no/such/mimixbox/wtmp
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox losetup
 Source: `test/e2e/tools/mimixbox/util-linux/losetup.atago.yaml`
 ### Scenario: lists active loop devices cleanly
@@ -18463,6 +20095,7 @@ losetup -a >/dev/null
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: refuses to associate a loop device
 #### When
 ```shell
@@ -18470,6 +20103,7 @@ losetup /dev/loop0 /tmp/img
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox lsattr
 Source: `test/e2e/tools/mimixbox/util-linux/lsattr.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18480,6 +20114,7 @@ lsattr --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: lsattr`, `attribute`
+
 ## mimixbox lsblk
 Source: `test/e2e/tools/mimixbox/util-linux/lsblk.atago.yaml`
 ### Scenario: prints the column header
@@ -18490,6 +20125,7 @@ lsblk | sed -n '1p'
 #### Then
 - exit code is `0`
 - stdout contains `NAME`, `SIZE`, `TYPE`
+
 ### Scenario: runs and exits successfully
 #### When
 ```shell
@@ -18497,6 +20133,7 @@ lsblk >/dev/null 2>&1
 ```
 #### Then
 - exit code is `0`
+
 ## mimixbox lspci
 Source: `test/e2e/tools/mimixbox/util-linux/lspci.atago.yaml`
 ### Scenario: lists PCI devices and exits successfully
@@ -18506,6 +20143,7 @@ lspci
 ```
 #### Then
 - exit code is `0`
+
 ## mimixbox lsusb
 Source: `test/e2e/tools/mimixbox/util-linux/lsusb.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18516,6 +20154,7 @@ lsusb --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: lsusb`, `USB`
+
 ## mimixbox mdev
 Source: `test/e2e/tools/mimixbox/util-linux/mdev.atago.yaml`
 ### Scenario: requires scan mode
@@ -18525,6 +20164,7 @@ mdev
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18533,6 +20173,7 @@ mdev --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: mdev`, `device`
+
 ## mimixbox mesg
 Source: `test/e2e/tools/mimixbox/util-linux/mesg.atago.yaml`
 ### Scenario: reports an error when stdin is not a terminal
@@ -18543,6 +20184,7 @@ mesg
 #### Then
 - exit code is `2`
 - stderr contains `cannot get terminal name`
+
 ## mimixbox mke2fs / mkfs.ext2
 Source: `test/e2e/tools/mimixbox/util-linux/mke2fs.atago.yaml`
 ### Scenario: writes the ext2 magic
@@ -18554,6 +20196,7 @@ dd if=/dev/zero of=e.img bs=1024 count=1024 2>/dev/null; mke2fs e.img >/dev/null
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: mkfs.ext2 refuses an oversized image
 #### When
 ```shell
@@ -18563,6 +20206,7 @@ mkfs.ext2 b.img
 #### Then
 - after `mkfs.ext2 b.img`:
   - exit code is not `0`
+
 ## mimixbox mkfs.minix
 Source: `test/e2e/tools/mimixbox/util-linux/mkfs_minix.atago.yaml`
 ### Scenario: writes the Minix v1 magic
@@ -18574,6 +20218,7 @@ dd if=/dev/zero of=m.img bs=1024 count=2048 2>/dev/null; mkfs.minix m.img >/dev/
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: refuses a too-small device
 #### When
 ```shell
@@ -18583,6 +20228,7 @@ mkfs.minix s.img
 #### Then
 - after `mkfs.minix s.img`:
   - exit code is not `0`
+
 ## mimixbox mkfs.reiser
 Source: `test/e2e/tools/mimixbox/util-linux/mkfs_reiser.atago.yaml`
 ### Scenario: refuses deterministically
@@ -18592,6 +20238,7 @@ mkfs.reiser /tmp/x.img
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: explains that ReiserFS is deprecated
 #### When
 ```shell
@@ -18600,6 +20247,7 @@ mkfs.reiser /tmp/x.img
 #### Then
 - exit code is not `0`
 - stderr contains `deprecated`
+
 ## mimixbox mkfs.vfat / mkdosfs
 Source: `test/e2e/tools/mimixbox/util-linux/mkfs_vfat.atago.yaml`
 ### Scenario: writes the FAT16 type label
@@ -18611,6 +20259,7 @@ dd if=/dev/zero of=v.img bs=1024 count=8192 2>/dev/null; mkfs.vfat v.img >/dev/n
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: mkdosfs refuses a too-small image
 #### When
 ```shell
@@ -18620,6 +20269,7 @@ mkdosfs s.img
 #### Then
 - after `mkdosfs s.img`:
   - exit code is not `0`
+
 ## mimixbox mkswap
 Source: `test/e2e/tools/mimixbox/util-linux/mkswap.atago.yaml`
 ### Scenario: formats an image as swap
@@ -18631,6 +20281,7 @@ dd if=/dev/zero of=swap.img bs=1024 count=64 2>/dev/null; chmod 0600 swap.img; m
 #### Then
 - exit code is `0`
 - stdout contains `version 1`
+
 ### Scenario: writes the swap signature
 #### When
 ```shell
@@ -18640,6 +20291,7 @@ dd if=/dev/zero of=swap2.img bs=1024 count=64 2>/dev/null; chmod 0600 swap2.img;
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox mount
 Source: `test/e2e/tools/mimixbox/util-linux/mount.atago.yaml`
 ### Scenario: lists the root filesystem
@@ -18650,6 +20302,7 @@ mount | grep -cE ' on / type '
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: refuses to perform a mount
 #### When
 ```shell
@@ -18657,6 +20310,7 @@ mount /dev/sda1 /mnt
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox nsenter
 Source: `test/e2e/tools/mimixbox/util-linux/nsenter.atago.yaml`
 ### Scenario: requires a target PID
@@ -18666,6 +20320,7 @@ nsenter -n echo x
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: requires a namespace flag
 #### When
 ```shell
@@ -18673,6 +20328,7 @@ nsenter -t 1 echo x
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox pivot_root
 Source: `test/e2e/tools/mimixbox/util-linux/pivot_root.atago.yaml`
 ### Scenario: requires two directories
@@ -18682,6 +20338,7 @@ pivot_root /onlyone
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -18690,6 +20347,7 @@ pivot_root --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: pivot_root`, `root`
+
 ## mimixbox rdate
 Source: `test/e2e/tools/mimixbox/util-linux/rdate.atago.yaml`
 ### Scenario: fails when no host is given
@@ -18699,6 +20357,7 @@ rdate
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: fails when the host has no time service
 #### When
 ```shell
@@ -18706,6 +20365,7 @@ rdate 127.0.0.1
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox rdev
 Source: `test/e2e/tools/mimixbox/util-linux/rdev.atago.yaml`
 ### Scenario: prints the root device with the / mountpoint
@@ -18716,6 +20376,7 @@ rdev
 #### Then
 - exit code is `0`
 - stdout contains ` /`
+
 ## mimixbox readprofile
 Source: `test/e2e/tools/mimixbox/util-linux/readprofile.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18726,6 +20387,7 @@ readprofile --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: readprofile`, `profiling`
+
 ## mimixbox renice
 Source: `test/e2e/tools/mimixbox/util-linux/renice.atago.yaml`
 ### Scenario: reports the priority change
@@ -18736,6 +20398,7 @@ renice -n 0 -p $$ | grep -c 'process ID'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects a non-numeric PID
 #### When
 ```shell
@@ -18743,6 +20406,7 @@ renice 5 notapid
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox rtcwake
 Source: `test/e2e/tools/mimixbox/util-linux/rtcwake.atago.yaml`
 ### Scenario: rejects a suspend mode
@@ -18752,6 +20416,7 @@ rtcwake -m mem -s 10
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: requires a wake time
 #### When
 ```shell
@@ -18759,6 +20424,7 @@ rtcwake -m no
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox script / scriptreplay
 Source: `test/e2e/tools/mimixbox/util-linux/script.atago.yaml`
 ### Scenario: records command output to a typescript
@@ -18770,6 +20436,7 @@ script -c 'printf recorded' -T timing out.txt >/dev/null 2>&1; grep -c 'Script s
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: replays a recorded typescript
 #### When
 ```shell
@@ -18779,6 +20446,7 @@ script -c 'printf replayed' -T timing out.txt >/dev/null 2>&1; scriptreplay timi
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox script / scriptreplay round-trip
 Source: `test/e2e/tools/mimixbox/util-linux/script_roundtrip.atago.yaml`
 ### Scenario: records the transcript framing
@@ -18789,6 +20457,7 @@ script -c 'printf "hello\nworld\n"' -T timing transcript >/dev/null 2>&1; cat tr
 #### Then
 - exit code is `0`
 - stdout contains `Script started`, `Script done`
+
 ### Scenario: records the command payload in the transcript
 #### When
 ```shell
@@ -18797,6 +20466,7 @@ script -c 'printf "hello\nworld\n"' -T timing transcript >/dev/null 2>&1; cat tr
 #### Then
 - exit code is `0`
 - stdout contains `hello`, `world`
+
 ### Scenario: writes a timing file of "delay bytes" records
 #### When
 ```shell
@@ -18804,6 +20474,7 @@ script -c 'printf "hello\nworld\n"' -T timing transcript >/dev/null 2>&1; awk 'N
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: replays the captured payload from the timing + transcript
 #### When
 ```shell
@@ -18812,6 +20483,7 @@ script -c 'printf "hello\nworld\n"' -T timing transcript >/dev/null 2>&1; script
 #### Then
 - exit code is `0`
 - stdout contains `hello`, `world`
+
 ## mimixbox scriptreplay
 Source: `test/e2e/tools/mimixbox/util-linux/scriptreplay.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18823,6 +20495,7 @@ scriptreplay --help
 - exit code is `0`
 - stdout contains `Usage: scriptreplay`
 - stderr is empty
+
 ## mimixbox setarch / linux32 / linux64
 Source: `test/e2e/tools/mimixbox/util-linux/setarch.atago.yaml`
 ### Scenario: linux32 makes uname report a 32-bit machine
@@ -18833,6 +20506,7 @@ linux32 uname -m
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: linux64 reports the native machine
 #### When
 ```shell
@@ -18841,6 +20515,7 @@ linux64 uname -m
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: linux32 passes the command output through
 #### When
 ```shell
@@ -18849,6 +20524,7 @@ linux32 echo passed
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: setarch selects the personality from ARCH
 #### When
 ```shell
@@ -18857,6 +20533,7 @@ setarch i686 uname -m
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox setpriv
 Source: `test/e2e/tools/mimixbox/util-linux/setpriv.atago.yaml`
 ### Scenario: dumps the current privileges
@@ -18867,6 +20544,7 @@ setpriv --dump | grep -cE 'uid:|no_new_privs:'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs a command with --no-new-privs
 #### When
 ```shell
@@ -18875,6 +20553,7 @@ setpriv --no-new-privs -- echo ran
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ## mimixbox setsid
 Source: `test/e2e/tools/mimixbox/util-linux/setsid.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18886,6 +20565,7 @@ setsid --help
 - exit code is `0`
 - stdout contains `Usage: setsid`
 - stderr is empty
+
 ## mimixbox setsid / fallocate
 Source: `test/e2e/tools/mimixbox/util-linux/setsid_fallocate.atago.yaml`
 ### Scenario: setsid runs a program in a new session
@@ -18896,6 +20576,7 @@ setsid echo "session ok"
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: fallocate sizes a file to the requested length
 #### When
 ```shell
@@ -18907,6 +20588,7 @@ wc -c < f
   - exit code is `0`
 - after `wc -c < f`:
   - stdout contains `4096`
+
 ### Scenario: fallocate without -l fails
 #### When
 ```shell
@@ -18914,6 +20596,7 @@ fallocate x
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox swapon / swapoff
 Source: `test/e2e/tools/mimixbox/util-linux/swap.atago.yaml`
 ### Scenario: swapon -s prints the swaps header
@@ -18924,6 +20607,7 @@ swapon -s | sed -n '1p' | grep -c 'Filename'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: swapoff requires a target
 #### When
 ```shell
@@ -18931,6 +20615,7 @@ swapoff
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox swapoff
 Source: `test/e2e/tools/mimixbox/util-linux/swapoff.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18942,6 +20627,7 @@ swapoff --help
 - exit code is `0`
 - stdout contains `Usage: swapoff`
 - stderr is empty
+
 ## mimixbox swapon
 Source: `test/e2e/tools/mimixbox/util-linux/swapon.atago.yaml`
 ### Scenario: describes itself with --help
@@ -18953,6 +20639,7 @@ swapon --help
 - exit code is `0`
 - stdout contains `Usage: swapon`
 - stderr is empty
+
 ## mimixbox switch_root
 Source: `test/e2e/tools/mimixbox/util-linux/switch_root.atago.yaml`
 ### Scenario: requires NEW_ROOT and INIT
@@ -18962,6 +20649,7 @@ switch_root /tmp
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: rejects a non-directory NEW_ROOT
 #### When
 ```shell
@@ -18969,6 +20657,7 @@ switch_root /no/such/dir /init
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox taskset
 Source: `test/e2e/tools/mimixbox/util-linux/taskset.atago.yaml`
 ### Scenario: prints a process affinity mask
@@ -18979,6 +20668,7 @@ taskset -p $$ | grep -c 'affinity mask'
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: runs a command bound to a CPU
 #### When
 ```shell
@@ -18987,6 +20677,7 @@ taskset -c 0 echo affined
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: rejects an invalid mask
 #### When
 ```shell
@@ -18994,11 +20685,13 @@ taskset zzz echo x
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox tune2fs
 Source: `test/e2e/tools/mimixbox/util-linux/tune2fs.atago.yaml`
 ### Scenario: rejects a non-ext image
 #### Given
 - Fixture file `bad.img` is created.
+
 #### Inputs
 _Fixture `bad.img`:_
 ```text
@@ -19010,6 +20703,7 @@ tune2fs -l bad.img
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -19018,6 +20712,7 @@ tune2fs --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: tune2fs`, `filesystem`
+
 ## mimixbox uevent
 Source: `test/e2e/tools/mimixbox/util-linux/uevent.atago.yaml`
 ### Scenario: describes itself with --help
@@ -19028,6 +20723,7 @@ uevent --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: uevent`, `uevent`
+
 ## mimixbox umount
 Source: `test/e2e/tools/mimixbox/util-linux/umount.atago.yaml`
 ### Scenario: fails for a target that is not mounted
@@ -19037,6 +20733,7 @@ umount /not/a/real/mountpoint
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: requires a target
 #### When
 ```shell
@@ -19044,6 +20741,7 @@ umount
 ```
 #### Then
 - exit code is not `0`
+
 ## mimixbox unshare
 Source: `test/e2e/tools/mimixbox/util-linux/unshare.atago.yaml`
 ### Scenario: requires a namespace flag
@@ -19053,6 +20751,7 @@ unshare echo x
 ```
 #### Then
 - exit code is not `0`
+
 ### Scenario: describes itself with --help
 #### When
 ```shell
@@ -19061,6 +20760,7 @@ unshare --help
 #### Then
 - exit code is `0`
 - stdout contains `Usage: unshare`, `namespace`
+
 ## mimixbox wall
 Source: `test/e2e/tools/mimixbox/util-linux/wall.atago.yaml`
 ### Scenario: runs and exits successfully

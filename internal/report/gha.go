@@ -5,17 +5,28 @@ import (
 	"io"
 	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // writeGHA emits GitHub Actions workflow-command annotations, so
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
-func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error {
+func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure, snapsUpdated int) error {
 	var b strings.Builder
 	var agg engine.Counts
 	var total int
+	// A spec that never parsed produced no scenario to annotate, so annotate the
+	// file itself, as an error matching the non-zero exit.
+	for _, lf := range loadFailures {
+		// The one annotation that has a file to point at: `file=` puts it on the
+		// spec in the Actions UI, where a scenario failure has only a title.
+		fmt.Fprintf(&b, "::error file=%s,title=%s::%s\n",
+			ghaEscapeProp(lf.SpecPath), ghaEscapeProp(lf.SpecPath),
+			ghaEscapeData("spec failed to load: "+oneLine(lf.Message)))
+	}
 	for _, res := range results {
 		for i := range res.Scenarios {
 			sc := &res.Scenarios[i]
@@ -24,8 +35,16 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(firstFailureMessage(sc)+" — "+oneLine(detailText(sc))))
 			case engine.StatusError:
+				// The code goes in the title, which is what GitHub renders in the
+				// annotations list; buried in the body it would only be visible to
+				// someone who already opened the annotation.
+				msg := firstErrorMessage(sc)
+				title := res.Suite + " / " + sc.Name
+				if codes := diag.Codes(msg); len(codes) > 0 {
+					title = codes[0].String() + " " + title
+				}
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
-					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(firstErrorMessage(sc)))
+					ghaEscapeProp(title), ghaEscapeData(msg))
 			case engine.StatusFlaky:
 				// Green for the job, loud in the annotations (#29, #138).
 				fmt.Fprintf(&b, "::warning title=%s::%s\n",
@@ -47,7 +66,25 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error
 				// reviewers to ignore the annotation channel.
 				fmt.Fprintf(&b, "::notice title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData("xfail: "+expectFailSummary(sc)))
+			case engine.StatusPassed, engine.StatusSkipped:
+				// No annotation. Annotating every green or gated scenario would
+				// bury the ones a reviewer has to act on, which is the only
+				// thing the annotation channel is good for.
 			}
+			// A failed teardown never changes the verdict or the exit code, so
+			// it is a warning — the flaky pattern: green for the job, loud in
+			// the annotations. Silence here meant a green Actions run with no
+			// trace that cleanup of external resources failed.
+			if msg := firstStepFailureMessage(sc.Teardown); msg != "" {
+				fmt.Fprintf(&b, "::warning title=%s::%s\n",
+					ghaEscapeProp(res.Suite+" / "+sc.Name),
+					ghaEscapeData("teardown failed: "+msg+" — "+oneLine(stepsDetailText(sc.Teardown))))
+			}
+		}
+		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
+			fmt.Fprintf(&b, "::warning title=%s::%s\n",
+				ghaEscapeProp(res.Suite),
+				ghaEscapeData("suite teardown failed: "+msg+" — "+oneLine(stepsDetailText(res.Teardown))))
 		}
 		// A suite that errored before any scenario ran (#7) surfaces its cause as
 		// an error annotation, so the Actions UI is never silent for a non-zero
@@ -70,9 +107,19 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool) error
 		agg = agg.Add(res.Counts())
 		total += len(res.Scenarios)
 	}
+	// A snapshot rewrite is loud in the annotations and green for the job, the
+	// flaky pattern: --update-snapshots replaced committed expected results, and
+	// a job that did so must not read like an ordinary green run.
+	if snapsUpdated > 0 {
+		fmt.Fprintf(&b, "::warning title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
+			"%s updated by --update-snapshots; the committed expected results were rewritten",
+			plural.Count(snapsUpdated, "snapshot", "snapshots"))))
+	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
-		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped, flakySuffix(agg)+expectFailSuffix(agg))))
+		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s%s",
+		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
+		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures)),
+		snapshotSuffix(snapsUpdated))))
 	_, err := io.WriteString(w, b.String())
 	return err
 }

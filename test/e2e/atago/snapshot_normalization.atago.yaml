@@ -82,6 +82,12 @@ scenarios:
           file: {path: g.txt, not_contains: "54321"}
 
   - name: the home directory is masked to a tilde in the golden
+    skip:
+      # The masker compares against os.UserHomeDir, which on Windows is
+      # C:\Users\name. A POSIX shell run there reports the MSYS spelling
+      # (/c/Users/name) instead, so the two never meet. Masking a native
+      # Windows home works and is covered by the unit tests.
+      os: windows
     steps:
       - fixture:
           file: home.atago.yaml

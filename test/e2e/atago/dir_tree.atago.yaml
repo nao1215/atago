@@ -104,6 +104,42 @@ scenarios:
             recursive: true
             not_contains: [a/deep/missing.md]
 
+  # The recursive counter sees files only while the failure listing shows every
+  # walked path, so the failure text must speak in files: a count labeled
+  # "entries" contradicts the listing printed right below it.
+  - name: a recursive count failure speaks in files, not entries
+    steps:
+      - fixture:
+          file: inner_count.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner count
+            scenarios:
+              - name: tree file count misses
+                steps:
+                  - fixture:
+                      file: out/kept.txt
+                      content: "kept\n"
+                  - fixture:
+                      file: out/sub/nested.txt
+                      content: "nested\n"
+                  - assert:
+                      dir:
+                        path: out
+                        recursive: true
+                        count: 5
+      - run:
+          command: ${atago} run inner_count.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - 'assert dir "out" file count'
+              - 'directory "out" has 2 files, expected exactly 5 files in the tree'
+            not_contains:
+              - "entries"
+
   - name: combining snapshot with matchers is a load-time error
     steps:
       - fixture:

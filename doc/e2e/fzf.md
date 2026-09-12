@@ -11,6 +11,7 @@
   - [multi-select accepts several lines at once](#scenario-multi-select-accepts-several-lines-at-once)
   - [aborting the finder exits 130](#scenario-aborting-the-finder-exits-130)
   - [the finder screen narrows to the typed query](#scenario-the-finder-screen-narrows-to-the-typed-query)
+
 ## fzf (third-party CLI, pty testbed)
 [fzf](https://github.com/junegunn/fzf) is the archetype of a CLI you cannot
 test by piping to it: it refuses to run without a terminal, redraws the
@@ -33,6 +34,7 @@ fzf --version
 #### Then
 - exit code is `0`
 - stdout matches `/^[0-9]+\.[0-9]+/`
+
 ### Scenario: filter mode matches fuzzily on stdin without a terminal
 _only when `fzf --version` succeeds_
 #### Inputs
@@ -49,6 +51,7 @@ fzf --filter=bna
 #### Then
 - exit code is `0`
 - stdout equals an exact value
+
 ### Scenario: filter mode exits 1 when nothing matches
 _only when `fzf --version` succeeds_
 #### Inputs
@@ -65,6 +68,7 @@ fzf --filter=zzz
 #### Then
 - exit code is `1`
 - stdout is empty
+
 ### Scenario: interactive mode refuses to start without a terminal
 _only when env CI is set_
 #### When
@@ -74,6 +78,7 @@ printf 'apple\n' | fzf
 #### Then
 - exit code is `2`
 - stderr contains `ioctl`
+
 ### Scenario: interactive selection picks the queried line
 _only when `fzf --version` succeeds · skipped on Windows_
 #### When
@@ -84,6 +89,7 @@ _only when `fzf --version` succeeds · skipped on Windows_
 - exit code is `0`
 - file `pick.txt` contains `cherry`
 - file `pick.txt` does not contain `banana`
+
 ### Scenario: multi-select accepts several lines at once
 _only when `fzf --version` succeeds · skipped on Windows_
 #### When
@@ -93,6 +99,7 @@ _only when `fzf --version` succeeds · skipped on Windows_
 #### Then
 - exit code is `0`
 - file `pick.txt` contains `apple`, `banana`, `cherry`
+
 ### Scenario: aborting the finder exits 130
 _only when `fzf --version` succeeds · skipped on Windows_
 #### When
@@ -101,6 +108,7 @@ _only when `fzf --version` succeeds · skipped on Windows_
 ```
 #### Then
 - exit code is `130`
+
 ### Scenario: the finder screen narrows to the typed query
 _only when `fzf --version` succeeds · skipped on Windows_
 #### When

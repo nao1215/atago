@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // specTargets resolves a subcommand's positional arguments into the spec files
@@ -27,12 +29,12 @@ func specTargets(label string, args []string, stderr io.Writer) (paths []string,
 	}
 	paths, err := collectSpecFiles(targets)
 	if err != nil {
-		fmt.Fprintf(stderr, "%s: %v\n", label, err)
+		fmt.Fprintf(stderr, "%s: %s\n", label, diag.TargetNotFound.Annotate(err.Error()))
 		return nil, ExitConfig, false
 	}
 	if len(paths) == 0 {
-		fmt.Fprintf(stderr, "%s: no *.atago.yaml (or *.atago.yml) files found in %s; run `atago init` to scaffold one\n",
-			label, quotedList(targets))
+		fmt.Fprintf(stderr, "%s: %s\n", label,
+			diag.NoSpecFiles.Annotate(fmt.Sprintf("no *.atago.yaml (or *.atago.yml) files found in %s; run `atago init` to scaffold one", quotedList(targets))))
 		return nil, ExitConfig, false
 	}
 	return paths, ExitOK, true

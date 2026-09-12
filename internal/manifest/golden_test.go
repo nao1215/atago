@@ -52,7 +52,10 @@ scenarios:
               "index": 1,
               "kind": "assert",
               "action": "assert stdout",
-              "target": "stdout"
+              "target": "stdout",
+              "asserts": [
+                "stdout contains \"hi\""
+              ]
             }
           ]
         }

@@ -1,22 +1,29 @@
 version: "1"
 
 suite:
-  name: atago self-hosting / harness shell is not shadowed by the program PATH
+  name: atago self-hosting / the harness shell cannot be supplied by the program under test
 
-# Regression for the mimixbox migration: atago sets up PATH for the *program
-# under test*, and a CLI may legitimately ship its own `sh` (e.g. mimixbox's sh
-# applet). If `shell: true` resolved its shell through that PATH, the program
-# under test would hijack atago's shell and change pipe/redirect/exit
-# semantics. The runner therefore invokes an absolute shell, so a
-# PATH-resident `sh` cannot take over.
+# Regression for the mimixbox migration: atago prepends the *program under
+# test*'s directory to its own PATH so a spec can invoke the binary by bare
+# name. If `shell: true` resolved its shell through that PATH, a CLI shipping an
+# `sh` applet — or anything Windows resolves for the bare name `cmd` — would
+# become the harness shell and change redirect semantics and exit codes for
+# every `shell: true` step in the suite. The runner therefore resolves an
+# ABSOLUTE shell on every platform, and ATAGO_SHELL is the one documented way to
+# change which one.
+#
+# The proof has to drive an INNER atago. The shell is resolved in the atago
+# process, not in the child, so an `env:` on a run step here would only ever
+# change the environment of the command under test — never the environment the
+# resolution reads. Both scenarios therefore hand the environment under test to
+# a nested `atago run`, which is what makes them able to fail at all.
 scenarios:
-  - name: a PATH-resident fake sh does not hijack shell:true
-    env:
-      # PATH points ONLY at the workdir, where a sabotaged `sh` lives. If the
-      # runner resolved "sh" through PATH it would find this fake; an absolute
-      # /bin/sh ignores it. echo is a shell builtin, so no other PATH is needed.
-      PATH: "${workdir}"
+  - name: a shell planted on the inner atago's PATH does not hijack shell:true
     steps:
+      # Both sabotaged shells are planted so the scenario means something on
+      # every platform: `sh` is what a POSIX lookup finds, and `cmd.bat` is what
+      # PATHEXT makes a hit for the bare name `cmd` on Windows. The one that
+      # does not apply to the host is inert.
       - fixture:
           file: sh
           mode: "0755"
@@ -24,24 +31,65 @@ scenarios:
             #!/bin/sh
             echo HIJACKED
             exit 0
+      - fixture:
+          file: cmd.bat
+          content: |
+            @echo HIJACKED
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the shell is the system one
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo real-shell"
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        equals: real-shell
       - run:
-          shell: true
-          command: "echo real-shell"
+          command: ${atago} run inner.atago.yaml
+          env:
+            # The inner atago sees ONLY the workdir on PATH, where the sabotaged
+            # shells live. `echo` is a builtin of both /bin/sh and cmd.exe, so a
+            # shell step needs nothing else from PATH to succeed.
+            PATH: "${workdir}"
       - assert:
+          # The inner assertion is the real check: a hijacked shell prints
+          # HIJACKED instead of real-shell, so the inner run exits 1.
           exit_code: 0
-          stdout:
-            equals: real-shell
-      - assert:
           stdout:
             not_contains: HIJACKED
 
-  - name: ATAGO_SHELL overrides the shell used for shell:true
-    env:
-      ATAGO_SHELL: /bin/sh
+  - name: ATAGO_SHELL selects the shell the inner atago runs shell:true with
     steps:
+      - fixture:
+          file: inner.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: a shell step
+                steps:
+                  - run:
+                      shell: true
+                      command: "echo hi"
       - run:
-          shell: true
-          command: "printf '%s\\n' ok"
+          command: ${atago} run inner.atago.yaml
+          env:
+            # Pointing the override at nothing is what makes this scenario able
+            # to fail on every platform: naming a real alternative shell would
+            # need a different binary per OS, and naming the default one would
+            # pass whether or not the variable was ever read.
+            ATAGO_SHELL: "${workdir}/no-such-shell"
       - assert:
+          # ATG4002: the program never began running. The run reports through
+          # the report stream, which is stdout.
+          exit_code: 4
           stdout:
-            equals: ok
+            contains: no-such-shell

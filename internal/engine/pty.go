@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/runner/ptyrun"
@@ -27,14 +28,24 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 	if err := checkPTYSessionResolved(p.Session, st); err != nil {
 		return nil, nil, err
 	}
-	c := *p
-	c.Command = st.Expand(p.Command)
-	c.Cwd = st.Expand(p.Cwd)
-	merged := make(map[string]string, len(scenarioEnv)+len(p.Env))
+	// The command that STARTS the session gets the same guard a run step's
+	// command gets. Without it the session entries were checked while the
+	// program they talk to was launched from text carrying the reference
+	// verbatim, so `command: "myapp ${env:PROFILE}"` with PROFILE unset started
+	// a program with the literal `${env:PROFILE}` as an argument and the failure
+	// arrived from the program instead of from the mistake in the spec.
+	if msg := commandRefGuard(st, "pty", p.Command, p.Cwd, p.ShellEnabled()); msg != "" {
+		return nil, nil, diag.VariableUnresolved.Errorf("%s", msg)
+	}
+	// The shared walker is the one list of what a pty step expands (command,
+	// cwd, env values, and every session entry); the engine only composes the
+	// runtime environment on top of it.
+	c := *spec.WalkPTYStrings(p, st.Expand)
+	merged := make(map[string]string, len(scenarioEnv)+len(c.Env))
 	for k, v := range st.ExpandMap(scenarioEnv) {
 		merged[k] = v
 	}
-	for k, v := range st.ExpandMap(p.Env) { // step env overrides scenario env
+	for k, v := range c.Env { // step env overrides scenario env
 		merged[k] = v
 	}
 	// A pty step drives a REAL terminal, and full-screen TUIs (less, vim, htop —
@@ -49,12 +60,6 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 		merged["TERM"] = "xterm-256color"
 	}
 	c.Env = merged
-	if len(p.Session) > 0 {
-		c.Session = make([]spec.PTYAction, len(p.Session))
-		for i, a := range p.Session {
-			c.Session[i] = expandPTYAction(a, st)
-		}
-	}
 	// sandbox_home (#71) redirects the pty child's home under ${workdir}/.atago-home.
 	var sandbox map[string]string
 	if c.SandboxHomeEnabled() {
@@ -65,39 +70,6 @@ func (e *Engine) runPTY(ctx context.Context, p *spec.PTY, st *store.Store, scena
 		sandbox = s
 	}
 	return ptyrun.Run(ctx, &c, workdir, runnercmd.BuildEnv(c.Env, c.ClearEnvEnabled(), c.PassEnv, sandbox))
-}
-
-// expandPTYAction returns a's copy with every author-written string run
-// through ${name} expansion, leaving the runner's copy independent of the
-// spec's.
-func expandPTYAction(a spec.PTYAction, st *store.Store) spec.PTYAction {
-	na := spec.PTYAction{Expect: st.Expand(a.Expect)}
-	if a.Send != nil {
-		cs := *a.Send
-		// Only verbatim text gets ${name} expansion; named keys are
-		// fixed byte sequences (#26).
-		if cs.Text != nil {
-			txt := st.Expand(*cs.Text)
-			cs.Text = &txt
-		}
-		// A paste carries author-written text like any other send, so it
-		// gets the same expansion (#378).
-		if cs.Paste != nil {
-			pasted := st.Expand(*cs.Paste)
-			cs.Paste = &pasted
-		}
-		na.Send = &cs
-	}
-	// A resize carries only integers, so it needs no expansion — but it
-	// still has to be carried into the copy the runner drives (#379).
-	na.Resize = a.Resize
-	if a.Exec != nil {
-		ce := *a.Exec
-		ce.Command = st.Expand(a.Exec.Command)
-		na.Exec = &ce
-	}
-	na.ExpectScreen = spec.WalkPTYExpectScreenStrings(a.ExpectScreen, st.Expand)
-	return na
 }
 
 // checkPTYSessionResolved reports the first session entry whose send text or
@@ -151,12 +123,10 @@ func unresolvedRefError(idx int, field, text string, st *store.Store) error {
 	}
 	name := names[0]
 	if envName, isEnv := strings.CutPrefix(name, "env:"); isEnv {
-		return fmt.Errorf(
-			"pty session entry %[1]d (%[2]s) references ${env:%[3]s}, but the environment variable %[3]s is not set; set it or write $${env:%[3]s} for the literal text",
+		return diag.VariableUnresolved.Errorf("pty session entry %[1]d (%[2]s) references ${env:%[3]s}, but the environment variable %[3]s is not set; set it or write $${env:%[3]s} for the literal text",
 			idx, field, envName)
 	}
-	return fmt.Errorf(
-		"pty session entry %[1]d (%[2]s) references ${%[3]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:); define the variable or write $${%[3]s} for the literal text",
+	return diag.VariableUnresolved.Errorf("pty session entry %[1]d (%[2]s) references ${%[3]s}, but no variable with that name is defined (builtins, matrix vars, store, ready.store, env:); define the variable or write $${%[3]s} for the literal text",
 		idx, field, name)
 }
 

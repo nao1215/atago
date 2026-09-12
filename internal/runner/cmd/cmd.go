@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	shellwords "github.com/mattn/go-shellwords"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
@@ -66,11 +66,13 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	}
 	cmd.Env = buildEnv(run.Env, run.ClearEnvEnabled(), run.PassEnv, sandbox)
 	// On cancellation (Ctrl-C / suite cancel / step timeout), kill the whole
-	// process group, not just the shell we spawned: `sh -c "sleep 30"` orphans its
+	// process tree, not just the shell we spawned: `sh -c "sleep 30"` orphans its
 	// child, and that orphan keeps the stdout/stderr pipe open, so cmd.Wait would
 	// otherwise block until it exits on its own. WaitDelay is a portable backstop
-	// that force-closes the pipes if a stray child still lingers.
-	configureCancellation(cmd)
+	// that force-closes the pipes if a stray child still lingers. ctx is passed
+	// for the teardown to inherit its VALUES from; the Windows build has to spawn
+	// taskkill at a moment when ctx is by definition already done.
+	configureCancellation(ctx, cmd)
 	stdin, err := stdinReader(run, workdir)
 	if err != nil {
 		return nil, err
@@ -86,12 +88,12 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// and a child that printed nothing produced the identical observation (#344).
 	stdout, err := newCapture()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	defer stdout.close()
 	stderr, err := newCapture()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	defer stderr.close()
 	cmd.Stdout = stdout.writer()
@@ -110,11 +112,11 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 			return res, nil
 		}
 		if cerr := ctx.Err(); cerr != nil {
-			return nil, fmt.Errorf("run %q canceled: %w", run.Command, cerr)
+			return nil, diag.RunInterrupted.Errorf("run %q canceled: %w", run.Command, cerr)
 		}
 		// Could not start the process at all (not found, permission, ...). Same
 		// message the combined Run() path produced for this case.
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, err)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, err)
 	}
 	// The child now holds the write ends; drop atago's copies or the read side
 	// never sees EOF at all, and the drains below would never finish.
@@ -201,7 +203,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 	// instead of asserting against the killed result (issue #30).
 	if err := ctx.Err(); err != nil {
 		res.ExitCode = -1
-		return res, fmt.Errorf("run %q canceled: %w", run.Command, err)
+		return res, diag.RunInterrupted.Errorf("run %q canceled: %w", run.Command, err)
 	}
 
 	var exitErr *exec.ExitError
@@ -214,7 +216,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		// Could not start the process at all (not found, permission, ...). A
 		// process that DID run and failed only to be captured returned above, so
 		// this message never claims a command that ran never started.
-		return nil, fmt.Errorf("failed to execute %q: %w", run.Command, runErr)
+		return nil, diag.CommandNotStarted.Errorf("failed to execute %q: %w", run.Command, runErr)
 	}
 	return res, nil
 }
@@ -258,7 +260,7 @@ func captureFailure(command string, exitCode int, err error) error {
 	if errors.Is(err, exec.ErrWaitDelay) || errors.Is(err, errDrainDeadline) {
 		hint = "; a process it started outlived it and kept the pipes open — declare a long-running program with a `service:` step instead of backgrounding it inside a run step"
 	}
-	return fmt.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)
+	return diag.CaptureFailed.Errorf("run %q exited with code %d but its output could not be captured: %w%s", command, exitCode, err, hint)
 }
 
 // stdinReader builds the reader fed to the command's standard input (#18):
@@ -277,19 +279,21 @@ func stdinReader(run *spec.Run, workdir string) (io.Reader, error) {
 		}
 		data, err := os.ReadFile(abs) //nolint:gosec // confined to the scenario workdir above
 		if err != nil {
-			return nil, fmt.Errorf("run.stdin.file: %w", err)
+			return nil, diag.SandboxSetupFailed.Errorf("run.stdin.file: %w", err)
 		}
 		return bytes.NewReader(data), nil
 	case s.Base64 != "":
 		data, err := base64.StdEncoding.DecodeString(s.Base64)
 		if err != nil {
 			// Unreachable for loader-validated specs; kept for direct API users.
-			return nil, fmt.Errorf("run.stdin.base64: %w", err)
+			return nil, diag.SandboxSetupFailed.Errorf("run.stdin.base64: %w", err)
 		}
 		return bytes.NewReader(data), nil
 	case s.Inline != "":
 		return strings.NewReader(s.Inline), nil
 	}
+	//nolint:nilnil // No stdin authored: the child inherits an empty stdin, which is a
+	// configuration, not a failure.
 	return nil, nil
 }
 
@@ -322,22 +326,24 @@ func commandLine(run *spec.Run) (string, []string, error) {
 // the explicit shell opt-in. It is shared with the background
 // service runner so services tokenize and shell-quote identically to run steps.
 //
+// The shell is resolved to an ABSOLUTE path on both platforms (see shellPath in
+// shell_unix.go / shell_windows.go), so the program under test — whose directory
+// atago prepends to PATH — cannot supply the harness's shell.
+//
 // A Windows shell command additionally needs ConfigureShell on the built
-// *exec.Cmd: the ("cmd", "/c", command) argv returned here would be re-escaped
-// by Go with MSVCRT quoting rules that cmd.exe does not follow.
+// *exec.Cmd: the ("...cmd.exe", "/c", command) argv returned here would be
+// re-escaped by Go with MSVCRT quoting rules that cmd.exe does not follow.
 func CommandLine(command string, shell bool) (string, []string, error) {
 	if shell {
-		if runtime.GOOS == "windows" {
-			return "cmd", []string{"/c", command}, nil
-		}
-		return shellPath(), []string{"-c", command}, nil
+		sh := shellPath()
+		return sh, shellArgs(sh, command), nil
 	}
 	fields, err := splitArgv(command)
 	if err != nil {
-		return "", nil, fmt.Errorf("cannot parse command %q: %w", command, err)
+		return "", nil, diag.CommandUnparsable.Errorf("cannot parse command %q: %w", command, err)
 	}
 	if len(fields) == 0 {
-		return "", nil, fmt.Errorf("empty command")
+		return "", nil, diag.CommandUnparsable.Errorf("empty command")
 	}
 	return fields[0], fields[1:], nil
 }
@@ -401,10 +407,10 @@ func windowsFields(command string) ([]string, error) {
 		}
 	}
 	if inDouble {
-		return nil, fmt.Errorf("unclosed double quote")
+		return nil, diag.CommandUnparsable.Errorf("unclosed double quote")
 	}
 	if inSingle {
-		return nil, fmt.Errorf("unclosed single quote")
+		return nil, diag.CommandUnparsable.Errorf("unclosed single quote")
 	}
 	if started {
 		fields = append(fields, cur.String())
@@ -419,36 +425,13 @@ func isFieldSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
 }
 
-// shellPath returns an absolute path to the POSIX shell used for `shell: true`.
-//
-// It deliberately does NOT trust PATH: atago sets up PATH for the *program
-// under test*, and a CLI may legitimately ship its own `sh` applet (e.g.
-// mimixbox). If the harness resolved its shell through that PATH, the program
-// under test would hijack atago's shell — changing pipe/redirect semantics and
-// exit codes. So we prefer a fixed system location (mirroring ShellSpec's
-// absolute `--shell /bin/sh`). The ATAGO_SHELL env var allows an explicit
-// override; an absolute /bin/sh is the default; only as a last resort do we
-// fall back to a PATH lookup.
-func shellPath() string {
-	if s := os.Getenv("ATAGO_SHELL"); s != "" {
-		return s
-	}
-	if _, err := os.Stat("/bin/sh"); err == nil {
-		return "/bin/sh"
-	}
-	if p, err := exec.LookPath("sh"); err == nil {
-		return p
-	}
-	return "/bin/sh"
-}
-
 func parseTimeout(s string) (time.Duration, error) {
 	if s == "" {
 		return 0, nil
 	}
 	d, err := time.ParseDuration(s)
 	if err != nil {
-		return 0, fmt.Errorf("invalid timeout %q: %w", s, err)
+		return 0, diag.InternalError.Errorf("invalid timeout %q: %w", s, err)
 	}
 	return d, nil
 }

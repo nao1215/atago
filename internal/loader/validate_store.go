@@ -2,27 +2,34 @@ package loader
 
 import (
 	"regexp"
+	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 	"github.com/ohler55/ojg/jp"
 )
 
-// reservedVarNames are the built-in variables the engine seeds into every
-// scenario store (${atago} binary path, ${workdir}, ${suitedir}). A user store
-// or matrix variable that reuses one silently shadows it — pointing ${workdir}
-// outside the isolated temp dir while cleanup still targets the real one — so
-// the collision is rejected at load time.
-var reservedVarNames = map[string]bool{"atago": true, "workdir": true, "suitedir": true}
+// reservedVarName reports whether a user store or matrix variable would shadow
+// a built-in the engine seeds. Shadowing one is silent — it points ${workdir}
+// outside the isolated temp dir while cleanup still targets the real one, or
+// ${specdir} away from the files a step meant to read — so the collision is
+// rejected at load time. The names come from the store package rather than a
+// copy here: the copy listed three of the five.
+func reservedVarName(name string) bool { return store.IsBuiltin(name) }
 
-func validateStore(add func(string, ...any), where string, s *spec.Store) {
+// builtinList names every reserved variable for an error message.
+func builtinList() string { return strings.Join(store.Builtins, "/") }
+
+func validateStore(add addFunc, where string, s *spec.Store) {
 	if s.Name == "" {
-		add("%s.store.name is required", where)
+		add(diag.RequiredKey, "%s.store.name is required", where)
 	}
-	if reservedVarNames[s.Name] {
-		add("%s.store.name %q shadows a built-in variable (atago/workdir/suitedir); choose another name", where, s.Name)
+	if reservedVarName(s.Name) {
+		add(diag.ReservedName, "%s.store.name %q shadows a built-in variable (%s); choose another name", where, s.Name, builtinList())
 	}
 	if s.From == nil {
-		add("%s.store.from is required", where)
+		add(diag.RequiredKey, "%s.store.from is required", where)
 		return
 	}
 	n := 0
@@ -49,10 +56,10 @@ func validateStore(add func(string, ...any), where string, s *spec.Store) {
 	}
 	switch n {
 	case 0:
-		add("%s.store.from must set one of stdout/body/file/header/rows/message/value", where)
+		add(diag.ChooseExactlyOne, "%s.store.from must set one of stdout/body/file/header/rows/message/value", where)
 	case 1:
 	default:
-		add("%s.store.from must set exactly one source", where)
+		add(diag.ChooseExactlyOne, "%s.store.from must set exactly one source", where)
 	}
 
 	// A store selector extracts a value via a json path or a matches regexp
@@ -81,7 +88,7 @@ func validateStore(add func(string, ...any), where string, s *spec.Store) {
 // validateStoreFileSelector checks a store.from.file selector: exactly one of a
 // json path (extract a value) or text: true (capture the whole file verbatim,
 // #158).
-func validateStoreFileSelector(add func(string, ...any), where string, f *spec.FileAssert) {
+func validateStoreFileSelector(add addFunc, where string, f *spec.FileAssert) {
 	n := 0
 	if len(f.JSON) > 0 {
 		n++
@@ -92,19 +99,19 @@ func validateStoreFileSelector(add func(string, ...any), where string, f *spec.F
 	}
 	switch n {
 	case 0:
-		add("%s must set a json path or text: true to capture a value", where)
+		add(diag.ChooseExactlyOne, "%s must set a json path or text: true to capture a value", where)
 	case 1:
 	default:
-		add("%s must set exactly one selector (json or text)", where)
+		add(diag.ChooseExactlyOne, "%s must set exactly one selector (json or text)", where)
 	}
 }
 
 // validateStoreJSONSelector checks the json selector of a store source: it
 // captures exactly one value, so a list of checks (#156) is rejected — a store
 // needs a single JSONPath, not several assertions.
-func validateStoreJSONSelector(add func(string, ...any), where string, list spec.JSONChecks) {
+func validateStoreJSONSelector(add addFunc, where string, list spec.JSONChecks) {
 	if len(list) > 1 {
-		add("%s must select a single value with one json path, not a list of checks", where)
+		add(diag.ChooseExactlyOne, "%s must select a single value with one json path, not a list of checks", where)
 		return
 	}
 	validateStoreJSONPath(add, where, list[0].Path)
@@ -114,7 +121,7 @@ func validateStoreJSONSelector(add func(string, ...any), where string, list spec
 // exactly one of a json path, a matches regexp, or trim (capture the whole
 // stream, #158) — the selectors the extractor understands — and whichever is
 // present must be well-formed.
-func validateStoreSelector(add func(string, ...any), where string, s *spec.StreamAssert) {
+func validateStoreSelector(add addFunc, where string, s *spec.StreamAssert) {
 	n := 0
 	if len(s.JSON) > 0 {
 		n++
@@ -123,7 +130,14 @@ func validateStoreSelector(add func(string, ...any), where string, s *spec.Strea
 	if s.Matches != nil {
 		n++
 		if _, err := regexp.Compile(*s.Matches); err != nil {
-			add("%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+			add(diag.BadRegexp, "%s.matches %q is not a valid regexp: %v", where, *s.Matches, err)
+		} else if matchesEmpty(*s.Matches) {
+			// The capture takes the first match, which for an empty-matching
+			// pattern is the empty string at position 0 — so the store silently
+			// holds "" for output that plainly contains the value, and the empty
+			// value flows into later steps with no diagnostic at all. This is the
+			// dangerous member of the family: a wrong value, not a wrong verdict.
+			add(diag.VacuousMatcher, "%s.matches %q matches the empty string, so it captures \"\" from any output; require at least one character (e.g. \"[0-9]+\")", where, *s.Matches)
 		}
 	}
 	if s.Trim != nil {
@@ -131,20 +145,20 @@ func validateStoreSelector(add func(string, ...any), where string, s *spec.Strea
 	}
 	switch n {
 	case 0:
-		add("%s must set a json path, a matches regexp, or trim to extract a value", where)
+		add(diag.ChooseExactlyOne, "%s must set a json path, a matches regexp, or trim to extract a value", where)
 	case 1:
 	default:
-		add("%s must set exactly one selector (json, matches, or trim)", where)
+		add(diag.ChooseExactlyOne, "%s must set exactly one selector (json, matches, or trim)", where)
 	}
 }
 
 // validateStoreJSONPath compile-checks a store selector's JSON path.
-func validateStoreJSONPath(add func(string, ...any), where, path string) {
+func validateStoreJSONPath(add addFunc, where, path string) {
 	if path == "" {
-		add("%s.path is required", where)
+		add(diag.RequiredKey, "%s.path is required", where)
 		return
 	}
 	if _, err := jp.ParseString(path); err != nil {
-		add("%s.path %q is not a valid JSON path: %v", where, path, err)
+		add(diag.BadFormat, "%s.path %q is not a valid JSON path: %v", where, path, err)
 	}
 }

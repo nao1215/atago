@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -21,7 +22,7 @@ type PolicyError struct {
 }
 
 func (e *PolicyError) Error() string {
-	return fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", "))
+	return diag.NetworkPolicyDenied.Annotate(fmt.Sprintf("network policy denies host %q (allowed: %s)", e.Host, strings.Join(e.Allow, ", ")))
 }
 
 // CheckHost reports whether hostport (a "host" or "host:port") is permitted by
@@ -166,7 +167,7 @@ func (m *Masker) Mask(s string) string {
 		return s
 	}
 	covered := make([]bool, len(s))
-	any := false
+	masked := false
 	for _, v := range m.values {
 		for i := 0; ; {
 			j := strings.Index(s[i:], v)
@@ -177,13 +178,13 @@ func (m *Masker) Mask(s string) string {
 			for k := start; k < start+len(v); k++ {
 				covered[k] = true
 			}
-			any = true
+			masked = true
 			// Advance by one, not len(v), so overlapping occurrences of the same
 			// secret are all covered — "aaaa" occurs three times in "aaaaaa".
 			i = start + 1
 		}
 	}
-	if !any {
+	if !masked {
 		return s
 	}
 	var b strings.Builder

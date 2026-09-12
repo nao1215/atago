@@ -1,11 +1,11 @@
 package ptyrun
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"syscall"
 
+	"github.com/nao1215/atago/internal/diag"
 	"golang.org/x/sys/unix"
 )
 
@@ -59,14 +59,14 @@ func openTerminalPair() (master, tty *os.File, err error) {
 		index, gerr = unix.IoctlGetInt(fd, unix.TIOCGPTN)
 		return gerr
 	}); ierr != nil {
-		return nil, nil, fmt.Errorf("asking the kernel which terminal /dev/ptmx just handed out: %w", ierr)
+		return nil, nil, diag.PTYFailed.Errorf("asking the kernel which terminal /dev/ptmx just handed out: %w", ierr)
 	}
 	// TIOCSPTLCK with a zero clears the lock the kernel puts on a freshly
 	// allocated slave; until it is cleared, opening the slave fails with EIO.
 	if ierr := ControlFD(master, func(fd int) error {
 		return unix.IoctlSetPointerInt(fd, unix.TIOCSPTLCK, 0)
 	}); ierr != nil {
-		return nil, nil, fmt.Errorf("unlocking terminal /dev/pts/%d: %w", index, ierr)
+		return nil, nil, diag.PTYFailed.Errorf("unlocking terminal /dev/pts/%d: %w", index, ierr)
 	}
 
 	name := "/dev/pts/" + strconv.Itoa(index)

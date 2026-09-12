@@ -178,9 +178,12 @@ scenarios:
               - "+BETA"
               - "snaps/out.txt"
       - run:
-          shell: true
-          command: ${atago} run --report json diffspec.atago.yaml; true
+          # No shell, and no `; true` to swallow the exit code: a run step's
+          # non-zero exit is only a failure when a spec asserts on it, and a
+          # Windows ${atago} carries backslashes a POSIX shell would eat.
+          command: ${atago} run --report json diffspec.atago.yaml
       - assert:
+          exit_code: 1
           stdout:
             contains: '"diff":'
 

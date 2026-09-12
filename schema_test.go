@@ -1,15 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
+	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/manifest"
+	"github.com/nao1215/atago/internal/report"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -47,21 +54,67 @@ func yamlToAny(t *testing.T, data []byte) any {
 	return v
 }
 
-// TestSchema_RealSpecsConform guards against drift between the JSON Schema and
-// the specs we ship: every example/demo spec must validate against the schema.
-func TestSchema_RealSpecsConform(t *testing.T) {
-	s := loadSchema(t)
-	specs := []string{
-		"doc/demo/passing.atago.yaml",
-		"doc/demo/failing.atago.yaml",
+// shippedSpecPaths returns every *.atago.yaml this repository ships, walked
+// from the module root rather than from a list of directories: a suite added
+// under a new path is then covered by the guards below without anyone
+// remembering they exist, which is exactly how fourteen specs drifted out of
+// schema conformance while a two-file guard stayed green. Dot directories (the
+// git metadata, agent worktrees) and dist/ (release output) carry no shipped
+// spec, so the walk skips them wholesale.
+func shippedSpecPaths(t *testing.T) []string {
+	t.Helper()
+	var specs []string
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if name := d.Name(); path != "." && (strings.HasPrefix(name, ".") || name == "dist") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(path, ".atago.yaml") || strings.HasSuffix(path, ".atago.yml") {
+			specs = append(specs, filepath.ToSlash(filepath.Clean(path)))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk repository: %v", err)
 	}
+	// A walk that silently matches nothing turns every corpus guard into a
+	// no-op, so assert the two trees that must always contribute.
+	var examples, e2e int
 	for _, p := range specs {
+		switch {
+		case strings.HasPrefix(p, "examples/"):
+			examples++
+		case strings.HasPrefix(p, "test/e2e/"):
+			e2e++
+		}
+	}
+	if examples == 0 || e2e == 0 {
+		t.Fatalf("spec walk found %d specs but %d under examples/ and %d under test/e2e/; the corpus guards would pass on nothing", len(specs), examples, e2e)
+	}
+	return specs
+}
+
+// TestSchema_EveryShippedSpecConforms is the drift guard between the specs this
+// repository ships and the schema editors validate them against. It used to
+// check two demo files, which is how a schema that rejects a composable file
+// assert and every store json-path capture shipped while the guard stayed
+// green: a user copying examples/http.atago.yaml saw their editor reject it.
+// Every spec in the tree is validated here, so a schema change that narrows the
+// accepted vocabulary fails the build instead of a user's editor.
+func TestSchema_EveryShippedSpecConforms(t *testing.T) {
+	s := loadSchema(t)
+	for _, p := range shippedSpecPaths(t) {
 		data, err := os.ReadFile(p)
 		if err != nil {
 			t.Fatalf("read %s: %v", p, err)
 		}
 		if err := s.Validate(yamlToAny(t, data)); err != nil {
-			t.Errorf("%s does not conform to schema:\n%v", p, err)
+			t.Errorf("%s does not conform to schema/atago.schema.json:\n%v", p, err)
 		}
 	}
 }
@@ -118,6 +171,158 @@ scenarios:
 		t.Run(name, func(t *testing.T) {
 			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
 				t.Errorf("schema rejected valid %s runner:\n%v", name, err)
+			}
+		})
+	}
+}
+
+// durationProperties are the schema properties whose value is a Go duration
+// string, and the reason each stays strictly typed. A bare number is always
+// wrong there — 30 is not 30s, and the loader refuses it — so the schema
+// catching it in the editor costs nothing and saves a run.
+var durationProperties = map[string]string{
+	"timeout":    "a step, session, service, or suite bound",
+	"stable_for": "how long a screen must hold still",
+	"interval":   "the wait between retry attempts",
+	"delay":      "a mock route's or a readiness probe's pause",
+	"gt":         "a duration assertion's lower bound",
+	"gte":        "a duration assertion's lower bound",
+	"lt":         "a duration assertion's upper bound",
+	"lte":        "a duration assertion's upper bound",
+}
+
+// TestSchema_TextPropertiesAcceptAnyScalar pins the schema against the rule the
+// loader implements: in a text field the characters in the file are the value,
+// so an unquoted number or boolean means those characters. Declaring every such
+// property `"type": "string"` flagged `env: {PORT: 8080}` — the way anyone
+// writes a port — on a spec atago runs. Only the duration properties stay
+// strict, and this walks the whole document so a new strictly-typed text
+// property has to be a decision rather than a habit.
+func TestSchema_TextPropertiesAcceptAnyScalar(t *testing.T) {
+	data, err := os.ReadFile("schema/atago.schema.json")
+	if err != nil {
+		t.Fatalf("read schema: %v", err)
+	}
+	var root any
+	if err := json.Unmarshal(data, &root); err != nil {
+		t.Fatalf("parse schema: %v", err)
+	}
+	seen := map[string]bool{}
+	var walk func(node any, name string)
+	walk = func(node any, name string) {
+		m, ok := node.(map[string]any)
+		if !ok {
+			if arr, ok := node.([]any); ok {
+				for _, item := range arr {
+					walk(item, name)
+				}
+			}
+			return
+		}
+		if typ, ok := m["type"].(string); ok && typ == "string" {
+			seen[name] = true
+			if _, allowed := durationProperties[name]; !allowed {
+				t.Errorf("schema property %q is typed \"string\" alone, so an unquoted scalar there is flagged on a spec the loader accepts verbatim; widen it to [\"string\", \"number\", \"boolean\"] or record it in durationProperties", name)
+			}
+		}
+		for k, v := range m {
+			switch k {
+			case "properties", "$defs", "patternProperties":
+				if props, ok := v.(map[string]any); ok {
+					for pk, pv := range props {
+						walk(pv, pk)
+					}
+				}
+			case "items", "additionalProperties", "oneOf", "anyOf", "allOf", "not":
+				walk(v, name)
+			}
+		}
+	}
+	walk(root, "")
+	for name := range durationProperties {
+		if !seen[name] {
+			t.Errorf("durationProperties lists %q, which is no longer a strictly-typed schema property; remove the entry", name)
+		}
+	}
+}
+
+// TestSchema_AcceptsUnquotedScalarsInTextFields is the user-facing half of the
+// rule: the shapes people actually write — a port in env, a version in a
+// matcher, a program named true — validate and load alike.
+func TestSchema_AcceptsUnquotedScalarsInTextFields(t *testing.T) {
+	s := loadSchema(t)
+	src := `version: "1"
+suite:
+  name: x
+  env: {BUILD: 007}
+scenarios:
+  - name: a
+    env: {PORT: 8080}
+    steps:
+      - fixture: {file: v.txt, content: 1.10, mode: 0755}
+      - run: {command: true, env: {RETRIES: 3}}
+      - assert: {stdout: {contains: 1.20}}
+`
+	if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+		t.Fatalf("loader rejected a spec of unquoted scalars: %v", err)
+	}
+	if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+		t.Errorf("schema rejected unquoted scalars the loader takes verbatim:\n%v", err)
+	}
+}
+
+// TestSchema_AcceptsComposableFileMatchers pins the file assert shapes the
+// loader documents as composable: a size bound stands alone or joins a content
+// matcher, and min_size with max_size bounds a range. The schema used to model
+// the matcher list with oneOf, which reads as "exactly one" and turned every one
+// of these into an editor error on a spec atago runs — including a shipped
+// example. Each case is loaded as well as validated, so the test fails if the
+// two ever disagree again in either direction.
+func TestSchema_AcceptsComposableFileMatchers(t *testing.T) {
+	s := loadSchema(t)
+	cases := map[string]string{
+		"exists with size":     `assert: {file: {path: out.txt, exists: true, size: 0}}`,
+		"size alone":           `assert: {file: {path: out.txt, size: 12}}`,
+		"size range":           `assert: {file: {path: out.txt, min_size: 1, max_size: 4096}}`,
+		"contains with count":  `assert: {file: {path: out.txt, contains: warn, count: 2}}`,
+		"contains with a size": `assert: {file: {path: out.txt, contains: warn, max_size: 4096}}`,
+	}
+	for name, step := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := "version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - " + step + "\n"
+			if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+				t.Fatalf("loader rejected %s: %v", name, err)
+			}
+			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+				t.Errorf("schema rejected %s, which the loader accepts:\n%v", name, err)
+			}
+		})
+	}
+}
+
+// TestSchema_AcceptsStoreCaptures pins the store shapes against the schema. A
+// capture selects a value rather than judging one, so its json node carries a
+// path and no matcher — the only spelling the loader accepts there. The schema
+// reached that node through the assert definition, whose oneOf demanded a
+// matcher, so every store-by-json-path spec in this repository (three shipped
+// examples among them) failed validation while running green.
+func TestSchema_AcceptsStoreCaptures(t *testing.T) {
+	s := loadSchema(t)
+	cases := map[string]string{
+		"stdout json path": `store: {name: id, from: {stdout: {json: {path: "$.id"}}}}`,
+		"stdout matches":   `store: {name: id, from: {stdout: {matches: "id=(\\d+)"}}}`,
+		"stdout trim":      `store: {name: all, from: {stdout: {trim: true}}}`,
+		"file json path":   `store: {name: v, from: {file: {path: out.json, json: {path: "$.v"}}}}`,
+		"file text":        `store: {name: body, from: {file: {path: out.txt, text: true}}}`,
+	}
+	for name, step := range cases {
+		t.Run(name, func(t *testing.T) {
+			src := "version: \"1\"\nsuite: {name: x}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - " + step + "\n"
+			if _, err := loader.LoadBytes("t.atago.yaml", []byte(src)); err != nil {
+				t.Fatalf("loader rejected %s: %v", name, err)
+			}
+			if err := s.Validate(yamlToAny(t, []byte(src))); err != nil {
+				t.Errorf("schema rejected %s, which the loader accepts:\n%v", name, err)
 			}
 		})
 	}
@@ -572,6 +777,12 @@ scenarios:
 			t.Errorf("suite_variables = %v, want it to include %q", sv, want)
 		}
 	}
+	// The shell-enabled setup run must surface in the suite security notes,
+	// proving the field round-trips through the schema above.
+	sec := strings.Join(doc.Specs[0].SuiteSecurity, "\n")
+	if !strings.Contains(sec, "shell execution enabled: echo build ${srcdir}") {
+		t.Errorf("suite_security = %v, want the shell-enabled setup run flagged", doc.Specs[0].SuiteSecurity)
+	}
 }
 
 // TestReportExample_Conforms validates the committed report example against the
@@ -582,6 +793,121 @@ func TestReportExample_Conforms(t *testing.T) {
 	s := compileSchema(t, "schema/report.schema.json")
 	if err := s.Validate(readJSONAny(t, "schema/examples/report.example.json")); err != nil {
 		t.Errorf("report example does not conform to schema:\n%v", err)
+	}
+}
+
+// TestManifest_ExpectFailAndDeterministicConform builds a manifest for a spec
+// carrying the two features the committed example never exercises — a
+// scenario's `expect_fail:` and a step's `deterministic:` — and validates the
+// real output against the manifest schema. Both shipped in the writer without a
+// schema property, so a manifest that used them failed the schema atago
+// publishes for it (#496).
+func TestManifest_ExpectFailAndDeterministicConform(t *testing.T) {
+	src := `
+version: "1"
+suite:
+  name: known-bugs
+scenarios:
+  - name: a known bug
+    expect_fail:
+      reason: still broken
+      issue: "https://github.com/nao1215/atago/issues/496"
+    steps:
+      - run:
+          shell: true
+          command: "exit 1"
+          deterministic:
+            runs: 3
+            compare: [stdout, exit_code]
+      - assert: {exit_code: 0}
+`
+	s, err := loader.LoadBytes("xf.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	doc := manifest.Build([]manifest.Input{{Spec: s, Path: "xf.atago.yaml"}})
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	var v any
+	if err := json.Unmarshal(blob, &v); err != nil {
+		t.Fatalf("unmarshal manifest: %v", err)
+	}
+	// The manifest must actually carry both fields, or the conformance check
+	// below would pass over a document that never exercised them.
+	sc := doc.Specs[0].Scenarios[0]
+	if sc.ExpectFail == nil {
+		t.Fatal("manifest scenario carries no expect_fail")
+	}
+	if sc.Steps[0].Deterministic == nil {
+		t.Fatal("manifest step carries no deterministic")
+	}
+	if err := compileSchema(t, "schema/manifest.schema.json").Validate(v); err != nil {
+		t.Errorf("expect_fail/deterministic manifest does not conform to schema:\n%v", err)
+	}
+}
+
+// TestReport_FeatureFieldsConform renders a real `--report json` document for
+// the three features the committed example never exercises — a spec that failed
+// to load, a suite whose setup failed, and a scenario declaring `expect_fail:` —
+// and validates it against the report schema. Each shipped in the writer without
+// a schema property, so any report using them failed the schema atago publishes
+// for editors and CI consumers (#496).
+func TestReport_FeatureFieldsConform(t *testing.T) {
+	specs := map[string]string{
+		"xf.atago.yaml": `
+version: "1"
+suite:
+  name: known-bug
+scenarios:
+  - name: a known bug
+    expect_fail:
+      reason: still broken
+      issue: "https://github.com/nao1215/atago/issues/496"
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`,
+		"setup.atago.yaml": `
+version: "1"
+suite:
+  name: broken-setup
+  setup:
+    - run: {shell: true, command: "exit 1"}
+    - assert: {exit_code: 0}
+scenarios:
+  - name: never runs
+    steps:
+      - run: {shell: true, command: "echo hi"}
+`,
+	}
+	var results []*engine.SuiteResult
+	for _, path := range []string{"xf.atago.yaml", "setup.atago.yaml"} {
+		sp, err := loader.LoadBytes(path, []byte(specs[path]))
+		if err != nil {
+			t.Fatalf("load %s: %v", path, err)
+		}
+		results = append(results, engine.New().Run(context.Background(), sp, path))
+	}
+	var buf bytes.Buffer
+	if err := report.Render(&buf, report.FormatJSON, results,
+		report.WithLoadFailures(report.LoadFailure{SpecPath: "broken.atago.yaml", Message: "yaml: line 3: mapping values are not allowed"})); err != nil {
+		t.Fatalf("render json report: %v", err)
+	}
+	// Every field under test must really be in the document, or conformance
+	// would be asserted over a report that exercised none of them.
+	for _, want := range []string{`"load_failures"`, `"setup_failures"`, `"expect_fail"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("rendered report carries no %s:\n%s", want, buf.String())
+		}
+	}
+	var v any
+	if err := json.Unmarshal(buf.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
+	if err := compileSchema(t, "schema/report.schema.json").Validate(v); err != nil {
+		t.Errorf("report does not conform to schema:\n%v", err)
 	}
 }
 

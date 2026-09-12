@@ -108,7 +108,7 @@ func TestRender_Console_LoadFailures(t *testing.T) {
 	t.Run("mixed valid+invalid reads FAILED and counts the drop", func(t *testing.T) {
 		t.Parallel()
 		var b bytes.Buffer
-		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(1)); err != nil {
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(LoadFailure{SpecPath: "bad.atago.yaml", Message: "unreadable"})); err != nil {
 			t.Fatal(err)
 		}
 		out := b.String()
@@ -126,7 +126,11 @@ func TestRender_Console_LoadFailures(t *testing.T) {
 	t.Run("plural spec count", func(t *testing.T) {
 		t.Parallel()
 		var b bytes.Buffer
-		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(3)); err != nil {
+		if err := Render(&b, FormatConsole, allPassingResults(), WithLoadFailures(
+			LoadFailure{SpecPath: "a.atago.yaml", Message: "unreadable"},
+			LoadFailure{SpecPath: "b.atago.yaml", Message: "unreadable"},
+			LoadFailure{SpecPath: "c.atago.yaml", Message: "unreadable"},
+		)); err != nil {
 			t.Fatal(err)
 		}
 		if out := b.String(); !strings.Contains(out, "3 specs failed to load") {
@@ -790,6 +794,163 @@ func TestJSON_ScenarioTeardownFailures(t *testing.T) {
 	}
 }
 
+// TestSnapshotUpdates_AreReported is a regression: `--update-snapshots`
+// rewrites the committed goldens — the expected results of the whole suite —
+// and left no trace anywhere. A CI job that carries the flag by accident
+// rewrites every golden to whatever the code currently does and reports green,
+// with nothing in the output for a reviewer of the log to notice.
+//
+// The count is a property of the run rather than of the results, so it arrives
+// as an option: the engine's write recorder is the only place that sees a
+// rewrite made by a teardown, a suite lifecycle block, or a repeat iteration
+// that is not the surviving result. What this test pins is that every format
+// reports the number it is given.
+func TestSnapshotUpdates_AreReported(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:    "snap",
+		SpecPath: "snap.atago.yaml",
+		Status:   engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "greets",
+			Status: engine.StatusPassed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{
+				{OK: true, Desc: "assert stdout snapshot (updated)"},
+				{OK: true, Desc: "assert exit_code is 0"},
+			}}},
+		}},
+	}
+
+	console := render(t, FormatConsole, res, WithSnapshotsUpdated(1))
+	if !strings.Contains(console, "1 snapshot updated") {
+		t.Errorf("console summary does not report the update:\n%s", console)
+	}
+
+	var doc jsonDocument
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, res, WithSnapshotsUpdated(1))), &doc); err != nil {
+		t.Fatalf("json invalid: %v", err)
+	}
+	if doc.SnapshotsUpdated != 1 {
+		t.Errorf("json snapshots_updated = %d, want 1", doc.SnapshotsUpdated)
+	}
+
+	if out := render(t, FormatGHA, res, WithSnapshotsUpdated(1)); !strings.Contains(out, "1 snapshot updated") {
+		t.Errorf("gha summary does not report the update:\n%s", out)
+	}
+	if out := render(t, FormatTAP, res, WithSnapshotsUpdated(1)); !strings.Contains(out, "# 1 snapshot updated") {
+		t.Errorf("tap stream does not report the update:\n%s", out)
+	}
+
+	// A run that wrote none says nothing: the note exists to flag a rewrite.
+	clean := &engine.SuiteResult{
+		Suite: "snap", Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{{Name: "greets", Status: engine.StatusPassed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}}},
+	}
+	if out := render(t, FormatConsole, clean); strings.Contains(out, "snapshot updated") {
+		t.Errorf("a run that updated nothing gained a note:\n%s", out)
+	}
+}
+
+// TestEvidencePaths_ReachEveryMachineFormat is a regression: --artifacts-dir
+// writes sidecars so CI, editors, and agents can jump straight to them, and
+// preserved service logs exist for the same reason — but only the console and
+// the json report carried the paths. junit, tap, and gha reproduced the diff
+// text while referencing no file, so the CI systems those formats exist for
+// could not reach the evidence the run had just written for them.
+func TestEvidencePaths_ReachEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:    "ev",
+		SpecPath: "ev.atago.yaml",
+		Status:   engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{{
+			Name:   "golden mismatch",
+			Status: engine.StatusFailed,
+			Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{
+				OK: false, Desc: "assert stdout equals golden",
+				ArtifactExpected: []byte("a\nb\nc\n"), ArtifactActual: []byte("a\nX\nc\n"),
+				ArtifactFiles: []assert.ArtifactFile{
+					{Role: "actual", Path: "ev/golden-mismatch-0/step-01-stdout.actual.txt"},
+					{Role: "expected", Path: "ev/golden-mismatch-0/step-01-stdout.expected.txt"},
+				},
+			}}}},
+			ServiceLogs: []engine.ServiceLog{{Name: "api", Path: "ev/golden-mismatch-0/service-api.log"}},
+		}},
+	}
+	for _, f := range []Format{FormatJUnit, FormatTAP, FormatGHA} {
+		out := render(t, f, res)
+		for _, want := range []string{
+			"ev/golden-mismatch-0/step-01-stdout.actual.txt",
+			"ev/golden-mismatch-0/step-01-stdout.expected.txt",
+			"ev/golden-mismatch-0/service-api.log",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s report missing evidence path %q\n--- got ---\n%s", f, want, out)
+			}
+		}
+	}
+}
+
+// TestTeardownFailure_VisibleInEveryMachineFormat is a regression: only the
+// console and json knew about a failed teardown. junit reported a clean pass
+// with zero trace of it, tap emitted a bare passing point, and gha a green
+// notice — so a CI consumer reading any of those formats never learned that
+// cleanup of external resources failed. Each format now carries the fact in
+// its non-verdict-changing slot; the verdict itself stays green everywhere.
+func TestTeardownFailure_VisibleInEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := scenarioTeardownFailure()
+
+	junitOut := render(t, FormatJUnit, res)
+	for _, want := range []string{"system-err", "assert file lock removed", "rm: permission denied"} {
+		if !strings.Contains(junitOut, want) {
+			t.Errorf("junit missing teardown evidence %q\n--- got ---\n%s", want, junitOut)
+		}
+	}
+	if !strings.Contains(junitOut, `failures="0" errors="0"`) {
+		t.Errorf("a failed teardown must not change the junit counts:\n%s", junitOut)
+	}
+
+	tapOut := render(t, FormatTAP, res)
+	if !strings.Contains(tapOut, "ok 1 - td / leaves-clean") {
+		t.Errorf("tap point must stay passing:\n%s", tapOut)
+	}
+	if !strings.Contains(tapOut, "# teardown failed: assert file lock removed") {
+		t.Errorf("tap missing the teardown comment:\n%s", tapOut)
+	}
+
+	ghaOut := render(t, FormatGHA, res)
+	if !strings.Contains(ghaOut, "::warning") || !strings.Contains(ghaOut, "teardown failed") {
+		t.Errorf("gha missing the teardown warning:\n%s", ghaOut)
+	}
+	if strings.Contains(ghaOut, "::error") {
+		t.Errorf("a failed teardown must not become a gha error:\n%s", ghaOut)
+	}
+}
+
+// TestSuiteTeardownFailure_VisibleInEveryMachineFormat covers the suite-level
+// twin: a failed suite.teardown was equally invisible to junit, tap, and gha.
+func TestSuiteTeardownFailure_VisibleInEveryMachineFormat(t *testing.T) {
+	t.Parallel()
+	res := suiteWithSetupAndTeardownFailures()
+
+	junitOut := render(t, FormatJUnit, res)
+	if !strings.Contains(junitOut, "docker rm: no such container") {
+		t.Errorf("junit missing the suite teardown evidence:\n%s", junitOut)
+	}
+
+	tapOut := render(t, FormatTAP, res)
+	if !strings.Contains(tapOut, "# suite teardown failed: assert dir /tmp/scratch does not exist") {
+		t.Errorf("tap missing the suite teardown comment:\n%s", tapOut)
+	}
+
+	ghaOut := render(t, FormatGHA, res)
+	if !strings.Contains(ghaOut, "suite teardown failed") {
+		t.Errorf("gha missing the suite teardown warning:\n%s", ghaOut)
+	}
+}
+
 // TestConsole_FailedScenarioArtifacts exercises writeDetail's Artifacts footer
 // for a failed check that wrote sidecar files (#48).
 func TestConsole_FailedScenarioArtifacts(t *testing.T) {
@@ -1040,6 +1201,37 @@ func TestConsole_RepeatRates(t *testing.T) {
 	}
 }
 
+// TestConsole_RepeatRates_SkippedIterationsAreClean is a regression: the rate
+// line counted only StatusPassed, while the fold that decides the verdict and
+// the flake rate every machine format prints both count a skipped iteration as
+// clean. So a scenario an OS gate skipped every time reported "0/5 passed" — in
+// green, next to a summary saying zero failed — and a repeat that mixed passes
+// with gate skips understated its own rate.
+func TestConsole_RepeatRates_SkippedIterationsAreClean(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite:  "rp",
+		Status: engine.StatusPassed,
+		Scenarios: []engine.ScenarioResult{
+			// Gated out on this OS: it ran nothing, so it has no rate to report.
+			{Name: "windows-only", Status: engine.StatusSkipped, SkipReason: "only on os=windows",
+				Iterations: []engine.Status{engine.StatusSkipped, engine.StatusSkipped}},
+			// A probe that stopped applying partway: the passes and the skips are
+			// both clean, and only the failure is not.
+			{Name: "gate-then-run", Status: engine.StatusFlaky, Iterations: []engine.Status{
+				engine.StatusSkipped, engine.StatusPassed, engine.StatusFailed,
+			}},
+		},
+	}
+	out := render(t, FormatConsole, res)
+	if strings.Contains(out, "windows-only") {
+		t.Errorf("a scenario skipped on every iteration has no rate to report:\n%s", out)
+	}
+	if !strings.Contains(out, "REPEAT: gate-then-run: 2/3 passed") {
+		t.Errorf("rate line does not count a skipped iteration as clean:\n%s", out)
+	}
+}
+
 // TestRepeatFlaky_MessageAcrossFormats proves a --repeat flake (Iterations set,
 // zero retry Attempts) reports its flake RATE — not a "0 attempts" retry phrase
 // — in every machine format, so a partial-failure repeat reads correctly in
@@ -1064,6 +1256,7 @@ func TestRepeatFlaky_MessageAcrossFormats(t *testing.T) {
 		{"junit", FormatJUnit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var b strings.Builder
 			if err := Render(&b, tc.format, res); err != nil {
 				t.Fatalf("render: %v", err)

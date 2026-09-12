@@ -4,8 +4,6 @@ package ptyrun
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"math"
 	"os"
 	"os/exec"
@@ -13,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
@@ -54,7 +53,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	}
 	master, tty, err := OpenTerminal(rows, cols)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+		return nil, nil, diag.CommandNotStarted.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	// releaseTTY drops atago's own slave handle. It is deferred as a backstop and
 	// called explicitly at the points below, so it has to tolerate both.
@@ -77,7 +76,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// for the drain would hang instead of surfacing the start failure.
 		releaseTTY()
 		term.waitDrain(func() { _ = master.Close() }, 0)
-		return nil, nil, fmt.Errorf("pty: start %q: %w", p.Command, err)
+		return nil, nil, diag.CommandNotStarted.Errorf("pty: start %q: %w", p.Command, err)
 	}
 	// atago's slave handle deliberately stays open until the child has been
 	// reaped (driveSession's finish calls releaseTTY). Handing the terminal to
@@ -92,7 +91,11 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// succeeding, so liveness must come from Wait itself. The buffered channel
 	// lets the reaper deliver the code even when a kill path drains it later.
 	exitCh := make(chan int, 1)
-	go func() { exitCh <- waitExitCode(cmd.Wait()) }()
+	// The exit code goes through the cmd runner's shared mapping, so a signaled
+	// child reports 128+signal here exactly as it does through a run: step. The
+	// abort paths (session budget, parent cancel) resolve to -1 before this value
+	// is ever consumed, which is what keeps a timeout kill from looking like 137.
+	go func() { exitCh <- runnercmd.ExitCode(cmd.Wait()) }()
 
 	proc := ptyProcess{
 		rw:    master,
@@ -108,7 +111,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 		// would from a real window change (#379).
 		resize: func(rows, cols int) error {
 			if rows < 1 || cols < 1 || rows > math.MaxUint16 || cols > math.MaxUint16 {
-				return fmt.Errorf("size %dx%d is out of range for a terminal", rows, cols)
+				return diag.PTYFailed.Errorf("size %dx%d is out of range for a terminal", rows, cols)
 			}
 			return setTerminalSize(master, uint16(rows), uint16(cols))
 		},
@@ -192,18 +195,4 @@ func adoptMasterReads(master *os.File) error {
 		return ctlErr
 	}
 	return setErr
-}
-
-// waitExitCode maps a cmd.Wait() error to the observed exit code, mirroring the
-// cmd runner: nil is a clean 0, an ExitError carries the process's own code, and
-// any other failure to reap is -1.
-func waitExitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		return exitErr.ExitCode()
-	}
-	return -1
 }

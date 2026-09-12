@@ -3,9 +3,9 @@ package engine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	grpcrunner "github.com/nao1215/atago/internal/runner/grpc"
 	"github.com/nao1215/atago/internal/security"
@@ -25,7 +25,7 @@ func (e *Engine) runGRPC(ctx context.Context, g *spec.GRPC, st *store.Store, rc 
 	if g.JSON != nil {
 		body, err = json.Marshal(g.JSON)
 		if err != nil {
-			return nil, fmt.Errorf("encoding grpc request body: %w", err)
+			return nil, diag.PayloadFailed.Errorf("encoding grpc request body: %w", err)
 		}
 	}
 	return conn.Invoke(ctx, g.Method, g.Header, body)

@@ -18,12 +18,13 @@ suite:
   name: stdin sources
 
 scenarios:
+  # `sort` rather than `cat`: it reads stdin and ships with Windows too, so
+  # these two scenarios are the same demonstration on every OS. A single line
+  # comes back unchanged, and the `equals` matcher folds the CRLF Windows adds.
   - name: inline text is fed to stdin verbatim
-    skip:
-      os: windows
     steps:
       - run:
-          command: cat
+          command: sort
           stdin: "hello from stdin"
       - assert:
           exit_code: 0
@@ -31,8 +32,6 @@ scenarios:
             equals: hello from stdin
 
   - name: stdin from a workdir file
-    skip:
-      os: windows
     steps:
       # Fixtures write the input; stdin: {file: ...} pipes it in. The path is
       # ${name}-expanded and confined to the scenario workdir.

@@ -40,6 +40,11 @@ runners:
 
 defaults:
   scenario:
+    # Every scenario here drives minio. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: minio --version
     env:
       MINIO_ROOT_USER: atago
       MINIO_ROOT_PASSWORD: atago-secret-key

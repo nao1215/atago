@@ -1,0 +1,235 @@
+version: "1"
+
+suite:
+  name: asdf (which version this directory gets)
+  description: |
+    The other half of [asdf](https://asdf-vm.com/): once a plugin has installed
+    a few versions, which one a command actually runs. The rules are a file —
+    `.tool-versions` — read from the current directory upwards, with the one in
+    the home directory as the fallback, and shims on PATH doing the dispatch.
+
+    Every scenario builds its own plugin and installs two versions of a program
+    that prints which one it is, so "the directory decided" is asserted by
+    running the program rather than by reading a report about it.
+
+defaults:
+  scenario:
+    only:
+      command: command -v asdf
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: global writes the file in the home directory and local writes one here
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0 2.0.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin' && cd .. && asdf plugin add mytool ${workdir}/myplugin && asdf install mytool 1.0.0 && asdf install mytool 2.0.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: asdf current mytool
+      - assert:
+          # Nothing chosen yet: 126, and the message names the three commands
+          # that would choose one.
+          exit_code: 126
+          stdout:
+            empty: true
+          stderr:
+            contains: 'No version is set. Run "asdf <global|shell|local> mytool <version>"'
+      - run:
+          command: asdf global mytool 1.0.0
+      - assert:
+          # The global choice is a file in the home directory, in the same format
+          # as the one a repository carries.
+          exit_code: 0
+          changes:
+            created: [.atago-home/.tool-versions]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .atago-home/.tool-versions
+            equals: |
+              mytool 1.0.0
+      - run:
+          command: asdf local mytool 2.0.0
+      - assert:
+          # And the local choice is the same file, here.
+          exit_code: 0
+          changes:
+            created: [.tool-versions]
+            modified: []
+            deleted: []
+      - run:
+          command: asdf current mytool
+      - assert:
+          # The report names the file the answer came from, which is the only
+          # way to tell two identical-looking version numbers apart.
+          exit_code: 0
+          stdout:
+            matches: "mytool\\s+2\\.0\\.0\\s+.*/\\.tool-versions"
+
+  - name: the shim runs whatever the directory says, with PATH never changing
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0 2.0.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin' && cd .. && asdf plugin add mytool ${workdir}/myplugin && asdf install mytool 1.0.0 && asdf install mytool 2.0.0 && asdf global mytool 1.0.0
+      - assert:
+          exit_code: 0
+      - assert:
+          # Installing generates a shim named after every executable the plugin
+          # laid down, and that is the only thing that ever goes on PATH.
+          file:
+            path: .atago-home/.asdf/shims/mytool
+            executable: true
+      - run:
+          shell: true
+          command: PATH="${workdir}/.atago-home/.asdf/shims:$PATH" mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              mytool 1.0.0
+      - run:
+          command: asdf local mytool 2.0.0
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: PATH="${workdir}/.atago-home/.asdf/shims:$PATH" mytool
+      - assert:
+          # Same command, same PATH, different program — the file in the
+          # directory is what changed.
+          exit_code: 0
+          stdout:
+            equals: |
+              mytool 2.0.0
+      - run:
+          shell: true
+          command: PATH="${workdir}/.atago-home/.asdf/shims:$PATH" ASDF_MYTOOL_VERSION=1.0.0 mytool
+      - assert:
+          # And an environment variable named after the tool outranks the file,
+          # which is how one command runs under another version without editing
+          # anything.
+          exit_code: 0
+          stdout:
+            equals: |
+              mytool 1.0.0
+
+  - name: exec and which agree, and a missing version explains itself
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0 2.0.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin' && cd .. && asdf plugin add mytool ${workdir}/myplugin && asdf install mytool 1.0.0 && asdf install mytool 2.0.0 && asdf local mytool 2.0.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: asdf which mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "/\\.asdf/installs/mytool/2\\.0\\.0/bin/mytool\\n$"
+      - run:
+          command: asdf where mytool
+      - assert:
+          # where is the directory, which is the answer to "what do I add to a
+          # build script", and it agrees with which.
+          exit_code: 0
+          stdout:
+            matches: "/\\.asdf/installs/mytool/2\\.0\\.0\\n$"
+      - run:
+          command: asdf exec mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              mytool 2.0.0
+      - run:
+          command: asdf uninstall mytool 2.0.0
+      - assert:
+          # Removing the version the directory selects leaves the selection
+          # pointing at nothing.
+          exit_code: 0
+      - assert:
+          dir:
+            path: .atago-home/.asdf/installs/mytool/2.0.0
+            exists: false
+      - run:
+          shell: true
+          command: PATH="${workdir}/.atago-home/.asdf/shims:$PATH" mytool
+      - assert:
+          # And the shim's refusal is the good kind: it quotes the exact command
+          # that fixes it and the exact file that asked for the missing version.
+          exit_code: 126
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "No preset version installed for command mytool"
+              - "asdf install mytool 2.0.0"
+            matches: "/\\.tool-versions"

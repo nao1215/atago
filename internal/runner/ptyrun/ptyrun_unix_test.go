@@ -161,7 +161,7 @@ func TestWaitDrain_ClosingTheMasterEndsTheDrain(t *testing.T) {
 	// ends on the closed descriptor and would prove nothing. Seeing the written
 	// bytes land in the transcript means the goroutine consumed them and went
 	// back for more.
-	if _, werr := tty.Write([]byte("parked\n")); werr != nil {
+	if _, werr := tty.WriteString("parked\n"); werr != nil {
 		t.Fatalf("write to the terminal: %v", werr)
 	}
 	deadline := time.Now().Add(10 * time.Second)
@@ -243,7 +243,7 @@ func TestOpenTerminal_PairsTheMasterWithItsOwnSlave(t *testing.T) {
 		if err != nil {
 			t.Fatalf("iteration %d: OpenTerminal: %v", i, err)
 		}
-		if _, werr := tty.Write([]byte("atago\n")); werr != nil {
+		if _, werr := tty.WriteString("atago\n"); werr != nil {
 			t.Fatalf("iteration %d: write to the terminal: %v", i, werr)
 		}
 		// The read has to be bounded, because the failure this test exists for

@@ -6,6 +6,7 @@
   - [the binary reports its version](#scenario-the-binary-reports-its-version)
   - [a binary upload round-trips byte-for-byte](#scenario-a-binary-upload-round-trips-byte-for-byte)
   - [a browser-style multipart upload is accepted too](#scenario-a-browser-style-multipart-upload-is-accepted-too)
+
 ## transfer.sh (self-hosted file sharing)
 [transfer.sh](https://github.com/dutchcoders/transfer.sh) takes a file and
 gives you a URL to fetch it back from. The only guarantee that matters is
@@ -21,7 +22,9 @@ The browser-style multipart upload path is exercised as well, since that is
 how a file arrives from a web form rather than from `curl`.
 
 Source: `test/e2e/thirdparty/transfersh/transfersh.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the binary reports its version
+_only when `command -v transfer.sh` succeeds_
 #### When
 ```shell
 transfer.sh version
@@ -29,17 +32,20 @@ transfer.sh version
 #### Then
 - exit code is `0`
 - stdout contains `transfer.sh`
+
 ### Scenario: a binary upload round-trips byte-for-byte
+_only when `command -v transfer.sh` succeeds_
 #### Given
 - Background service `transfersh` is started: `transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18210`.
 - Fixture file `storage/.keep` is created.
 - Fixture file `tmp/.keep` is created.
 - Fixture file `pixel.png` is created.
+
 #### When
 ```shell
-# HTTP PUT /pixel.png
+# HTTP PUT /pixel.png via share
 # capture ${share_url} from the response body
-# HTTP GET ${share_url}
+# HTTP GET ${share_url} via share
 cmp pixel.png downloaded.png
 ```
 #### Then
@@ -51,14 +57,18 @@ cmp pixel.png downloaded.png
   - image `downloaded.png` is `png`, width 1, height 1
 - after `cmp pixel.png downloaded.png`:
   - exit code is `0`
+
 #### Generated artifacts
 - `downloaded.png`
+
 ### Scenario: a browser-style multipart upload is accepted too
+_only when `command -v transfer.sh` succeeds_
 #### Given
 - Background service `transfersh` is started: `transfer.sh --provider local --basedir storage --temp-path tmp --listener 127.0.0.1:18211`.
 - Fixture file `storage/.keep` is created.
 - Fixture file `tmp/.keep` is created.
 - Fixture file `notes.txt` is created.
+
 #### Inputs
 _Fixture `notes.txt`:_
 ```text
@@ -66,10 +76,10 @@ shared through a multipart form
 ```
 #### When
 ```shell
-# HTTP POST /
+# HTTP POST / via share2
 # capture ${share_url} from the response body
-# HTTP GET ${share_url}
-# HTTP GET /no-such-token/notes.txt
+# HTTP GET ${share_url} via share2
+# HTTP GET /no-such-token/notes.txt via share2
 ```
 #### Then
 - after `HTTP POST /`:

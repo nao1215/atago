@@ -62,6 +62,107 @@ func suggestScalarMatcher(msg string) string {
 	return fmt.Sprintf("%s\nhint: %s must set a matcher mapping, e.g. %s: {contains: \"...\"} or %s: {equals: \"...\"}", msg, t, t, t)
 }
 
+// collectionIntoScalarRe matches goccy's decode error for a list or a mapping
+// written where the model holds a single value. The message names the Go type
+// and the OUTERMOST struct field ("Spec.Scenarios"), never the key the author
+// wrote, so on its own it points at the wrong place.
+var collectionIntoScalarRe = regexp.MustCompile(`cannot unmarshal (\[\]interface \{\}|map\[string\]interface \{\}) into Go struct field \S+ of type (\S+)`)
+
+// gutterRe strips the excerpt's line gutter ("  10 | " / "> 11 | ") so the YAML
+// on that line can be read.
+var gutterRe = regexp.MustCompile(`^(>?\s*\d+ \| )`)
+
+// blockKeyRe matches a mapping key that opens a block (no value on its line),
+// which is the key a following sequence or mapping belongs to.
+var blockKeyRe = regexp.MustCompile(`^(\s*)([A-Za-z_][A-Za-z0-9_-]*):\s*$`)
+
+// flowKeyRe matches a mapping key whose value opens a flow collection on the
+// same line (`matches: ["a", "b"]`).
+var flowKeyRe = regexp.MustCompile(`([A-Za-z_][A-Za-z0-9_-]*):\s*[\[{]`)
+
+// suggestCollectionShape appends a hint when a list or a mapping was written
+// where one value belongs — `matches: [a, b]` for a key that takes one pattern,
+// or a nested mapping under a key that takes a string. The decoder's own message
+// names a Go type and the outermost struct field ("Spec.Scenarios of type
+// string"), so it tells the author neither which key is wrong nor what shape it
+// wants; the excerpt already points at the right line, and this reads the key
+// off it.
+func suggestCollectionShape(msg string) string {
+	m := collectionIntoScalarRe.FindStringSubmatch(msg)
+	if m == nil {
+		return msg
+	}
+	key, ok := keyAtMarker(msg)
+	if !ok {
+		return msg
+	}
+	written := "a list"
+	if strings.HasPrefix(m[1], "map[") {
+		written = "a mapping"
+	}
+	hint := fmt.Sprintf("%s\nhint: %q takes %s, not %s", msg, key, singleValuePhrase(m[2]), written)
+	// A list of patterns is the common shape of this mistake, and the substring
+	// matchers next to it are the ones that do take a list — so say which is
+	// which rather than leaving the author to guess that one key differs.
+	if written == "a list" && (key == "matches" || key == "not_matches") {
+		hint += "; write one assert per pattern (the substring matchers \"contains\" and \"not_contains\" are the ones that take a list)"
+	}
+	return hint
+}
+
+// singleValuePhrase renders the Go type the decoder wanted as something a spec
+// author recognizes.
+func singleValuePhrase(goType string) string {
+	switch goType {
+	case "string":
+		return "a single value"
+	case "int", "int64", "uint", "uint64", "float64":
+		return "a single number"
+	case "bool":
+		return "true or false"
+	default:
+		return "a single value"
+	}
+}
+
+// keyAtMarker reads the spec key the error's excerpt points at: the key on the
+// marked line when the collection was written in flow style, and otherwise the
+// nearest block key above it that opens the collection.
+func keyAtMarker(msg string) (string, bool) {
+	lines := strings.Split(msg, "\n")
+	marked := -1
+	for i, l := range lines {
+		if strings.HasPrefix(l, ">") && gutterRe.MatchString(l) {
+			marked = i
+			break
+		}
+	}
+	if marked < 0 {
+		return "", false
+	}
+	content := gutterRe.ReplaceAllString(lines[marked], "")
+	if m := flowKeyRe.FindAllStringSubmatch(content, -1); m != nil {
+		// The innermost flow key on the line is the one whose value the caret
+		// sits in: `- assert: {stdout: {matches: [...]}}`.
+		return m[len(m)-1][1], true
+	}
+	markedIndent := len(content) - len(strings.TrimLeft(content, " "))
+	for i := marked - 1; i >= 0; i-- {
+		if !gutterRe.MatchString(lines[i]) {
+			continue
+		}
+		above := gutterRe.ReplaceAllString(lines[i], "")
+		km := blockKeyRe.FindStringSubmatch(above)
+		if km == nil {
+			continue
+		}
+		if len(km[1]) < markedIndent {
+			return km[2], true
+		}
+	}
+	return "", false
+}
+
 // isKnownField reports whether name is a field somewhere in the spec model.
 func isKnownField(name string) bool {
 	return slices.Contains(fieldVocabulary(), strings.ToLower(name))

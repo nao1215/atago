@@ -98,10 +98,10 @@ func TestResolve_RelativeRoot(t *testing.T) {
 // path that is merely absent must not become an error — `exists: false` asks
 // exactly that question.
 func TestResolve_AncestorSymlinkMayNotEscapeTheRoot(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink creation is not reliably available on Windows CI")
 	}
-	t.Parallel()
 	root := t.TempDir()
 	outside := t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
@@ -225,12 +225,12 @@ func TestResolve_RootBehindASymlink(t *testing.T) {
 	}
 	t.Parallel()
 	base := t.TempDir()
-	real := filepath.Join(base, "real")
-	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o750); err != nil {
+	target := filepath.Join(base, "target")
+	if err := os.MkdirAll(filepath.Join(target, "sub"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	alias := filepath.Join(base, "alias")
-	if err := os.Symlink("real", alias); err != nil {
+	if err := os.Symlink("target", alias); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ResolveWorkdirPath("assert.file.path", alias, "sub/out.txt"); err != nil {

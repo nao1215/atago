@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
 	"github.com/nao1215/markdown"
@@ -89,16 +90,44 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	// byte-identical across platforms (Windows filepath.Clean uses backslashes).
 	md.PlainTextf("Source: `%s`", filepath.ToSlash(src.Path))
 
+	// The two spec-level declarations that are guarantees rather than steps: the
+	// hosts a suite is confined to, and the values masked in every output.
+	// explain and the manifest both report them; the published doc said nothing,
+	// so a reader could not tell a suite confined to one host from one that talks
+	// anywhere. An unrestricted policy and an empty secrets list are the absence
+	// of a guarantee, so they stay silent rather than adding a line per suite.
+	if s.Permissions != nil && s.Permissions.Network != nil && len(s.Permissions.Network.Allow) > 0 {
+		md.PlainTextf("Network policy: egress is allowed only to %s.", codeList(spec.StringList(s.Permissions.Network.Allow)))
+	}
+	if len(s.Secrets) > 0 {
+		md.PlainTextf("Secrets declared: %s.", codeList(spec.StringList(s.Secrets)))
+	}
+
+	// The suite lifecycle is part of the documented behavior: setup runs once
+	// before any scenario and teardown always runs after the last, and explain
+	// and the manifest already describe both — the published doc was the one
+	// summary that hid the bootstrap and the cleanup entirely, while rendering
+	// a scenario's teardown for the same always-runs reason.
+	noExpand := func(s string) string { return s }
+	if cmds := narrative(s.Suite.Setup, noExpand, s.Runners); len(cmds) > 0 {
+		md.H3("Suite setup (runs once before any scenario)")
+		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+	}
+	if cmds := narrative(s.Suite.Teardown, noExpand, s.Runners); len(cmds) > 0 {
+		md.H3("Suite teardown (always runs after the last scenario)")
+		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+	}
+
 	// Golden files (snapshots, image baselines) are resolved relative to the spec
 	// file's directory, so the doc can inline/embed the committed expected result
 	// (#67). outputDir anchors relative links to embedded images.
 	specDir := filepath.Dir(src.Path)
 	for i := range s.Scenarios {
-		writeScenario(md, &s.Scenarios[i], specDir, outputDir)
+		writeScenario(md, &s.Scenarios[i], specDir, outputDir, s.Runners)
 	}
 }
 
-func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string) {
+func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string, runners map[string]spec.Runner) {
 	md.H3f("Scenario: %s", sc.Name)
 	writeDescription(md, sc.Description)
 	if meta := scenarioMeta(sc); meta != "" {
@@ -107,7 +136,11 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	// A matrix instance's name already shows the row's concrete values; render
 	// its commands and assertions with the same values so the reader sees
-	// `git checkout v9.9.9`, not the template's ${ref}.
+	// `git checkout v9.9.9`, not the template's ${ref}. The substitution goes
+	// through the shared walker, so doc, explain, and manifest expand the same
+	// fields — they did not, and explain and manifest printed the template while
+	// this page printed the values.
+	sc = spec.ExpandScenarioRow(sc)
 	expand := matrixExpander(sc)
 
 	if given := givenBullets(sc, expand); len(given) > 0 {
@@ -120,7 +153,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 		writePreviews(md, inputs)
 	}
 
-	if cmds := commands(sc.Steps, expand); len(cmds) > 0 {
+	if cmds := commands(sc.Steps, expand, runners); len(cmds) > 0 {
 		md.H4("When")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
 	}
@@ -129,7 +162,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	// Teardown always runs — pass, fail, error, or interrupt — so document the
 	// cleanup a scenario performs against external systems.
-	if td := commands(sc.Teardown, expand); len(td) > 0 {
+	if td := narrative(sc.Teardown, expand, runners); len(td) > 0 {
 		md.H4("Finally (teardown, always runs)")
 		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(td, "\n"))
 	}
@@ -143,6 +176,35 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 		md.H4("Generated artifacts")
 		md.BulletList(gen...)
 	}
+}
+
+// retryBullet renders a step's retry policy as a Given bullet, or "" for a step
+// that does not retry. It reads the retry through the step's own kind so run and
+// http — the two kinds that share the retry shape — are described identically.
+func retryBullet(step *spec.Step) string {
+	var r *spec.Retry
+	switch step.Kind() {
+	case spec.StepRun:
+		r = step.Run.Retry
+	case spec.StepHTTP:
+		r = step.HTTP.Retry
+	case spec.StepFixture, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepAssert,
+		spec.StepStore, spec.StepService, spec.StepPTY, spec.StepSignal, spec.StepMockServer:
+		// No retry shape: run and http are the only kinds that carry one.
+	}
+	if r == nil {
+		return ""
+	}
+	desc := fmt.Sprintf("The step is retried up to %s", plural.Count(r.Times, "time", "times"))
+	if r.Interval != "" {
+		desc += " every " + r.Interval
+	}
+	if r.Until != nil {
+		if until := describeAsserts(r.Until); len(until) > 0 {
+			desc += " until " + strings.Join(until, " and ")
+		}
+	}
+	return desc + "."
 }
 
 // matrixExpander returns a display-only ${name} expander seeded with the
@@ -287,6 +349,12 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 	}
 	for i := range sc.Steps {
 		step := &sc.Steps[i]
+		// A retry decides how many times the step's side effects happen, so the
+		// published contract has to state it — the same reason `deterministic:`
+		// is documented. run and http share the retry shape and this bullet.
+		if note := retryBullet(step); note != "" {
+			out = append(out, note)
+		}
 		switch step.Kind() {
 		case spec.StepFixture:
 			out = append(out, fmt.Sprintf("Fixture file `%s` is created.", step.Fixture.File))
@@ -307,6 +375,12 @@ func givenBullets(sc *spec.Scenario, expand func(string) string) []string {
 			if step.PTY.SandboxHomeEnabled() {
 				out = append(out, sandboxHomeBullet)
 			}
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepAssert, spec.StepStore, spec.StepSignal:
+			// No environment of their own to declare: they act through a runner
+			// the Runners section documents, or they only read the result.
+		case spec.StepService, spec.StepMockServer:
+			// Suite-level only (ATG-2106). A scenario's own services are rendered
+			// above, from sc.Services.
 		}
 	}
 	return out
@@ -330,25 +404,70 @@ func clearedEnvBullet(passEnv []string) string {
 // just run steps, so HTTP/query/gRPC/CDP interactions are documented too (#41),
 // and store steps appear as comments so a later ${name} reference is explained
 // where it is born instead of appearing out of nowhere.
-func commands(steps []spec.Step, expand func(string) string) []string {
+func commands(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner) []string {
+	return renderSteps(steps, expand, runners, commandLine)
+}
+
+// narrative renders a block that documents a step sequence outside the
+// Given/When/Then split: a scenario's teardown and the suite lifecycle. Those
+// have no Given or Then of their own, so a fixture written or an assertion made
+// there has nowhere else to appear — and rendering them through `commands`
+// dropped both, which hid a documented cleanup guarantee and made a
+// fixture-only suite.setup produce no block at all.
+func narrative(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner) []string {
+	return renderSteps(steps, expand, runners, narrativeLine)
+}
+
+// renderSteps is the shared walk behind commands and narrative: same loop, one
+// line per step, differing only in which renderer decides what a step says.
+func renderSteps(steps []spec.Step, expand func(string) string, runners map[string]spec.Runner,
+	line func(*spec.Step, func(string) string, map[string]spec.Runner) (string, bool)) []string {
 	var out []string
 	for i := range steps {
-		if line, ok := commandLine(&steps[i], expand); ok {
-			out = append(out, line)
+		if l, ok := line(&steps[i], expand, runners); ok {
+			out = append(out, l)
 		}
 	}
 	return out
 }
 
+// narrativeLine renders one step of a teardown or suite lifecycle block: every
+// command line, plus the fixtures and assertions those blocks have no Given or
+// Then to carry. Both render as comments, like every other non-pasteable line.
+func narrativeLine(step *spec.Step, expand func(string) string, runners map[string]spec.Runner) (string, bool) {
+	switch step.Kind() {
+	case spec.StepFixture:
+		return "# write fixture " + expand(step.Fixture.File), true
+	case spec.StepAssert:
+		if desc := describeAsserts(step.Assert); len(desc) > 0 {
+			return "# expect " + expand(strings.Join(desc, " and ")), true
+		}
+		return "", false
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP,
+		spec.StepStore, spec.StepService, spec.StepPTY, spec.StepSignal, spec.StepMockServer:
+		// commandLine owns the phrasing of every acting kind, so a lifecycle block
+		// reads the way a scenario's When does.
+	}
+	return commandLine(step, expand, runners)
+}
+
 // commandLine renders one step's "When" line; ok is false for a step kind that
 // contributes nothing (fixtures, asserts).
-func commandLine(step *spec.Step, expand func(string) string) (string, bool) {
+func commandLine(step *spec.Step, expand func(string) string, runners map[string]spec.Runner) (string, bool) {
 	switch step.Kind() {
 	case spec.StepRun:
+		// A remote command is a comment like every other non-local step: it is
+		// not something a reader can paste into their own shell, and printing
+		// it bare made an ssh run indistinguishable from one that ran here.
+		if host := spec.RunHost(step.Run, runners); host != "" {
+			return fmt.Sprintf("# %s: %s", host, expand(step.Run.Command)), true
+		}
 		return expand(step.Run.Command), true
 	case spec.StepHTTP:
 		if step.HTTP != nil {
-			return fmt.Sprintf("# HTTP %s %s", step.HTTP.Method, expand(step.HTTP.Path)), true
+			// Name the runner like every other runner-backed kind: without it
+			// two requests to different hosts render as the same line.
+			return fmt.Sprintf("# HTTP %s %s%s", step.HTTP.Method, expand(step.HTTP.Path), spec.ViaRunner(step.HTTP.Runner)), true
 		}
 	case spec.StepQuery:
 		if step.Query != nil {
@@ -362,6 +481,18 @@ func commandLine(step *spec.Step, expand func(string) string) (string, bool) {
 		if step.PTY != nil {
 			return fmt.Sprintf("# interactive (pty): %s", expand(step.PTY.Command)), true
 		}
+	case spec.StepService:
+		// Suite-only kinds (the loader rejects them elsewhere): a comment like
+		// every other non-pasteable step, so the suite lifecycle block reads
+		// the way a scenario's When does.
+		if step.Service != nil {
+			return fmt.Sprintf("# start service %s: %s", step.Service.Name, expand(step.Service.Command)), true
+		}
+	case spec.StepMockServer:
+		if step.MockServer != nil {
+			return fmt.Sprintf("# start mock server %s (%s)", step.MockServer.Name,
+				plural.Count(len(step.MockServer.Routes), "route", "routes")), true
+		}
 	case spec.StepCDP:
 		if step.CDP != nil {
 			return "# CDP via " + step.CDP.Runner + ": " + cdpActions(step.CDP), true
@@ -374,6 +505,9 @@ func commandLine(step *spec.Step, expand func(string) string) (string, bool) {
 		if step.Signal != nil {
 			return signalLine(step.Signal, expand), true
 		}
+	case spec.StepFixture, spec.StepAssert:
+		// Not commands. narrativeLine renders these for the blocks that have no
+		// Given or Then section to carry them.
 	}
 	return "", false
 }
@@ -445,16 +579,20 @@ type thenGroup struct {
 // or grouped flat ones.
 func isActionStep(kind spec.StepKind) bool {
 	switch kind {
-	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal:
+	case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepSignal, spec.StepPTY:
 		return true
-	default:
+	case spec.StepFixture, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepMockServer:
+		// Not an action an assertion reads against: a fixture and a store observe
+		// nothing, an assert IS the reading, and the two suite-level kinds never
+		// appear among a scenario's steps.
 		return false
 	}
+	return false
 }
 
 // thenGroups walks the steps and groups each assert under the most recent
-// action step (run/http/query/grpc/cdp). Fixture and store steps never break a
-// group: they observe nothing.
+// action step (isActionStep is the one definition of that set). Fixture and
+// store steps never break a group: they observe nothing.
 func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 	var groups []thenGroup
 	actionIdx, actionLbl := -1, ""
@@ -473,6 +611,14 @@ func thenGroups(sc *spec.Scenario, expand func(string) string) []thenGroup {
 			for _, b := range describeAsserts(step.Assert) {
 				g.bullets = append(g.bullets, expand(b))
 			}
+		case spec.StepFixture, spec.StepStore:
+			// Never break a group: they observe nothing, so the assertions after
+			// them still read against the same action.
+		case spec.StepService, spec.StepMockServer:
+			// Suite-level only (ATG-2106).
+		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// Unreachable: isActionStep claimed these above and continued. Listed
+			// so a new kind has to be classified here as well as there.
 		}
 	}
 	return groups
@@ -494,9 +640,15 @@ func actionLabel(step *spec.Step, expand func(string) string) string {
 		return "the browser flow"
 	case spec.StepSignal:
 		return "SIG" + spec.NormalizeSignalName(step.Signal.Signal) + " to " + expand(step.Signal.Service)
-	default:
+	case spec.StepPTY:
+		// Match the "When" line's phrasing so the group header names the same
+		// thing the code block shows.
+		return "interactive (pty): " + expand(step.PTY.Command)
+	case spec.StepFixture, spec.StepAssert, spec.StepStore, spec.StepService, spec.StepMockServer:
+		// Not actions (isActionStep says so), so they never label a Then group.
 		return ""
 	}
+	return ""
 }
 
 // writeThen renders the Then section. A scenario with at most one action keeps
@@ -531,7 +683,7 @@ func writeThen(md *markdown.Markdown, sc *spec.Scenario, expand func(string) str
 			}
 			continue
 		}
-		fmt.Fprintf(&b, "- after %s:\n", markdown.Code(g.action))
+		fmt.Fprintf(&b, "- after %s:\n", inlineCode(g.action))
 		for _, bl := range g.bullets {
 			fmt.Fprintf(&b, "  - %s\n", bl)
 		}
@@ -546,7 +698,7 @@ func generatedArtifacts(sc *spec.Scenario) []string {
 	paths := spec.GeneratedArtifacts(sc)
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
-		out = append(out, markdown.Code(p))
+		out = append(out, inlineCode(p))
 	}
 	return out
 }

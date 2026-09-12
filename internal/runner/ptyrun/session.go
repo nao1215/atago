@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/runner"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -76,7 +78,7 @@ type ptyProcess struct {
 func driveSession(ctx context.Context, p *spec.PTY, proc ptyProcess) (*runner.Result, *ExpectFailure, error) {
 	expects, err := compileSession(p.Session)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pty: invalid expect regexp: %w", err)
+		return nil, nil, diag.InternalError.Errorf("pty: invalid expect regexp: %w", err)
 	}
 
 	budget := sessionTimeout(p)
@@ -150,6 +152,128 @@ type sessionDriver struct {
 	// (any shell prompt) waits for its NEXT occurrence instead of matching the
 	// stale earlier one.
 	matchOffset int
+	// echoes records what each send since the last match transmitted, so an
+	// expect can tell the terminal's echo of its own keystrokes apart from the
+	// program's answer.
+	echoes []echoSpan
+}
+
+// echoSpan is one send's echo: the bytes the terminal would write back, and
+// the transcript position they must occupy to be that echo.
+type echoSpan struct {
+	// at is the transcript length at the moment of the send. The echo, if the
+	// terminal performs one, begins exactly here: the line discipline writes it
+	// synchronously with the write, before the program is scheduled to respond.
+	// Anything appearing later is the program's, however much it resembles what
+	// was sent.
+	at int
+	// echo is what the line discipline writes back: the sent bytes with each LF
+	// rendered as CRLF, which is what ONLCR does on the way out.
+	echo []byte
+	// state is whether the bytes at `at` have been examined yet, and what they
+	// turned out to be.
+	state echoState
+}
+
+// echoState is what is known about one send's echo.
+type echoState int
+
+const (
+	// echoPending means too few bytes have arrived at `at` to tell yet.
+	echoPending echoState = iota
+	// echoConfirmed means the transcript at `at` is exactly the echo.
+	echoConfirmed
+	// echoAbsent means it is not, so the terminal did not echo this send and
+	// nothing about it is discounted.
+	echoAbsent
+)
+
+// EchoOf is what a terminal writes back when its line discipline echoes the
+// bytes a send transmitted.
+//
+// It is exported because the recorder builds its expects by the same rule the
+// driver discounts matches by, and the two agreeing means one definition.
+func EchoOf(sent []byte) []byte {
+	return bytes.ReplaceAll(sent, []byte("\n"), []byte("\r\n"))
+}
+
+// locateEchoes decides, for each send, whether the terminal echoed it —
+// by looking only at the bytes sitting exactly where the write landed.
+//
+// Position is what separates an echo from the program's own output, and it is
+// the only thing that can: the two are identical bytes on the same stream. The
+// line discipline writes its echo synchronously with the write, so it is at the
+// write's offset or it does not exist. Searching further along would find any
+// later occurrence of the same text and call it an echo — which is how a TUI
+// redrawing the `:` it was just sent had its own output discounted, leaving an
+// expect waiting for something already on screen.
+func (d *sessionDriver) locateEchoes(transcript []byte) {
+	for i := range d.echoes {
+		e := &d.echoes[i]
+		if e.state != echoPending || len(e.echo) == 0 {
+			continue
+		}
+		if e.at+len(e.echo) > len(transcript) {
+			// Not enough has arrived to tell; a later poll decides. A prefix
+			// that already disagrees is decided now rather than waited on.
+			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) {
+				e.state = echoAbsent
+			}
+			continue
+		}
+		if bytes.Equal(transcript[e.at:e.at+len(e.echo)], e.echo) {
+			e.state = echoConfirmed
+		} else {
+			e.state = echoAbsent
+		}
+	}
+}
+
+// isEcho reports whether the transcript range [from,to) lies entirely inside
+// the echo of a send this expect has not yet passed.
+//
+// An expect that matches only its own keystrokes has asserted that atago can
+// type, not that the program answered: it passes whether the program is
+// listening, busy, or already dead. atago refuses assertions that cannot fail
+// while loading a spec (ATG2312), and this is the same defect one layer down,
+// reached by the natural way to drive a prompt — send a line, expect a
+// substring of it. The terminal is not lying, since with ECHO on typed input
+// does appear; it is the assertion that means nothing.
+//
+// Only a match wholly inside the echo is rejected. A program that repeats the
+// input itself keeps its copy: cat both echoes through the line discipline and
+// prints the line, and the printed one falls outside the echo span.
+func (d *sessionDriver) isEcho(from, to int) bool {
+	for _, e := range d.echoes {
+		if e.state != echoConfirmed {
+			continue
+		}
+		if from >= e.at && to <= e.at+len(e.echo) {
+			return true
+		}
+	}
+	return false
+}
+
+// findReal returns the first match in tail that is not a send's echo, as an
+// offset pair relative to tail, or nil when there is none yet. base is tail's
+// own offset in the transcript, since the echo spans are absolute.
+func (d *sessionDriver) findReal(re *regexp.Regexp, tail []byte, base int) []int {
+	for at := 0; at <= len(tail); {
+		loc := re.FindIndex(tail[at:])
+		if loc == nil {
+			return nil
+		}
+		from, to := at+loc[0], at+loc[1]
+		if !d.isEcho(base+from, base+to) {
+			return []int{from, to}
+		}
+		// Step past this occurrence and keep looking: the program's own copy
+		// may follow the echo. Advancing by one keeps an empty match from
+		// spinning.
+		at = from + 1
+	}
+	return nil
 }
 
 // finish shapes the session's Result after the child has been reaped.
@@ -181,8 +305,7 @@ func (d *sessionDriver) finish(timedOut bool, code int, ef *ExpectFailure) *sess
 	// alone without racing the exit.
 	rerr := d.term.readError()
 	if rerr != nil {
-		return &sessionOutcome{err: fmt.Errorf(
-			"pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
+		return &sessionOutcome{err: diag.CaptureFailed.Errorf("pty %q: the terminal transcript is incomplete — reading the terminal failed after %d bytes: %w",
 			d.p.Command, len(tr), rerr)}
 	}
 	screenTextStr, screenCells := renderScreenCells(tr, d.p, d.term.snapshotResizes())
@@ -235,7 +358,7 @@ func (d *sessionDriver) failHard(err error) *sessionOutcome {
 // against a killed terminal — mirroring the cmd runner's cancel/timeout split
 // (#30).
 func (d *sessionDriver) canceled(ctx context.Context) *sessionOutcome {
-	return d.failHard(fmt.Errorf("pty %q canceled: %w", d.p.Command, ctx.Err()))
+	return d.failHard(diag.RunInterrupted.Errorf("pty %q canceled: %w", d.p.Command, ctx.Err()))
 }
 
 // waitExpect polls the transcript past the previous match until re matches,
@@ -245,9 +368,10 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 	scannedTo := -1 // transcript length at the last scan; -1 forces one
 	for {
 		if n := d.term.curLen(); n != scannedTo {
+			d.locateEchoes(d.term.snapshot())
 			tail, m := d.term.tailFrom(d.matchOffset)
 			scannedTo = m
-			if loc := re.FindIndex(tail); loc != nil {
+			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 				break
@@ -257,8 +381,9 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 		case <-ctx.Done():
 			// One last check: bytes may have landed in the final poll
 			// window before the deadline fired.
+			d.locateEchoes(d.term.snapshot())
 			tail, _ := d.term.tailFrom(d.matchOffset)
-			if loc := re.FindIndex(tail); loc != nil {
+			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 			}
@@ -388,7 +513,7 @@ func (d *sessionDriver) runExec(ctx context.Context, i int, e *spec.PTYExec) *se
 func (d *sessionDriver) applyResize(i int, r *spec.PTYResize) *sessionOutcome {
 	d.term.markResize(r.Rows, r.Cols)
 	if rerr := d.proc.resize(r.Rows, r.Cols); rerr != nil {
-		return d.failHard(fmt.Errorf("pty %q: session[%d] resize to %dx%d: %w",
+		return d.failHard(diag.PTYFailed.Errorf("pty %q: session[%d] resize to %dx%d: %w",
 			d.p.Command, i, r.Rows, r.Cols, rerr))
 	}
 	return nil
@@ -403,11 +528,10 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// line by line, or as "[200~" typed into a prompt — so refuse here,
 	// where the mistake is (#378).
 	if s.Paste != nil && !d.term.modeEnabled(decsetBracketedPaste) {
-		return d.failHard(fmt.Errorf(
-			"pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
-				"(it never wrote ESC [?2004h, or turned the mode back off). "+
-				"Programs that do not distinguish a paste from typing take a plain send instead; "+
-				"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
+		return d.failHard(diag.TerminalModeMismatch.Errorf("pty %q: session[%d] sends a paste, but the program has not enabled bracketed paste "+
+			"(it never wrote ESC [?2004h, or turned the mode back off). "+
+			"Programs that do not distinguish a paste from typing take a plain send instead; "+
+			"if this one does enable the mode, wait for it with an expect or expect_screen before pasting",
 			d.p.Command, i))
 	}
 	// A mouse event only means something to a program that asked to be
@@ -420,9 +544,18 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// Bytes resolves named keys to their xterm sequences, wraps a paste
 	// in its markers, and keeps the historical rule that an empty
 	// verbatim send transmits EOF (^D).
-	if _, werr := d.term.write(s.Bytes()); werr != nil {
-		return d.failHard(fmt.Errorf("pty: send: %w", werr))
+	sent := s.Bytes()
+	// Where the echo will land has to be read BEFORE the write: the reader
+	// goroutine can append the echoed bytes as soon as the write returns, and
+	// reading the length afterwards then points past them, so the echo would
+	// never be recognized. Taking it first is also what makes the position
+	// meaningful — it is the boundary between what the terminal had already
+	// shown and what this send causes.
+	at := d.term.curLen()
+	if _, werr := d.term.write(sent); werr != nil {
+		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent)})
 	return nil
 }
 
@@ -469,9 +602,13 @@ func parsePositiveDuration(s string) time.Duration {
 }
 
 func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runner.ScreenCell) *assert.CheckResult {
+	// A mid-session screen check needs no run context: the loader rejects snapshot
+	// and trim inside expect_screen, so there is no workdir, spec directory, or
+	// snapshot bookkeeping for this comparison to read.
+	env := assert.Env{} //nolint:exhaustruct_v5 // deliberately empty, per the comment above
 	return assert.Check(&spec.Assert{Screen: &es.ScreenAssert}, &runner.Result{
 		IsPTY:       true,
 		Screen:      screen,
 		ScreenCells: cells,
-	}, assert.Env{})
+	}, env)
 }

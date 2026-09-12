@@ -1,0 +1,248 @@
+version: "1"
+
+suite:
+  name: asdf (the plugin protocol)
+  description: |
+    [asdf](https://asdf-vm.com/) manages versions of any tool through plugins,
+    and a plugin is just a git repository holding a few executables that asdf
+    calls. It keeps its own test suite in Bats; what those tests check is pinned
+    here from outside.
+
+    Nothing is downloaded. Each scenario writes its own plugin — `bin/list-all`,
+    `bin/download`, `bin/install` — commits it in the workdir, and adds it from
+    that path, so the protocol itself is what is under test: which script asdf
+    calls, what it passes in the environment, and what it does with the result,
+    including a plugin that refuses a version.
+
+defaults:
+  scenario:
+    only:
+      command: command -v asdf
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: the version, and a command it does not have
+    steps:
+      - run:
+          command: asdf version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^v[0-9]+\\.[0-9]+\\.[0-9]+"
+      - run:
+          command: asdf nosuchcommand
+      - assert:
+          # asdf resolves an unknown word as a command and then as a plugin,
+          # and says so twice rather than guessing.
+          exit_code: 1
+          stderr:
+            contains:
+              - "Unknown command: `asdf nosuchcommand`"
+              - "No plugin named nosuchcommand"
+
+  - name: a plugin is a repository, added from wherever it lives
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0 1.1.0 2.0.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+            echo "downloaded $ASDF_INSTALL_VERSION" > "$ASDF_DOWNLOAD_PATH/payload"
+          # asdf hands the plugin its paths and the version in the environment;
+          # the plugin does the rest.
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin'
+      - assert:
+          exit_code: 0
+      - run:
+          command: asdf plugin list
+      - assert:
+          # Nothing installed yet, reported on stderr with stdout left empty for
+          # whatever was going to read the list.
+          exit_code: 0
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              No plugins installed
+      - run:
+          command: asdf plugin add mytool ${workdir}/myplugin
+      - assert:
+          exit_code: 0
+      - assert:
+          # The plugin is cloned into the data directory, which lives under the
+          # home asdf was given rather than anywhere near the tool itself.
+          dir:
+            path: .atago-home/.asdf/plugins/mytool/bin
+            contains:
+              - list-all
+              - download
+              - install
+      - run:
+          command: asdf plugin list
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              mytool
+      - run:
+          command: asdf list all mytool
+      - assert:
+          # This output came from the plugin's own list-all: asdf asked it and
+          # printed the answer, one version per line.
+          exit_code: 0
+          stdout:
+            equals: |
+              1.0.0
+              1.1.0
+              2.0.0
+
+  - name: installing runs the plugin and lands a real program
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0 1.1.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+            echo "downloaded $ASDF_INSTALL_VERSION" > "$ASDF_DOWNLOAD_PATH/payload"
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            case "$ASDF_INSTALL_VERSION" in
+              1.0.0|1.1.0) ;;
+              *) echo "mytool: no such version: $ASDF_INSTALL_VERSION" >&2; exit 1 ;;
+            esac
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin' && cd .. && asdf plugin add mytool ${workdir}/myplugin
+      - assert:
+          exit_code: 0
+      - run:
+          command: asdf install mytool 1.1.0
+      - assert:
+          exit_code: 0
+      - assert:
+          # The program the plugin wrote is where asdf told it to write it, and
+          # it is executable.
+          file:
+            path: .atago-home/.asdf/installs/mytool/1.1.0/bin/mytool
+            executable: true
+      - assert:
+          # The download step ran first, into its own directory — and that
+          # directory is gone once the install succeeded. The two halves of the
+          # protocol are separate on purpose, and the intermediate is not kept
+          # unless asked for.
+          dir:
+            path: .atago-home/.asdf/downloads/mytool/1.1.0
+            exists: false
+      - run:
+          command: asdf list mytool
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "  1.1.0\n"
+      - run:
+          command: asdf install mytool 9.9.9
+      - assert:
+          # A plugin that refuses is the whole answer: asdf reports what the
+          # plugin said and fails, rather than deciding for it.
+          exit_code: 1
+          stderr:
+            contains: "mytool: no such version: 9.9.9"
+      - assert:
+          dir:
+            path: .atago-home/.asdf/installs/mytool
+            not_contains: ["9.9.9"]
+      - assert:
+          # And what the plugin downloaded before refusing is kept, which is
+          # what makes a second attempt cheap.
+          file:
+            path: .atago-home/.asdf/downloads/mytool/9.9.9/payload
+            equals: |
+              downloaded 9.9.9
+
+  - name: removing the plugin takes its versions with it
+    steps:
+      - fixture:
+          file: myplugin/bin/list-all
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            echo "1.0.0"
+      - fixture:
+          file: myplugin/bin/download
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_DOWNLOAD_PATH"
+      - fixture:
+          file: myplugin/bin/install
+          mode: "0755"
+          content: |
+            #!/usr/bin/env bash
+            mkdir -p "$ASDF_INSTALL_PATH/bin"
+            printf '#!/bin/sh\necho "mytool %s"\n' "$ASDF_INSTALL_VERSION" > "$ASDF_INSTALL_PATH/bin/mytool"
+            chmod +x "$ASDF_INSTALL_PATH/bin/mytool"
+      - run:
+          shell: true
+          command: cd myplugin && git init -q && git config user.email plugin@example.com && git config user.name 'A Plugin' && git add -A && git commit -q -m 'the plugin' && cd .. && asdf plugin add mytool ${workdir}/myplugin && asdf install mytool 1.0.0
+      - assert:
+          exit_code: 0
+      - run:
+          command: asdf plugin remove mytool
+      - assert:
+          exit_code: 0
+      - assert:
+          dir:
+            path: .atago-home/.asdf/plugins/mytool
+            exists: false
+      - assert:
+          # The installed versions go with the plugin that knew how to build
+          # them, which is the answer to "why is my disk still full".
+          dir:
+            path: .atago-home/.asdf/installs/mytool
+            exists: false
+      - run:
+          command: asdf plugin list
+      - assert:
+          # Pinned as observed: with no plugins left, the listing is a literal
+          # asterisk on stdout — an unexpanded glob — where the same empty state
+          # before any plugin was added is reported as "No plugins installed" on
+          # stderr. Two ways of saying nothing, depending on history.
+          exit_code: 0
+          stdout:
+            equals: |
+              *

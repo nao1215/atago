@@ -10,6 +10,7 @@
   - [store create returns the new store as JSON](#scenario-store-create-returns-the-new-store-as-json)
   - [tuples write and delete against a live store](#scenario-tuples-write-and-delete-against-a-live-store)
   - [store import builds a store, a model, and tuples from one file](#scenario-store-import-builds-a-store-a-model-and-tuples-from-one-file)
+
 ## openfga (fine-grained authorization CLI and server)
 [OpenFGA](https://openfga.dev/) is a relationship-based authorization
 system: the `fga` CLI authors and tests authorization models, and the
@@ -30,6 +31,7 @@ counts-only report, and `store import` building a store, a model, and
 tuples from one file.
 
 Source: `test/e2e/thirdparty/openfga/openfga.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: version prints something sane
 _only when `fga --version` succeeds_
 #### When
@@ -39,12 +41,14 @@ fga --version
 #### Then
 - exit code is `0`
 - stdout contains `fga version`
+
 ### Scenario: model test runs a local store file without a server
 _only when `fga --version` succeeds_
 #### Given
 - Fixture file `tests/fixtures/basic-model.fga` is created.
 - Fixture file `tests/fixtures/basic-tuples.json` is created.
 - Fixture file `tests/fixtures/basic-store.fga.yaml` is created.
+
 #### Inputs
 _Fixture `tests/fixtures/basic-model.fga`:_
 ```text
@@ -100,6 +104,7 @@ fga model test --tests tests/**/*-store.fga.yaml
 - after `fga model test --tests tests/**/*-store.fga.yaml`:
   - exit code is `0`
   - stderr contains `# Test Summary #`
+
 ### Scenario: a store file's references are contained to its directory
 _only when `fga --version` succeeds_
 #### Given
@@ -107,6 +112,7 @@ _only when `fga --version` succeeds_
 - Fixture file `tests/fixtures/basic-tuples.json` is created.
 - Fixture file `tests/fixtures/relative-path/relative-path-store.fga.yaml` is created.
 - Fixture file `tests/fixtures/traversal/traversal-store.fga.yaml` is created.
+
 #### Inputs
 _Fixture `tests/fixtures/basic-model.fga`:_
 ```text
@@ -165,11 +171,13 @@ fga model test --tests tests/fixtures/traversal/traversal-store.fga.yaml
 - after `fga model test --tests tests/fixtures/traversal/traversal-store.fga.yaml`:
   - exit code is `1`
   - stderr contains `is not accessible within`
+
 ### Scenario: the type-count limit fails loudly and a sufficient limit passes
 _only when `fga --version` succeeds_
 #### Given
 - Fixture file `tests/fixtures/many-types-model.fga` is created.
 - Fixture file `tests/fixtures/many-types.fga.yaml` is created.
+
 #### Inputs
 _Fixture `tests/fixtures/many-types-model.fga`:_
 ```text
@@ -223,10 +231,12 @@ fga model test --tests tests/fixtures/many-types.fga.yaml --max-types-per-author
 - after `fga model test --tests tests/fixtures/many-types.fga.yaml --max-types-per-authorization-model 10`:
   - exit code is `0`
   - stderr contains `# Test Summary #`
+
 ### Scenario: store create returns the new store as JSON
 _only when `fga --version && openfga version` succeeds_
 #### Given
 - Background service `openfga` is started: `openfga run --http-addr 127.0.0.1:18230 --grpc-addr 127.0.0.1:18231 --metrics-enabled=false --log-level warn`.
+
 #### When
 ```shell
 fga store create --name "FGA Demo Store" --api-url http://127.0.0.1:18230
@@ -234,6 +244,7 @@ fga store create --name "FGA Demo Store" --api-url http://127.0.0.1:18230
 #### Then
 - exit code is `0`
 - stdout at `$.store.name` equals `FGA Demo Store`; at `$.store.id` matches `/^[A-Z0-9]+$/`
+
 ### Scenario: tuples write and delete against a live store
 _only when `fga --version && openfga version` succeeds_
 #### Given
@@ -241,6 +252,7 @@ _only when `fga --version && openfga version` succeeds_
 - Fixture file `tests/fixtures/basic-model.fga` is created.
 - Fixture file `tests/fixtures/basic-tuples.json` is created.
 - Fixture file `tests/fixtures/basic-tuples.jsonl` is created.
+
 #### Inputs
 _Fixture `tests/fixtures/basic-model.fga`:_
 ```text
@@ -295,6 +307,7 @@ fga tuple write --file=./tests/fixtures/basic-tuples.json --hide-imported-tuples
 - after `fga tuple write --file=./tests/fixtures/basic-tuples.json --hide-imported-tuples --store-id=${store_id} --model-id=${model_id} --api-url http://127.0.0.1:18232`:
   - exit code is `0`
   - stdout at `$.total_count` equals `1`; at `$.successful_count` equals `1`; at `$.failed_count` equals `0`
+
 ### Scenario: store import builds a store, a model, and tuples from one file
 _only when `fga --version && openfga version` succeeds_
 #### Given
@@ -303,6 +316,7 @@ _only when `fga --version && openfga version` succeeds_
 - Fixture file `tests/fixtures/basic-tuples.json` is created.
 - Fixture file `tests/fixtures/basic-store.fga.yaml` is created.
 - Fixture file `tests/fixtures/relative-path/relative-path-store.fga.yaml` is created.
+
 #### Inputs
 _Fixture `tests/fixtures/basic-model.fga`:_
 ```text

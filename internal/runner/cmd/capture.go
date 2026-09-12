@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"errors"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/nao1215/atago/internal/diag"
 )
 
 // captureDrainGrace bounds how long Run waits for a capture pipe to reach EOF
@@ -37,7 +38,7 @@ const earlyEOFMargin = 50 * time.Millisecond
 // os/exec no longer produces for these streams now that atago owns them: the
 // condition and the advice are identical, so captureFailure treats them alike
 // and the message a user sees is unchanged.
-var errDrainDeadline = errors.New("the capture pipe was still open 2s after the command exited")
+var errDrainDeadline = diag.CaptureFailed.Errorf("the capture pipe was still open 2s after the command exited")
 
 // capture owns one of the command's output streams end to end: the pipe handed
 // to the child, the goroutine draining it, and the bytes it collected.

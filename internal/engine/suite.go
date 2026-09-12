@@ -7,6 +7,7 @@ import (
 
 	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/runner"
 	mockrunner "github.com/nao1215/atago/internal/runner/mock"
@@ -76,11 +77,13 @@ func (rt *suiteRuntime) stop() {
 // nothing.
 func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*suiteRuntime, error) {
 	if len(s.Suite.Setup) == 0 && len(s.Suite.Teardown) == 0 && len(s.Suite.Env) == 0 {
+		//nolint:nilnil // A spec with no suite-level blocks needs no runtime; absent is not
+		// an error, and the caller's nil check is what keeps the common case free.
 		return nil, nil
 	}
 	dir, err := os.MkdirTemp("", "atago-suite-")
 	if err != nil {
-		return nil, fmt.Errorf("could not create suite dir: %w", err)
+		return nil, diag.SandboxSetupFailed.Errorf("could not create suite dir: %w", err)
 	}
 	rt := &suiteRuntime{
 		dir:      dir,
@@ -92,11 +95,11 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 	for k, v := range e.builtins {
 		rt.st.Set(k, v)
 	}
-	rt.set("suitedir", dir)
+	rt.set(store.BuiltinSuitedir, dir)
 	// Suite setup reads the same input directories scenarios do (#394).
-	rt.set("specdir", absPath(specDir))
+	rt.set(store.BuiltinSpecdir, absPath(specDir))
 	if fixturesDir != "" {
-		rt.set("fixtures", fixturesDir)
+		rt.set(store.BuiltinFixtures, fixturesDir)
 	}
 	return rt, nil
 }
@@ -108,6 +111,12 @@ func (e *Engine) newSuiteRuntime(s *spec.Spec, specDir, fixturesDir string) (*su
 // The returned bool reports whether every step succeeded.
 func (e *Engine) runSuiteSteps(ctx context.Context, steps []spec.Step, rt *suiteRuntime, rc runConfig, stopOnFailure bool, label string) ([]StepResult, bool) {
 	var out []StepResult
+	// rc is this block's own copy. A suite block is its own snapshot writer —
+	// it belongs to no scenario, and naming the two blocks separately keeps a
+	// clash between them naming both sides — set the same way runScenario names
+	// a scenario, so every Env built below it (asserts and `until` polls alike)
+	// carries it.
+	rc.snapshotWriter = rc.specPath + " / " + label
 	x := &suiteStepper{e: e, rt: rt, rc: rc, label: label}
 	ok := true
 
@@ -171,10 +180,13 @@ func (x *suiteStepper) exec(ctx context.Context, step *spec.Step, i int, sr *Ste
 		return x.execService(ctx, step, sr)
 	case spec.StepMockServer:
 		return x.execMockServer(ctx, step, sr)
-	default:
-		sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
-		return true
+	case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+		// Named rather than defaulted so a new step kind has to answer "is this
+		// allowed at suite level?" instead of inheriting "no" in silence. Each of
+		// these drives or produces the result a scenario owns.
 	}
+	sr.ErrMsg = fmt.Sprintf("%s steps are not allowed at suite level", step.Kind())
+	return true
 }
 
 // execRun runs one suite-level command and folds its retry `until` checks.
@@ -183,7 +195,7 @@ func (x *suiteStepper) execRun(ctx context.Context, step *spec.Step, i int, sr *
 	// typo in suite.setup errors with the explained diagnostic instead of
 	// leaking the literal reference into argv (#243).
 	if msg := runRefGuard(x.rt.st, step.Run, x.rc.runners); msg != "" {
-		sr.ErrMsg = msg
+		sr.ErrMsg = diag.VariableUnresolved.Annotate(msg)
 		return true
 	}
 	run := mergeScenarioEnv(resolvableEnv(x.rt.st, x.rt.env), expandRun(x.rt.st, step.Run), x.rt.st)
@@ -209,21 +221,16 @@ func (x *suiteStepper) execRun(ctx context.Context, step *spec.Step, i int, sr *
 
 // execAssert checks one suite-level assert against the latest run result.
 func (x *suiteStepper) execAssert(step *spec.Step, i int, sr *StepResult) bool {
-	crs := assert.CheckAll(expandAssert(x.rt.st, step.Assert), x.current, assert.Env{
-		Workdir:         x.rt.dir,
-		SpecDir:         x.rc.specDir,
-		UpdateSnapshots: x.e.UpdateSnapshots,
-		Secrets:         x.rc.masker.MaskBytes,
-		Scrub:           x.rc.scrubber.Apply,
-		MockRecords: func(name string) ([]mockrunner.Record, bool) {
-			for _, m := range x.rt.mocks {
-				if m.Name() == name {
-					return m.Records(), true
-				}
+	env := x.e.assertEnv(x.rc, x.rt.dir, x.rc.specDir)
+	env.MockRecords = func(name string) ([]mockrunner.Record, bool) {
+		for _, m := range x.rt.mocks {
+			if m.Name() == name {
+				return m.Records(), true
 			}
-			return nil, false
-		},
-	})
+		}
+		return nil, false
+	}
+	crs := assert.CheckAll(expandAssert(x.rt.st, step.Assert), x.current, env)
 	x.e.recordChecks(x.rc.masker, crs, suiteArtifactScope(x.rc, x.label), i)
 	sr.Checks = crs
 	return !assert.AllOK(crs)
@@ -283,6 +290,8 @@ func (e *Engine) runSuiteTeardown(ctx context.Context, s *spec.Spec, rt *suiteRu
 	if rt == nil || len(s.Suite.Teardown) == 0 {
 		return nil
 	}
+	//nolint:contextcheck // Deliberately not derived from a done ctx, for the same reason
+	// as scenario teardown: suite teardown has to run even after an interrupt.
 	tctx := ctx
 	if ctx.Err() != nil {
 		var cancel context.CancelFunc

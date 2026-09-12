@@ -6,7 +6,9 @@ import "runtime"
 // currentOS is a package var so tests can override it.
 var currentOS = runtime.GOOS
 
-// OS returns the normalized host operating system: linux, darwin, or windows.
+// OS returns the host operating system as runtime.GOOS names it: linux,
+// darwin, windows, or one of the BSDs (freebsd, openbsd, netbsd), which a
+// gate names one at a time rather than as a family.
 func OS() string { return currentOS }
 
 // Matches reports whether the given condition OS equals the host OS. An empty

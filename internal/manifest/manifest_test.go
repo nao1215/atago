@@ -175,8 +175,8 @@ func TestBuild_SecretsNeverExposeValues(t *testing.T) {
 }
 
 // TestBuild_GeneratedArtifactsAcrossKinds keeps the manifest aligned with the
-// shared spec model: image outputs and cdp screenshots are generated artifacts,
-// just like file exists:true (#56).
+// shared spec model: image/pdf outputs, cdp screenshots, and teardown
+// redirects are generated artifacts, just like file exists:true (#56).
 func TestBuild_GeneratedArtifactsAcrossKinds(t *testing.T) {
 	t.Parallel()
 	const src = `
@@ -202,6 +202,14 @@ scenarios:
           actions:
             - navigate: http://localhost:8080
             - screenshot: {path: home.png}
+      - assert:
+          pdf:
+            path: report.pdf
+            min_pages: 1
+    teardown:
+      - run:
+          command: audit
+          stdout_to: logs/audit.log
 `
 	s, err := loader.LoadBytes("gen.atago.yaml", []byte(src))
 	if err != nil {
@@ -209,8 +217,155 @@ scenarios:
 	}
 	doc := Build([]Input{{Spec: s, Path: "gen.atago.yaml"}})
 	got := doc.Specs[0].Scenarios[0].Generates
-	if strings.Join(got, ",") != "thumb.png,out.txt,home.png" {
-		t.Errorf("generates = %v, want [thumb.png out.txt home.png]", got)
+	if strings.Join(got, ",") != "thumb.png,out.txt,home.png,report.pdf,logs/audit.log" {
+		t.Errorf("generates = %v, want [thumb.png out.txt home.png report.pdf logs/audit.log]", got)
+	}
+}
+
+// TestBuild_StepDeclarativeFields is a regression: the manifest's charter is to
+// describe what a spec declares without replaying it, and a run step's reduction
+// dropped cwd, timeout, and the redirect targets while an http step's dropped
+// body_to — so "which steps have no explicit timeout" or "which steps run
+// outside the workdir root" was unanswerable from the document.
+func TestBuild_StepDeclarativeFields(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: fields
+runners:
+  api: {type: http, base_url: "http://127.0.0.1:8080"}
+scenarios:
+  - name: declarative knobs
+    steps:
+      - run:
+          command: build-tool compile
+          cwd: sub/dir
+          timeout: 90s
+          stdout_to: logs/build.log
+          stderr_to: logs/build.err
+      - http:
+          runner: api
+          method: GET
+          path: /report
+          body_to: downloads/report.json
+`
+	s, err := loader.LoadBytes("f.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	steps := Build([]Input{{Spec: s, Path: "f.atago.yaml"}}).Specs[0].Scenarios[0].Steps
+	run := steps[0]
+	if run.Cwd != "sub/dir" || run.Timeout != "90s" {
+		t.Errorf("run cwd/timeout = %q/%q, want sub/dir and 90s", run.Cwd, run.Timeout)
+	}
+	if run.StdoutTo != "logs/build.log" || run.StderrTo != "logs/build.err" {
+		t.Errorf("run redirects = %q/%q", run.StdoutTo, run.StderrTo)
+	}
+	if steps[1].BodyTo != "downloads/report.json" {
+		t.Errorf("http body_to = %q", steps[1].BodyTo)
+	}
+	// A step that sets none of them keeps the fields out of the document.
+	plain, err := loader.LoadBytes("p.atago.yaml", []byte("version: \"1\"\nsuite:\n  name: p\nscenarios:\n  - name: s\n    steps:\n      - run: {command: echo}\n"))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	blob, err := json.Marshal(Build([]Input{{Spec: plain, Path: "p.atago.yaml"}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, absent := range []string{"cwd", "timeout", "stdout_to", "stderr_to", "body_to"} {
+		if strings.Contains(string(blob), `"`+absent+`"`) {
+			t.Errorf("an unset %s reached the manifest:\n%s", absent, blob)
+		}
+	}
+}
+
+// TestBuild_RunnerDeclarativeFields is a regression: the runner reduction kept
+// name/type/host and dropped everything a reviewer audits — a cmd runner's cwd
+// and timeout, an ssh runner's user, and above all insecure_host_key, whose
+// per-step security note fires only when a run step uses that runner. Credential
+// material stays out, as `has_dsn` already established.
+func TestBuild_RunnerDeclarativeFields(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: runnerfields
+runners:
+  slowbox: {type: cmd, cwd: ./sub, timeout: 45s}
+  jump: {type: ssh, host: "shell.example:2222", user: deploy, password: hunter2, insecure_host_key: true}
+scenarios:
+  - name: uses both
+    steps:
+      - run: {runner: slowbox, command: "true"}
+      - run: {runner: jump, command: uptime}
+`
+	s, err := loader.LoadBytes("r.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	doc := Build([]Input{{Spec: s, Path: "r.atago.yaml"}})
+	byName := map[string]Runner{}
+	for _, r := range doc.Specs[0].Runners {
+		byName[r.Name] = r
+	}
+	if got := byName["slowbox"]; got.Cwd != "./sub" || got.Timeout != "45s" {
+		t.Errorf("cmd runner = %+v, want cwd and timeout", got)
+	}
+	jump := byName["jump"]
+	if jump.User != "deploy" || !jump.InsecureHostKey {
+		t.Errorf("ssh runner = %+v, want the user and the host-key opt-out", jump)
+	}
+	// The password is credential material and must never reach the document.
+	blob, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(blob), "hunter2") {
+		t.Errorf("an ssh password leaked into the manifest:\n%s", blob)
+	}
+}
+
+// TestBuild_RetryUntilAndHTTPRunner is a regression on two counts: the manifest
+// carried a retry's times and interval but dropped the until condition that
+// ends the loop, and an http step's action line named no runner while every
+// other runner-backed kind's did.
+func TestBuild_RetryUntilAndHTTPRunner(t *testing.T) {
+	t.Parallel()
+	const src = `
+version: "1"
+suite:
+  name: retryman
+runners:
+  billing: {type: http, base_url: "https://billing.example.com"}
+scenarios:
+  - name: polls the charge endpoint
+    steps:
+      - http:
+          runner: billing
+          method: POST
+          path: /charge
+          retry: {times: 3, interval: 200ms, until: {status: 200}}
+      - run:
+          command: probe
+          retry: {times: 5, until: {exit_code: 0, stdout: {contains: ready}}}
+`
+	s, err := loader.LoadBytes("r.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	steps := Build([]Input{{Spec: s, Path: "r.atago.yaml"}}).Specs[0].Scenarios[0].Steps
+	if got := steps[0].Action; got != "HTTP POST /charge via billing" {
+		t.Errorf("http action = %q, want it to name the runner", got)
+	}
+	if steps[0].Retry == nil || steps[0].Retry.Until != "status" {
+		t.Errorf("http retry = %+v, want until %q", steps[0].Retry, "status")
+	}
+	// An until setting several targets names them all, the way an assert step's
+	// target does.
+	if steps[1].Retry == nil || steps[1].Retry.Until != "exit_code+stdout" {
+		t.Errorf("run retry = %+v, want until %q", steps[1].Retry, "exit_code+stdout")
 	}
 }
 
@@ -263,7 +418,10 @@ scenarios:
 		t.Errorf("manifest browser_args = %v, want two entries", web.BrowserArgs)
 	}
 	// The config must not leak into unrelated runner types when absent.
-	out, _ := json.Marshal(doc)
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
 	if strings.Count(string(out), "\"headless\"") != 1 {
 		t.Errorf("headless should appear exactly once in the manifest JSON:\n%s", out)
 	}
@@ -543,6 +701,45 @@ func TestBuildSpec_SuiteLifecycle(t *testing.T) {
 	}
 	if strings.Contains(string(out), "secret") {
 		t.Errorf("suite env value leaked into manifest:\n%s", out)
+	}
+}
+
+// TestBuildSpec_SuiteSecurity is a regression: the manifest carried a security
+// array per scenario and nothing for the suite lifecycle, so a consumer
+// auditing egress from the manifest saw no trace of a setup that curls through
+// the shell, a suite service that opens an ssh tunnel, or a teardown that
+// curls a purge endpoint.
+func TestBuildSpec_SuiteSecurity(t *testing.T) {
+	t.Parallel()
+	s := &spec.Spec{
+		Suite: spec.Suite{
+			Name: "egress",
+			Setup: []spec.Step{
+				{Run: &spec.Run{Command: "curl https://seed.example/data", Shell: spec.Bool(true)}},
+				{Service: &spec.Service{Name: "relay", Command: "ssh -N jump.example"}},
+			},
+			Teardown: []spec.Step{
+				{Run: &spec.Run{Command: "curl https://api.example/purge"}},
+			},
+		},
+		Scenarios: []spec.Scenario{{Name: "quiet", Steps: []spec.Step{{Run: &spec.Run{Command: "echo hi"}}}}},
+	}
+	sp := Build([]Input{{Spec: s, Path: "egress.atago.yaml"}}).Specs[0]
+	got := strings.Join(sp.SuiteSecurity, "\n")
+	for _, want := range []string{
+		"shell execution enabled: curl https://seed.example/data",
+		"network access: curl https://seed.example/data",
+		"network access (service relay): ssh -N jump.example",
+		"network access: curl https://api.example/purge",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("suite_security missing %q\n got: %v", want, sp.SuiteSecurity)
+		}
+	}
+	// A quiet scenario keeps its own security array empty — the suite's egress
+	// belongs to the suite, not to every scenario beneath it.
+	if len(sp.Scenarios[0].Security) != 0 {
+		t.Errorf("scenario security = %v, want none", sp.Scenarios[0].Security)
 	}
 }
 

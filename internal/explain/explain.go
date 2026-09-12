@@ -6,7 +6,6 @@ package explain
 import (
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/nao1215/atago/internal/assertdesc"
@@ -25,6 +24,16 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 	if s.ProjectPath != "" {
 		fmt.Fprintf(&b, "Project manifest: %s\n", s.ProjectPath)
 	}
+	// The manifest's subject build runs on the host before any scenario, so a
+	// reviewer has to see the command as well as the file it came from: naming
+	// only the path left an arbitrary (optionally shell) build invisible.
+	if sub := s.Subject; sub != nil {
+		line := fmt.Sprintf("Subject under test: %s (built by: %s", sub.Name, sub.Command)
+		if sub.Shell {
+			line += ", shell"
+		}
+		fmt.Fprintf(&b, "%s)\n", line)
+	}
 	if s.FixturesDir != "" {
 		fmt.Fprintf(&b, "Fixtures (${fixtures}): %s\n", s.FixturesDir)
 	}
@@ -35,11 +44,24 @@ func Explain(w io.Writer, s *spec.Spec, path string) error {
 		fmt.Fprintf(&b, "Secrets declared: %s\n", strings.Join(s.Secrets, ", "))
 	}
 	fmt.Fprintf(&b, "Network policy: %s\n", networkPolicy(s))
-	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup)
-	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown)
+	explainSuiteBlock(&b, "Suite setup (runs once before any scenario)", s.Suite.Setup, s.Runners)
+	explainSuiteBlock(&b, "Suite teardown (always runs after the last scenario)", s.Suite.Teardown, s.Runners)
+	// The lifecycle's own outputs: a redirect in setup or teardown writes a file
+	// exactly as a scenario's does, and there was no suite-level list anywhere.
+	if gen := spec.SuiteGeneratedArtifacts(&s.Suite); len(gen) > 0 {
+		writeList(&b, "Suite generates", gen)
+	}
+	// The suite lifecycle gets the same security summary a scenario gets: its
+	// steps run like any scenario's, and only the scenarios were flagged.
+	if notes := spec.SuiteSecurityNotes(s); len(notes) > 0 {
+		b.WriteString("⚠ Suite security notes:\n")
+		for _, note := range notes {
+			fmt.Fprintf(&b, "  - %s\n", note)
+		}
+	}
 
 	for i := range s.Scenarios {
-		explainScenario(&b, &s.Scenarios[i])
+		explainScenario(&b, &s.Scenarios[i], s.Runners)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
@@ -58,7 +80,7 @@ func networkPolicy(s *spec.Spec) string {
 // explainSuiteBlock summarizes suite.setup / suite.teardown (#7) so a reviewer
 // sees the once-per-suite bootstrap (built helpers, suite-wide services,
 // cleanup) without reading YAML.
-func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
+func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step, runners map[string]spec.Runner) {
 	if len(steps) == 0 {
 		return
 	}
@@ -67,7 +89,7 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 		step := &steps[i]
 		switch step.Kind() {
 		case spec.StepRun:
-			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run))
+			fmt.Fprintf(b, "  - %s\n", describeRun(step.Run, runners))
 		case spec.StepService:
 			fmt.Fprintf(b, "  - start suite service %q: %s\n", step.Service.Name, step.Service.Command)
 		case spec.StepMockServer:
@@ -80,12 +102,23 @@ func explainSuiteBlock(b *strings.Builder, label string, steps []spec.Step) {
 			for _, d := range describeAsserts(step.Assert) {
 				fmt.Fprintf(b, "  - expect %s\n", d)
 			}
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepPTY, spec.StepSignal:
+			// The loader rejects these at suite level (ATG-2106), so a spec that
+			// reaches explain never carries one here.
 		}
 	}
 }
 
-func explainScenario(b *strings.Builder, sc *spec.Scenario) {
+func explainScenario(b *strings.Builder, sc *spec.Scenario, runners map[string]spec.Runner) {
 	explainScenarioHeading(b, sc)
+
+	// A matrix instance's NAME already carries its row's values, so its
+	// commands and assertions are shown with the same values — the two rows of
+	// one matrix otherwise print identical bodies under two different headings,
+	// and a reader cannot tell them apart. Only the row is substituted:
+	// ${env:...} and a value produced at run time are genuinely unknown before
+	// the run, and the "Variables used" line is how those are reported.
+	sc = spec.ExpandScenarioRow(sc)
 
 	var fixtures, commands, expects, stores, services []string
 	vars := map[string]bool{}
@@ -107,8 +140,8 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 		// Variable references are collected by the shared spec walk so explain and
 		// manifest never disagree about which ${name}s a step uses; the bucketing
 		// below only formats the human-facing summary lines.
-		spec.CollectStepVars(vars, step)
-		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores)
+		spec.CollectStepVars(vars, step, runners)
+		bucketScenarioStep(step, &fixtures, &commands, &expects, &stores, runners)
 	}
 
 	// Teardown steps always run after the scenario — summarize them separately
@@ -116,8 +149,8 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	var teardown []string
 	for i := range sc.Teardown {
 		step := &sc.Teardown[i]
-		spec.CollectStepVars(vars, step)
-		teardown = append(teardown, describeTeardownStep(step)...)
+		spec.CollectStepVars(vars, step, runners)
+		teardown = append(teardown, describeTeardownStep(step, runners)...)
 	}
 
 	// Generated artifacts and security notes come from the shared spec model, so
@@ -132,19 +165,19 @@ func explainScenario(b *strings.Builder, sc *spec.Scenario) {
 	if used := spec.SortedKeys(vars); len(used) > 0 {
 		fmt.Fprintf(b, "  Variables used: %s\n", strings.Join(used, ", "))
 	}
-	if security := spec.SecurityNotes(sc); len(security) > 0 {
+	if security := spec.SecurityNotes(sc, runners); len(security) > 0 {
 		writeList(b, "⚠ Security notes", security)
 	}
 }
 
 // bucketScenarioStep files one scenario step's summary line under the section
 // it belongs to: fixtures, commands, expects, or stores.
-func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]string) {
+func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]string, runners map[string]spec.Runner) {
 	switch step.Kind() {
 	case spec.StepFixture:
 		*fixtures = append(*fixtures, describeFixture(step.Fixture))
 	case spec.StepRun:
-		*commands = append(*commands, describeRun(step.Run))
+		*commands = append(*commands, describeRun(step.Run, runners))
 	case spec.StepAssert:
 		*expects = append(*expects, describeAsserts(step.Assert)...)
 	case spec.StepStore:
@@ -153,7 +186,7 @@ func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]
 		}
 	case spec.StepHTTP:
 		if step.HTTP != nil {
-			*commands = append(*commands, fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path))
+			*commands = append(*commands, describeHTTP(step.HTTP))
 		}
 	case spec.StepQuery:
 		if step.Query != nil {
@@ -175,6 +208,10 @@ func bucketScenarioStep(step *spec.Step, fixtures, commands, expects, stores *[]
 		if step.Signal != nil {
 			*commands = append(*commands, describeSignal(step.Signal))
 		}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only (ATG-2106): a scenario's own services and mock servers
+		// are declared in its `services:`/`mock_servers:` lists, not as steps, and
+		// explainScenarioHeading reports those.
 	}
 }
 
@@ -187,11 +224,12 @@ func explainScenarioHeading(b *strings.Builder, sc *spec.Scenario) {
 	if len(sc.Tags) > 0 {
 		fmt.Fprintf(b, "  [tags: %s]", strings.Join(sc.Tags, ", "))
 	}
-	if sc.Only != nil && sc.Only.OS != "" {
-		fmt.Fprintf(b, "  [only os=%s]", sc.Only.OS)
-	}
-	if sc.Skip != nil && sc.Skip.OS != "" {
-		fmt.Fprintf(b, "  [skip os=%s]", sc.Skip.OS)
+	// Every gate, not just the OS: an env- or command-gated scenario read as
+	// unconditional here while doc named all three and list showed them in its
+	// GATES column, and a gate inherited from defaults.scenario was equally
+	// invisible.
+	for _, g := range append(gateMarkers("only", sc.Only), gateMarkers("skip", sc.Skip)...) {
+		fmt.Fprintf(b, "  [%s]", g)
 	}
 	if sc.ExpectFail != nil {
 		fmt.Fprintf(b, "  [expect_fail: %s]", sc.ExpectFail.Reason)
@@ -200,6 +238,26 @@ func explainScenarioHeading(b *strings.Builder, sc *spec.Scenario) {
 		}
 	}
 	b.WriteByte('\n')
+}
+
+// gateMarkers renders a scenario's selection gate as heading markers — one per
+// condition the gate sets, since os/env/command are independent claims. It
+// returns nothing for an unset gate.
+func gateMarkers(key string, c *spec.Condition) []string {
+	if c == nil {
+		return nil
+	}
+	var out []string
+	if c.OS != "" {
+		out = append(out, fmt.Sprintf("%s os=%s", key, c.OS))
+	}
+	if c.Env != "" {
+		out = append(out, fmt.Sprintf("%s env=%s", key, c.Env))
+	}
+	if c.Command != "" {
+		out = append(out, fmt.Sprintf("%s command=%q", key, c.Command))
+	}
+	return out
 }
 
 // describePTY renders a one-line summary of an interactive pty step: the
@@ -261,12 +319,12 @@ func describePTY(p *spec.PTY) string {
 // describeTeardownStep renders a teardown step's summary lines. Unlike the
 // scenario body, whose steps are bucketed into Commands/Expects/Fixtures,
 // teardown is one flat list — cleanup reads in execution order.
-func describeTeardownStep(step *spec.Step) []string {
+func describeTeardownStep(step *spec.Step, runners map[string]spec.Runner) []string {
 	switch step.Kind() {
 	case spec.StepRun:
-		return []string{describeRun(step.Run)}
+		return []string{describeRun(step.Run, runners)}
 	case spec.StepHTTP:
-		return []string{fmt.Sprintf("HTTP %s %s", step.HTTP.Method, step.HTTP.Path)}
+		return []string{describeHTTP(step.HTTP)}
 	case spec.StepQuery:
 		return []string{fmt.Sprintf("SQL query via %s: %s", step.Query.Runner, step.Query.SQL)}
 	case spec.StepGRPC:
@@ -281,6 +339,15 @@ func describeTeardownStep(step *spec.Step) []string {
 		return []string{"store " + step.Store.Name}
 	case spec.StepSignal:
 		return []string{describeSignal(step.Signal)}
+	case spec.StepPTY:
+		// Teardown accepts a pty session and the engine runs it, so explain has to
+		// show it. This branch was missing while the loader allowed the step: a
+		// cleanup block could drive an interactive program with nothing in
+		// `atago explain` to say so.
+		return []string{describePTY(step.PTY)}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only (ATG-2106), so a teardown block never carries one.
+		return nil
 	}
 	return nil
 }
@@ -333,17 +400,6 @@ func describeSignal(sg *spec.Signal) string {
 	return desc
 }
 
-// describeChangesExplain renders a workdir-delta assertion (#70) as a compact
-// phrase for `atago explain`. `modified: []` renders as "modified nothing".
-func describeChangesExplain(c *spec.ChangesAssert) string {
-	return assertdesc.DescribeChanges(c, explainChangesStyle)
-}
-
-// describeMockAssert renders a one-line summary of a mock assertion (#24).
-func describeMockAssert(m *spec.MockAssert) string {
-	return assertdesc.DescribeMock(m, explainMockStyle)
-}
-
 func describeFixture(f *spec.Fixture) string {
 	kind := "inline content"
 	if f.Base64 != "" {
@@ -352,10 +408,54 @@ func describeFixture(f *spec.Fixture) string {
 	return fmt.Sprintf("%s (%s)", f.File, kind)
 }
 
-func describeRun(r *spec.Run) string {
+// describeHTTP renders a one-line summary of an http step. It names the runner
+// that carried the request the way every other runner-backed kind does: the
+// line was a bare method and path, so two requests to different hosts read
+// identically. A retry is reported for the same reason a run step's is.
+func describeHTTP(h *spec.HTTP) string {
+	desc := fmt.Sprintf("HTTP %s %s", h.Method, h.Path)
+	if h.Runner != "" {
+		desc += " via " + h.Runner
+	}
+	if note := describeRetry(h.Retry); note != "" {
+		desc += "  (" + note + ")"
+	}
+	return desc
+}
+
+// describeRetry renders a step's retry policy — how many attempts, how far
+// apart, and the condition that ends the loop. A retry changes how many times
+// the step's side effects happen, which is exactly what a reader of a spec
+// summary needs to know (the reason `deterministic:` carries a note), and it
+// was invisible in both explain and doc.
+func describeRetry(r *spec.Retry) string {
+	if r == nil {
+		return ""
+	}
+	desc := fmt.Sprintf("retried up to %s", plural.Count(r.Times, "time", "times"))
+	if r.Interval != "" {
+		desc += " every " + r.Interval
+	}
+	if r.Until != nil {
+		if until := describeAsserts(r.Until); len(until) > 0 {
+			desc += " until " + strings.Join(until, " and ")
+		}
+	}
+	return desc
+}
+
+func describeRun(r *spec.Run, runners map[string]spec.Runner) string {
 	var notes []string
+	// Where it runs, when that is not here: every other step kind already says
+	// which runner carried it, and a bare command line read as local.
+	if host := spec.RunHost(r, runners); host != "" {
+		notes = append(notes, host)
+	}
 	if r.Timeout != "" {
 		notes = append(notes, "timeout "+r.Timeout)
+	}
+	if note := describeRetry(r.Retry); note != "" {
+		notes = append(notes, note)
 	}
 	if len(r.Env) > 0 {
 		notes = append(notes, "env: "+strings.Join(spec.SortedKeys(toSet(r.Env)), ", "))
@@ -395,176 +495,11 @@ func describeRun(r *spec.Run) string {
 
 // describeAsserts renders one line per assertion target; an assert may set
 // several (exit_code + stdout + …), each an independent expectation.
+// describeAsserts renders one phrase per target an assert sets. The phrases
+// themselves live in assertdesc, shared with the manifest so explain and
+// manifest cannot describe the same assertion differently.
 func describeAsserts(a *spec.Assert) []string {
-	targets := a.SetTargets()
-	if len(targets) == 0 {
-		return []string{"(invalid assertion)"}
-	}
-	out := make([]string, 0, len(targets))
-	for _, t := range targets {
-		out = append(out, describeTarget(a, t))
-	}
-	return out
-}
-
-func describeTarget(a *spec.Assert, target spec.AssertTarget) string {
-	switch target {
-	case spec.AssertExitCode:
-		if a.ExitCode.Not != nil {
-			return fmt.Sprintf("exit code is not %d", *a.ExitCode.Not)
-		}
-		if len(a.ExitCode.In) > 0 {
-			return "exit code in " + intList(a.ExitCode.In)
-		}
-		if a.ExitCode.Equals != nil {
-			return fmt.Sprintf("exit code is %d", *a.ExitCode.Equals)
-		}
-		return "exit code"
-	case spec.AssertMock:
-		return describeMockAssert(a.Mock)
-	case spec.AssertScreen:
-		return "screen " + describeScreen(a.Screen)
-	case spec.AssertDuration:
-		return "completes " + a.Duration.DescribeDuration()
-	case spec.AssertChanges:
-		return "changed exactly " + describeChangesExplain(a.Changes)
-	case spec.AssertStdout:
-		return "stdout " + describeStream(a.Stdout)
-	case spec.AssertStderr:
-		return "stderr " + describeStream(a.Stderr)
-	case spec.AssertFile:
-		return "file " + describeFile(a.File)
-	case spec.AssertImage:
-		return "image " + describeImage(a.Image)
-	case spec.AssertDir:
-		return "dir " + describeDir(a.Dir)
-	case spec.AssertPDF:
-		return "pdf " + describePDF(a.PDF)
-	case spec.AssertStatus:
-		if a.Status != nil {
-			return fmt.Sprintf("HTTP status is %d", *a.Status)
-		}
-		return "HTTP status"
-	case spec.AssertHeader:
-		if a.Header != nil {
-			return "header " + describeHeader(a.Header)
-		}
-		return "header"
-	case spec.AssertBody:
-		return "body " + describeStream(a.Body)
-	case spec.AssertRows:
-		return "rows " + describeStream(a.Rows)
-	case spec.AssertGRPCStatus:
-		if a.GRPCStatus != nil {
-			return fmt.Sprintf("gRPC status is %d", *a.GRPCStatus)
-		}
-		return "gRPC status"
-	case spec.AssertMessage:
-		return "message " + describeStream(a.Message)
-	case spec.AssertValue:
-		return "value " + describeStream(a.Value)
-	default:
-		return string(target)
-	}
-}
-
-func describeHeader(h *spec.HeaderMatch) string {
-	return assertdesc.DescribeHeader(h, explainHeaderStyle)
-}
-
-func describeImage(im *spec.ImageAssert) string {
-	return assertdesc.DescribeImage(im, explainImageStyle)
-}
-
-// describeDir renders a directory/tree assertion (#74) for explain output.
-func describeDir(d *spec.DirAssert) string {
-	return assertdesc.DescribeDir(d, explainDirStyle)
-}
-
-// describePDF renders a PDF assertion (#73) for explain output.
-func describePDF(p *spec.PDFAssert) string {
-	return assertdesc.DescribePDF(p, explainPDFStyle)
-}
-
-var explainJSONStyle = assertdesc.JSONStyle{
-	Prefix:  func(path string) string { return "JSON " + path },
-	Equals:  func(v any) string { return "== " + assertdesc.JSONValueText(v) },
-	Matches: func(s string) string { return fmt.Sprintf("matches /%s/", s) },
-	Length:  func(n int) string { return fmt.Sprintf("length %d", n) },
-	Compare: func(op string, v any) string { return fmt.Sprintf("%s %v", op, v) },
-	Default: "",
-}
-
-var explainYAMLStyle = explainJSONStyle.WithPrefix(func(path string) string {
-	return "YAML " + path
-})
-
-var explainStreamStyle = assertdesc.StreamStyle{
-	List:      spec.StringList.Quoted,
-	Regex:     func(s string) string { return fmt.Sprintf("/%s/", s) },
-	Equals:    "equals exact text",
-	NotEquals: "does not equal exact text",
-	JSON:      explainJSONStyle,
-	YAML:      explainYAMLStyle,
-	Snapshot:  func(s string) string { return s },
-	Line:      func(n int) string { return fmt.Sprintf("line %d", n) },
-	NoMatcher: "(no matcher)",
-}
-
-var explainFileStyle = assertdesc.FileStyle{
-	Path:       func(s string) string { return fmt.Sprintf("%q", s) },
-	List:       spec.StringList.Quoted,
-	JSON:       explainJSONStyle,
-	Snapshot:   func(s string) string { return s },
-	Checked:    func(path string) string { return path },
-	ExactBytes: "equals exact bytes",
-}
-
-var explainHeaderStyle = assertdesc.HeaderStyle{
-	Name:  func(s string) string { return fmt.Sprintf("%q", s) },
-	Value: func(s string) string { return fmt.Sprintf("%q", s) },
-	Regex: func(s string) string { return fmt.Sprintf("/%s/", s) },
-	Bare:  func(s string) string { return fmt.Sprintf("%q", s) },
-}
-
-var explainImageStyle = assertdesc.ImageStyle{
-	Path:      func(s string) string { return fmt.Sprintf("%q", s) },
-	Format:    func(s string) string { return s },
-	SimilarTo: func(s string) string { return s },
-	Checked:   func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainDirStyle = assertdesc.DirStyle{
-	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
-	Item:    func(s string) string { return s },
-	Token:   func(s string) string { return s },
-	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainPDFStyle = assertdesc.PDFStyle{
-	Path:    func(s string) string { return fmt.Sprintf("%q", s) },
-	Value:   func(s string) string { return fmt.Sprintf("%q", s) },
-	Stream:  describeStream,
-	Checked: func(path string) string { return fmt.Sprintf("%q is checked", path) },
-}
-
-var explainChangesStyle = assertdesc.ChangesStyle{
-	Entry: func(s string) string { return s },
-	Join:  "; ",
-}
-
-var explainMockStyle = assertdesc.MockStyle{
-	Name:  func(s string) string { return s },
-	Route: func(s string) string { return s },
-	Count: func(n int) string { return fmt.Sprintf(" x%d", n) },
-}
-
-func describeStream(s *spec.StreamAssert) string {
-	return assertdesc.DescribeStream(s, explainStreamStyle)
-}
-
-func describeFile(f *spec.FileAssert) string {
-	return assertdesc.DescribeFile(f, explainFileStyle)
+	return assertdesc.Describe(a)
 }
 
 func writeList(b *strings.Builder, title string, items []string) {
@@ -577,35 +512,10 @@ func writeList(b *strings.Builder, title string, items []string) {
 	}
 }
 
-// intList renders an accepted exit-code set as "[0, 2]" (#19).
-func intList(ns []int) string {
-	parts := make([]string, len(ns))
-	for i, n := range ns {
-		parts[i] = strconv.Itoa(n)
-	}
-	return "[" + strings.Join(parts, ", ") + "]"
-}
-
 func toSet(m map[string]string) map[string]bool {
 	out := make(map[string]bool, len(m))
 	for k := range m {
 		out[k] = true
 	}
 	return out
-}
-
-// describeScreen renders a rendered-screen assertion: its stream matcher, plus
-// the attribute entries (#382) that say how the text is drawn.
-func describeScreen(s *spec.ScreenAssert) string {
-	if s == nil {
-		return ""
-	}
-	parts := []string{}
-	if desc := describeStream(&s.StreamAssert); desc != "" {
-		parts = append(parts, desc)
-	}
-	for i := range s.Attrs {
-		parts = append(parts, "shows "+s.Attrs[i].Describe())
-	}
-	return strings.Join(parts, " and ")
 }

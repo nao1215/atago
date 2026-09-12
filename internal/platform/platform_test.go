@@ -22,4 +22,19 @@ func TestOSAndMatches(t *testing.T) {
 	if Matches("") {
 		t.Error("Matches(\"\") = true, want false")
 	}
+
+	// The BSDs are separate hosts, not one family: a gate naming FreeBSD
+	// does not hold on OpenBSD, and "bsd" is not a host at all.
+	currentOS = "freebsd"
+	if OS() != "freebsd" {
+		t.Errorf("OS() = %q, want freebsd", OS())
+	}
+	if !Matches("freebsd") {
+		t.Error("Matches(freebsd) = false, want true")
+	}
+	for _, other := range []string{"openbsd", "netbsd", "darwin", "bsd"} {
+		if Matches(other) {
+			t.Errorf("Matches(%q) = true on freebsd, want false", other)
+		}
+	}
 }

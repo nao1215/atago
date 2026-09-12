@@ -68,6 +68,10 @@ func inputPreviews(sc *spec.Scenario) []previewBlock {
 					body:  fmt.Sprintf("(binary, %d base64 chars)", len(s.Base64)),
 				})
 			}
+		case spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepCDP, spec.StepAssert,
+			spec.StepStore, spec.StepService, spec.StepPTY, spec.StepSignal, spec.StepMockServer:
+			// No authored input the When line hides. An assert's expected values are
+			// previewed by exactPreviews instead, which reads them as outputs.
 		}
 	}
 	return out

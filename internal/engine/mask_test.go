@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -115,6 +116,271 @@ scenarios:
 	}
 	if strings.TrimSpace(string(golden)) != "same" {
 		t.Errorf("golden = %q, want %q", golden, "same")
+	}
+}
+
+// requirePOSIXShell skips a test whose spec needs a POSIX shell builtin that
+// has no Windows equivalent.
+func requirePOSIXShell(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell primitive that yields a different value per attempt")
+	}
+}
+
+// TestSnapshotsUpdated_CountsEveryGoldenTheRunWrote is a regression: the count
+// exists so a reviewer is told when a run rewrote committed goldens, and it was
+// derived by walking the scenarios' numbered steps. That walk misses a
+// scenario's teardown, both suite lifecycle blocks, and — because a repeat or
+// retry reports one folded result — the iterations that are not the surviving
+// one. It also counted a check per matrix row, so eight rows sharing one golden
+// reported eight rewrites of one file.
+func TestSnapshotsUpdated_CountsEveryGoldenTheRunWrote(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: lifecycle
+  setup:
+    - run: {shell: true, command: echo setup banner}
+    - assert:
+        stdout:
+          snapshot: snaps/setup.txt
+  teardown:
+    - run: {shell: true, command: echo suite teardown}
+    - assert:
+        stdout:
+          snapshot: snaps/suite_teardown.txt
+scenarios:
+  - name: writes three goldens
+    steps:
+      - run: {shell: true, command: echo main output}
+      - assert:
+          stdout:
+            snapshot: snaps/main.txt
+    teardown:
+      - run: {shell: true, command: echo scenario teardown}
+      - assert:
+          stdout:
+            snapshot: snaps/scenario_teardown.txt
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	res := eng.Run(context.Background(), s, specPath)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+	for _, name := range []string{"setup.txt", "suite_teardown.txt", "main.txt", "scenario_teardown.txt"} {
+		if _, err := os.Stat(filepath.Join(dir, "snaps", name)); err != nil {
+			t.Fatalf("golden %s was not written: %v", name, err)
+		}
+	}
+	if got := eng.SnapshotsUpdated(); got != 4 {
+		t.Errorf("SnapshotsUpdated() = %d, want 4 (suite setup, suite teardown, a step, and a scenario teardown)", got)
+	}
+}
+
+// TestSnapshotsUpdated_CountsAGoldenARedRunWrote pins the case the summary was
+// silent about: a --repeat run whose scenario is not deterministic writes its
+// golden on the first iteration and reports the scenario as flaky, so no
+// surviving result carries the write at all.
+func TestSnapshotsUpdated_CountsAGoldenARedRunWrote(t *testing.T) {
+	t.Parallel()
+	// The scenario needs output that differs between iterations AND survives
+	// snapshot normalization, which scrubs the workdir path by design. A POSIX
+	// nanosecond timestamp is that value; Windows has no equivalent in the shell
+	// atago runs there.
+	requirePOSIXShell(t)
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: repeat-snap
+scenarios:
+  - name: output differs between iterations
+    steps:
+      - run: {shell: true, command: "date +%s%N"}
+      - assert:
+          stdout:
+            snapshot: snaps/now.txt
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	eng.Repeat = 2
+	eng.Run(context.Background(), s, specPath)
+	if _, err := os.Stat(filepath.Join(dir, "snaps", "now.txt")); err != nil {
+		t.Fatalf("golden was not written: %v", err)
+	}
+	if got := eng.SnapshotsUpdated(); got != 1 {
+		t.Errorf("SnapshotsUpdated() = %d, want 1 (the golden reached disk even though the run went red)", got)
+	}
+}
+
+// TestSnapshotsUpdated_CountsSharedGoldenOnce pins the other direction: the
+// count names files, so matrix rows writing identical content to one path are
+// one rewrite, not one per row.
+func TestSnapshotsUpdated_CountsSharedGoldenOnce(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: shared
+scenarios:
+  - name: row ${v}
+    matrix:
+      - { v: "a" }
+      - { v: "b" }
+      - { v: "c" }
+    steps:
+      - run: { shell: true, command: echo same }
+      - assert:
+          stdout:
+            snapshot: snaps/shared.txt
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	res := eng.Run(context.Background(), s, specPath)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+	if got := eng.SnapshotsUpdated(); got != 1 {
+		t.Errorf("SnapshotsUpdated() = %d, want 1 (three rows, one golden file)", got)
+	}
+}
+
+// TestSnapshotClash_NamesTheAttemptNotASecondScenario is a regression: when a
+// --retry-failed attempt clashed with the write its OWN first attempt made, the
+// hint blamed "two scenarios", sending the reader after a second scenario that
+// does not exist. The finding is that the scenario's snapshotted output changes
+// between attempts.
+func TestSnapshotClash_NamesTheAttemptNotASecondScenario(t *testing.T) {
+	t.Parallel()
+	requirePOSIXShell(t)
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: retry-snap
+scenarios:
+  - name: snapshots a value that changes every attempt
+    steps:
+      - run: {shell: true, command: "date +%s%N"}
+      - assert:
+          stdout:
+            snapshot: snaps/now.txt
+      - run: {shell: true, command: "exit 1"}
+      - assert:
+          exit_code: 0
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	eng.RetryFailed = 1
+	res := eng.Run(context.Background(), s, specPath)
+	var hints []string
+	for i := range res.Scenarios {
+		for _, step := range res.Scenarios[i].Steps {
+			for _, ck := range step.Checks {
+				if ck != nil && !ck.OK {
+					hints = append(hints, ck.Hint)
+				}
+			}
+		}
+	}
+	joined := strings.Join(hints, "\n")
+	if !strings.Contains(joined, "changed between attempts") {
+		t.Errorf("hints = %q, want the clash attributed to this scenario's own earlier attempt", joined)
+	}
+	if strings.Contains(joined, "two scenarios cannot share") {
+		t.Errorf("hints = %q, want no blame on a second scenario that does not exist", joined)
+	}
+}
+
+// TestSnapshotClash_StillNamesASecondScenario guards the case the wording was
+// written for: two DIFFERENT scenarios claiming one path with different content.
+func TestSnapshotClash_StillNamesASecondScenario(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: clash
+scenarios:
+  - name: alpha
+    steps:
+      - run: {shell: true, command: echo alpha}
+      - assert:
+          stdout:
+            snapshot: snaps/shared.txt
+  - name: beta
+    steps:
+      - run: {shell: true, command: echo beta}
+      - assert:
+          stdout:
+            snapshot: snaps/shared.txt
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	eng := New()
+	eng.UpdateSnapshots = true
+	eng.Parallel = 1
+	res := eng.Run(context.Background(), s, specPath)
+	var joined string
+	for i := range res.Scenarios {
+		for _, step := range res.Scenarios[i].Steps {
+			for _, ck := range step.Checks {
+				if ck != nil && !ck.OK {
+					joined += ck.Hint + "\n"
+				}
+			}
+		}
+	}
+	if !strings.Contains(joined, "two scenarios cannot share") {
+		t.Errorf("hints = %q, want the two-scenario wording for a genuine cross-scenario clash", joined)
 	}
 }
 

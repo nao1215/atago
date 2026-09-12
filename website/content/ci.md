@@ -57,10 +57,41 @@ The image contains `atago` and `ca-certificates`; if your scenarios drive `git`,
 and layer those tools on top.
 
 - `--report json|junit|gha|tap` picks the report format; the JSON shape is stable and versioned ([sample JSON](/samples/report.json), [JUnit](/samples/report.junit.xml), [TAP](/samples/report.tap)).
+- A spec file that fails to load runs no scenario, so every format names it rather than leaving the document green: junit gets a testsuite whose `load` testcase is an `<error>`, tap a `not ok` point counted in the plan, gha an `::error` annotation, and json a `load_failures` array carrying the path and the diagnostic (omitted when there are none). A pipeline that judges the run from the report file, not from the exit code, sees the dropped file.
 - `--ci` enables deterministic, color-free output. It also turns an empty selection into a hard error: a `--filter`/`--tag`/`--skip-tag` that matches no scenario fails the run (exit 3) instead of passing an empty suite, so a typo cannot silently disable your specs. Without `--ci` the same case is a warning that still exits 0.
 - `--fail-fast` stops scheduling new scenarios at the first outcome that fails the run — a failed assertion, an execution error, an XPASS, or a scenario that only passed on a retry (unless `--allow-xpass`/`--allow-flaky` made it green). Scenarios already in flight finish; the rest are reported as `skipped after fail-fast`, so the summary stays honest about how much of the suite ran.
 - `--artifacts-dir DIR` persists the exact payloads a failed assertion compared — plus, for a failed scenario, its background services' logs and each mock server's recorded requests — so a failure stays reviewable after the job ends.
 - Environment variable names listed under `secrets:` are masked as `***` in all reports and snapshots.
+
+## Run the suite on more than one OS
+
+A CLI that ships binaries for three platforms has three behaviors to check, and the ones that differ are exactly the ones nobody writes a spec for: path separators, line endings, the shell, the exit code a signal produces. A matrix costs one block:
+
+```yaml
+name: behavior-specs
+on: [push, pull_request]
+jobs:
+  atago:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nao1215/setup-atago@v0
+      - run: atago run --ci --report gha ./specs
+```
+
+Two things make the Windows leg pay off rather than turn red on the first commit. Gate what is genuinely POSIX — a `signal:` step, a symlink fixture, a permission assertion — with `skip: {os: windows}` rather than deleting the scenario, so the report says which platform it applies to instead of pretending it does not exist. And keep `shell: true` commands out of the specs where you can: `run.env:`, `run.stdin:`, and `run.stdout_to:` cover the variable prefixes and redirects most specs reach for a shell to get, and a command built from argv runs unchanged on all three. Where a POSIX shell really is needed, `ATAGO_SHELL` points atago at the bash that ships with Git for Windows, which is preinstalled on the GitHub runner:
+
+```yaml
+      - run: atago run --ci --report gha ./specs
+        env:
+          ATAGO_SHELL: ${{ runner.os == 'Windows' && 'C:\Program Files\Git\bin\bash.exe' || '' }}
+```
+
+[Platform support](/reference/#platform-support) is the full list of what differs.
 
 ## Review specs without running them
 

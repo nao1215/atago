@@ -6,15 +6,42 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
 
-// TestCommandLine covers how a command becomes the single command line ConPTY
-// hands to CreateProcess: a shell command reuses cmd.exe's `/S /C "<command>"`
-// contract verbatim, and a shell-free command is tokenized with the cmd runner's
+// TestCommandLine_Shell pins the shell half: the command reuses cmd.exe's
+// `/S /C "<command>"` contract verbatim, behind an ABSOLUTE interpreter — a
+// pty session resolves the same shell a run step does rather than whatever a
+// bare `cmd` lookup finds on the PATH atago has put the program under test on.
+func TestCommandLine_Shell(t *testing.T) {
+	t.Parallel()
+	got, err := CommandLine(`echo hi & echo bye`, true)
+	if err != nil {
+		t.Fatalf("CommandLine(shell): unexpected error: %v", err)
+	}
+	interpreter, rest, found := strings.Cut(got, " /S /C ")
+	if !found {
+		t.Fatalf("CommandLine(shell) = %q, want it to carry cmd.exe's /S /C contract", got)
+	}
+	if !filepath.IsAbs(strings.Trim(interpreter, `"`)) {
+		t.Errorf("interpreter = %q, want an absolute path", interpreter)
+	}
+	if strings.ToLower(filepath.Base(strings.Trim(interpreter, `"`))) != "cmd.exe" {
+		t.Errorf("interpreter = %q, want cmd.exe", interpreter)
+	}
+	// Verbatim: the `&` and the spaces reach cmd exactly as authored.
+	if want := `"echo hi & echo bye"`; rest != want {
+		t.Errorf("command portion = %q, want %q", rest, want)
+	}
+}
+
+// TestCommandLine covers how a SHELL-FREE command becomes the single command
+// line ConPTY hands to CreateProcess: it is tokenized with the cmd runner's
 // splitter and re-escaped so the C runtime re-parses it to the same argv (plain
 // words stay bare, a path with spaces gets quoted).
 func TestCommandLine(t *testing.T) {
@@ -25,7 +52,6 @@ func TestCommandLine(t *testing.T) {
 		shell   bool
 		want    string
 	}{
-		{"shell wraps in cmd /S /C", `echo hi & echo bye`, true, `cmd /S /C "echo hi & echo bye"`},
 		{"plain words stay bare", `tool --flag value`, false, `tool --flag value`},
 		{"quoted path with spaces re-quotes", `"C:\Program Files\t.exe" run`, false, `"C:\Program Files\t.exe" run`},
 	}

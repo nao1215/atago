@@ -4,10 +4,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
+
+	"github.com/nao1215/atago/internal/store"
 )
 
 func TestLoadBytes_Valid(t *testing.T) {
@@ -929,6 +932,7 @@ func TestLoadBytes_ExplicitTagRejected(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			s, err := LoadBytes("t.atago.yaml", []byte(tt.src))
 			if err == nil {
 				t.Fatalf("LoadBytes() = nil error, want a parse error naming the tag")
@@ -1005,12 +1009,12 @@ func TestLoadBytes_JSONEqualsNull(t *testing.T) {
 	t.Parallel()
 
 	for _, spelling := range []string{"equals: null", "equals: ~", "equals: Null"} {
-		src := specSteps("assert: {stdout: {json: {path: \"$.v\", " + spelling + "}}}")
+		src := specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.v\", "+spelling+"}}}")
 		s, err := LoadBytes("t.atago.yaml", []byte(src))
 		if err != nil {
 			t.Fatalf("LoadBytes(%s) error = %v, want a clean load", spelling, err)
 		}
-		checks := s.Scenarios[0].Steps[0].Assert.Stdout.JSON
+		checks := s.Scenarios[0].Steps[1].Assert.Stdout.JSON
 		if len(checks) != 1 {
 			t.Fatalf("%s: got %d checks, want 1", spelling, len(checks))
 		}
@@ -1024,12 +1028,12 @@ func TestLoadBytes_JSONEqualsNull(t *testing.T) {
 
 	// An `equals` key written with a real value keeps reporting present, and a
 	// check with no `equals` key at all is still matcher-less.
-	src := specSteps("assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: null}]}}")
+	src := specSteps("run: {command: echo}", "assert: {stdout: {json: [{path: \"$.a\", equals: 1}, {path: \"$.b\", equals: null}]}}")
 	s, err := LoadBytes("t.atago.yaml", []byte(src))
 	if err != nil {
 		t.Fatalf("LoadBytes(list form) error = %v", err)
 	}
-	for i, c := range s.Scenarios[0].Steps[0].Assert.Stdout.JSON {
+	for i, c := range s.Scenarios[0].Steps[1].Assert.Stdout.JSON {
 		if !c.HasEquals() {
 			t.Errorf("list check %d: HasEquals() = false, want true", i)
 		}
@@ -1067,6 +1071,40 @@ func mustReject(t *testing.T, name, src, want string) {
 	}
 	if !strings.Contains(err.Error(), want) {
 		t.Errorf("%s: error = %q, want substring %q", name, err.Error(), want)
+	}
+	requireDiagnosticCodes(t, name, err)
+}
+
+// atgCode matches the code prefix every load error is supposed to carry.
+var atgCode = regexp.MustCompile(`ATG\d{4}: `)
+
+// requireDiagnosticCodes asserts every message inside a load error carries a
+// diagnostic code. The published error reference can only explain what it can
+// name, and the coverage gate proves the reference is provoked — nothing proved
+// the converse, which is how the matrix validator emitted five uncoded messages
+// beside coded ones in a single error list. Every rejection case in this file is
+// a corpus entry for that check.
+func requireDiagnosticCodes(t *testing.T, name string, err error) {
+	t.Helper()
+	lines := strings.Split(err.Error(), "\n")
+	// One problem is rendered as a single message that may carry a multi-line
+	// source excerpt below it, so only its first line is checked. Several are
+	// rendered as a count header followed by one "  - " entry each, and every
+	// entry has to name its own diagnostic.
+	if !strings.HasSuffix(lines[0], "validation errors:") {
+		if !atgCode.MatchString(lines[0]) {
+			t.Errorf("%s: error %q carries no ATG code; every load error must name the diagnostic that explains it", name, lines[0])
+		}
+		return
+	}
+	for _, line := range lines[1:] {
+		entry, listed := strings.CutPrefix(strings.TrimSpace(line), "- ")
+		if !listed {
+			continue // continuation of the entry above
+		}
+		if !atgCode.MatchString(entry) {
+			t.Errorf("%s: error entry %q carries no ATG code; every load error must name the diagnostic that explains it", name, entry)
+		}
 	}
 }
 
@@ -1156,7 +1194,7 @@ func TestBugHunt_Rejections(t *testing.T) {
 
 		// ---- validateFile ----
 		{"file path required", specSteps("assert: {file: {exists: true}}"), "file.path is required"},
-		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
+		{"file no matcher", specSteps("assert: {file: {path: out.txt}}"), "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot/size/min_size/max_size"},
 		{"file two matchers", specSteps("assert: {file: {path: out.txt, exists: true, snapshot: s}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
 		{"file not_contains empty", specSteps("assert: {file: {path: out.txt, not_contains: []}}"), "not_contains must not be empty"},
 		{"file equals and equals_file exclusive", specSteps("assert: {file: {path: out.txt, equals: x, equals_file: in.txt}}"), "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"},
@@ -1211,9 +1249,32 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"mock header invalid", mockScenario("assert: {mock: {name: api, header: {name: X}}}"), "must set one of contains/equals/matches"},
 		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set at least one matcher"},
 
+		// ---- empty-matching regexps outside not_matches (#557) ----
+		{"count bound on an empty-matching pattern", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"q*\", max_count: 0}}"), "matches the empty string"},
+		{"count bound on an optional group", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"(foo)?\", count: 1}}"), "matches the empty string"},
+		{"scrub rule matching the empty string", "version: \"1\"\nsuite: {name: s}\nscrub:\n  - {pattern: \"[0-9]*\", placeholder: \"<ID>\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n", "matches the empty string"},
+		{"store capture matching the empty string", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"[0-9]*\"}}}"), "matches the empty string"},
+
+		// ---- matchers of one assert that contradict each other (#558) ----
+		{"contains and not_contains share an entry", specSteps("run: {command: echo}", "assert: {stdout: {contains: [abc], not_contains: [abc]}}"), "contains and not_contains both list \"abc\""},
+		{"matches equals not_matches", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"a.c\", not_matches: \"a.c\"}}"), "matches and not_matches are the same pattern"},
+		{"dir contains with count zero", specSteps("assert: {dir: {path: d, contains: [x], count: 0}}"), "count: 0 cannot hold together with contains"},
+		{"dir contains above max_count", specSteps("assert: {dir: {path: d, contains: [x, y], max_count: 1}}"), "requires at least 2 entries"},
+		{"dir contains and not_contains share an entry", specSteps("assert: {dir: {path: d, contains: [x], not_contains: [x]}}"), "contains and not_contains both list \"x\""},
+
 		// ---- validateCondition ----
 		{"skip bad os", scenarioTop("skip: {os: solaris}", "run: {command: echo}"), "skip.os \"solaris\" is invalid"},
+		// "bsd" is not a system: each of them is a value of its own, and a
+		// gate that names the family would claim four platforms at once.
 		{"only bad os", scenarioTop("only: {os: bsd}", "run: {command: echo}"), "only.os \"bsd\" is invalid"},
+		{"empty skip gate", scenarioTop("skip: {}", "run: {command: echo}"), "skip must name a condition"},
+		{"empty only gate", scenarioTop("only: {}", "run: {command: echo}"), "only must name a condition"},
+		{"canceling os gates", scenarioTop("skip: {os: linux}\n    only: {os: linux}", "run: {command: echo}"), "skip.os and only.os both name \"linux\""},
+		{"canceling env gates", scenarioTop("skip: {env: FEATURE_X}\n    only: {env: FEATURE_X}", "run: {command: echo}"), "skip.env and only.env both name \"FEATURE_X\""},
+		{"canceling command gates", scenarioTop("skip: {command: \"true\"}\n    only: {command: \"true\"}", "run: {command: echo}"), "skip.command and only.command both name \"true\""},
+
+		// ---- validateDeterministic empty compare (#564) ----
+		{"deterministic empty compare", specSteps("run: {command: echo, deterministic: {compare: []}}"), "deterministic.compare must not be empty"},
 
 		// ---- validateStep ----
 		{"step no action", specSteps("{}"), "step must set exactly one of fixture/run/http/query/grpc/cdp/assert/store/pty/signal (got none)"},
@@ -1295,6 +1356,12 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"pty expect_screen with snapshot rejected", specSteps("pty: {command: sh, session: [{expect_screen: {snapshot: snap.txt}}]}"), "snapshot is not supported in expect_screen"},
 		{"pty expect_screen with trim rejected", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, trim: true}}]}"), "trim is not supported in expect_screen"},
 		{"pty expect_screen stable exceeds timeout", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, timeout: \"20ms\", stable_for: \"30ms\"}}]}"), "must not exceed scenario \"a\".steps[0].pty.session[0].expect_screen.timeout"},
+		// With no action-local timeout the session budget is what bounds the
+		// wait, so a stable_for above it can never succeed either.
+		{"pty expect_screen stable exceeds the session timeout", specSteps("pty: {command: sh, timeout: \"2s\", session: [{expect_screen: {contains: hi, stable_for: \"60s\"}}]}"), "must not exceed scenario \"a\".steps[0].pty.timeout"},
+		// Same contradiction against the built-in session default when the step
+		// sets no timeout of its own.
+		{"pty expect_screen stable exceeds the default session timeout", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"60s\"}}]}"), "must not exceed the pty session timeout"},
 
 		// ---- validateMockRoutes (scenario) ----
 		{"route method required", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    mock_servers:\n      - name: m\n        routes:\n          - {path: /}\n    steps:\n      - run: {command: echo}\n", "method is required"},
@@ -1321,6 +1388,7 @@ func TestBugHunt_Rejections(t *testing.T) {
 	// the Go runtime on Windows CI.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1353,15 +1421,15 @@ func TestBugHunt_Acceptances(t *testing.T) {
 	}
 
 	tests := []struct{ name, src string }{
-		{"store stdout json", specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}")},
-		{"store header", specSteps("store: {name: v, from: {header: X-Request-Id}}")},
-		{"store stdout matches", specSteps("store: {name: v, from: {stdout: {matches: \"id=(\\\\d+)\"}}}")},
+		{"store stdout json", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}")},
+		{"store header", withRunner("runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n", specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {header: X-Request-Id}}"))},
+		{"store stdout matches", specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"id=(\\\\d+)\"}}}")},
 		{"store file json", specSteps("store: {name: v, from: {file: {path: out.json, json: {path: \"$.id\"}}}}")},
 		{"exit_code in", specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1, 2]}}")},
 		{"exit_code not", specSteps("run: {command: echo}", "assert: {exit_code: {not: 1}}")},
 		{"file exists", specSteps("assert: {file: {path: out.txt, exists: true}}")},
-		{"header equals", specSteps("assert: {header: {name: Content-Type, equals: text/html}}")},
-		{"json gt", specSteps("assert: {stdout: {json: {path: \"$.count\", gt: 5}}}")},
+		{"header equals", withRunner("runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n", specSteps("http: {runner: api, method: GET, path: /}", "assert: {header: {name: Content-Type, equals: text/html}}"))},
+		{"json gt", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.count\", gt: 5}}}")},
 		{"mock count", mockScenario("assert: {mock: {name: api, count: 2}}")},
 		{"signal valid", svcScenario("signal: {service: s, signal: TERM}")},
 		{"signal var target", svcScenario("signal: {service: \"${svc}\", signal: KILL}")},
@@ -1369,18 +1437,41 @@ func TestBugHunt_Acceptances(t *testing.T) {
 		{"fixture content", specSteps("fixture: {file: a.txt, content: hello}")},
 		{"pty valid", specSteps("pty: {command: sh, session: [{expect: \"[$] \"}, {send: \"ls\\n\"}]}")},
 		{"pty expect_screen valid", specSteps("pty: {command: sh, session: [{expect_screen: {contains: hi, stable_for: \"20ms\"}}]}")},
-		{"assert message", specSteps("assert: {message: {equals: ok}}")},
-		{"assert value", specSteps("assert: {value: {contains: hi}}")},
-		{"assert grpc_status", specSteps("assert: {grpc_status: 0}")},
+		{"assert message", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {message: {equals: ok}}"))},
+		{"assert value", withRunner(browserRunner, specSteps("cdp: {runner: b, actions: [{text: \"h1\"}]}", "assert: {value: {contains: hi}}"))},
+		{"assert grpc_status", withRunner("runners:\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n", specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {grpc_status: 0}"))},
 		{"assert screen after pty", specSteps("pty: {command: sh}", "assert: {screen: {contains: prompt}}")},
 		{"assert duration after run", specSteps("run: {command: echo}", "assert: {duration: {lt: \"5s\"}}")},
 		{"skip valid os", scenarioTop("skip: {os: darwin}", "run: {command: echo}")},
 		{"only valid os", scenarioTop("only: {os: windows}", "run: {command: echo}")},
+		// Each BSD is a gate of its own: a scenario for what FreeBSD ps
+		// prints says nothing about OpenBSD, and the values are the ones
+		// runtime.GOOS reports.
+		{"only os freebsd", scenarioTop("only: {os: freebsd}", "run: {command: echo}")},
+		{"skip os openbsd", scenarioTop("skip: {os: openbsd}", "run: {command: echo}")},
+		{"only os netbsd", scenarioTop("only: {os: netbsd}", "run: {command: echo}")},
+		{"gates naming two different BSDs", scenarioTop("skip: {os: freebsd}\n    only: {os: openbsd}", "run: {command: echo}")},
+		// Contradiction checks compare literally, so anything that can be
+		// satisfied keeps loading.
+		{"contains and not_contains that differ", specSteps("run: {command: echo}", "assert: {stdout: {contains: [abc], not_contains: [abcd]}}")},
+		{"matches and not_matches that differ", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"a.c\", not_matches: \"a\\\\.c\"}}")},
+		{"dir contains repeated names one child", specSteps("assert: {dir: {path: d, contains: [x, x], count: 1}}")},
+		{"dir contains a nested path under its ceiling", specSteps("assert: {dir: {path: d, contains: [\"assets/app.css\"], max_count: 1}}")},
+		{"recursive dir contains with a count", specSteps("assert: {dir: {path: d, recursive: true, contains: [\"a/b.txt\"], count: 0}}")},
+		{"empty-matching pattern without a count bound", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"z*\"}}")},
+		// Gates that name DIFFERENT fields compose normally: "this scenario is
+		// POSIX-only and needs fzf" is an ordinary spec, and so are two gates on
+		// one field with different values.
+		{"gates on different fields", scenarioTop("skip: {os: windows}\n    only: {command: fzf}", "run: {command: echo}")},
+		{"gates on one field with different values", scenarioTop("skip: {os: windows}\n    only: {os: linux}", "run: {command: echo}")},
+		{"deterministic compare listed", specSteps("run: {command: echo, deterministic: {compare: [stdout]}}")},
+		{"deterministic without compare", specSteps("run: {command: echo, deterministic: {runs: 3}}")},
 		{"suite setup kinds", "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - fixture: {file: seed.txt, content: hi}\n    - run: {command: echo}\n    - store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}\n    - assert: {exit_code: 0}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}
@@ -1393,9 +1484,9 @@ func TestBugHunt_RoundTrip(t *testing.T) {
 	t.Parallel()
 	srcs := []string{
 		specSteps("run: {command: echo}", "assert: {exit_code: {in: [0, 1]}}"),
-		specSteps("store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
+		specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {json: {path: \"$.a\"}}}}"),
 		specSteps("fixture: {file: a.txt, content: hello}"),
-		specSteps("assert: {stdout: {contains: [\"a\", \"b\"]}}"),
+		specSteps("run: {command: echo}", "assert: {stdout: {contains: [\"a\", \"b\"]}}"),
 	}
 	for i, src := range srcs {
 		s1, err := LoadBytes("t.atago.yaml", []byte(src))
@@ -1475,6 +1566,7 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range reject {
 		t.Run("reject/"+tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustReject(t, tt.name, tt.src, tt.want)
 		})
 	}
@@ -1496,6 +1588,7 @@ func TestBugHunt_DirAssert(t *testing.T) {
 	}
 	for _, tt := range accept {
 		t.Run("accept/"+tt.name, func(t *testing.T) {
+			t.Parallel()
 			mustAccept(t, tt.name, tt.src)
 		})
 	}
@@ -1505,20 +1598,26 @@ func TestBugHunt_DirAssert(t *testing.T) {
 // (executable, snapshot, the numeric json bounds) on the accept side.
 func TestBugHunt_FileAndJSONExtras(t *testing.T) {
 	t.Parallel()
+	// A store reads what a step produced, so the runner-backed sources need both
+	// the runner and the step that fills the source.
+	withRunners := func(body string) string {
+		runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n  b: {type: browser}\n"
+		return strings.Replace(body, "scenarios:", runners+"scenarios:", 1)
+	}
 	accept := []struct{ name, src string }{
 		{"file executable", specSteps("assert: {file: {path: bin/tool, executable: true}}")},
 		{"file snapshot", specSteps("assert: {file: {path: out.txt, snapshot: golden}}")},
 		{"file contains list", specSteps("assert: {file: {path: out.txt, contains: [\"a\", \"b\"]}}")},
 		{"file json", specSteps("assert: {file: {path: out.json, json: {path: \"$.id\", equals: 7}}}")},
-		{"json lt", specSteps("assert: {stdout: {json: {path: \"$.n\", lt: 10}}}")},
-		{"json lte", specSteps("assert: {stdout: {json: {path: \"$.n\", lte: 10}}}")},
-		{"json gte", specSteps("assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
-		{"json length", specSteps("assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
-		{"yaml matcher", specSteps("assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
-		{"store from body matches", specSteps("store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}")},
-		{"store from rows json", specSteps("store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}")},
-		{"store from message json", specSteps("store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}")},
-		{"store from value matches", specSteps("store: {name: v, from: {value: {matches: \"^ok$\"}}}")},
+		{"json lt", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", lt: 10}}}")},
+		{"json lte", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", lte: 10}}}")},
+		{"json gte", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.n\", gte: 1}}}")},
+		{"json length", specSteps("run: {command: echo}", "assert: {stdout: {json: {path: \"$.items\", length: 3}}}")},
+		{"yaml matcher", specSteps("run: {command: echo}", "assert: {stdout: {yaml: {path: \"$.k\", equals: v}}}")},
+		{"store from body matches", withRunners(specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {body: {matches: \"tok=(\\\\w+)\"}}}"))},
+		{"store from rows json", withRunners(specSteps("query: {runner: db, sql: \"SELECT 1\"}", "store: {name: v, from: {rows: {json: {path: \"$[0].id\"}}}}"))},
+		{"store from message json", withRunners(specSteps("grpc: {runner: rpc, method: pkg.S/M}", "store: {name: v, from: {message: {json: {path: \"$.ok\"}}}}"))},
+		{"store from value matches", withRunners(specSteps("cdp: {runner: b, actions: [{text: \"h1\"}]}", "store: {name: v, from: {value: {matches: \"^ok$\"}}}"))},
 	}
 	for _, tt := range accept {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1629,5 +1728,483 @@ scenarios:
 				t.Errorf("error = %q, want a source excerpt containing %q", msg, tc.excerpt)
 			}
 		})
+	}
+}
+
+// TestLoadBytes_CwdEscapesWorkdir is a regression: run.cwd is documented as a
+// working directory relative to the scenario workdir, and a `../` one walked
+// straight out of it — `cwd: ../../../../../..` ran the command at the
+// filesystem root. Nothing said so, and every assertion the scenario then made
+// (changes:, dir:, file:) still looked at the untouched sandbox, so a scenario
+// could act on the host and pass having done none of what it claimed. Other
+// workdir-relative fields have rejected the same traversal all along.
+func TestLoadBytes_CwdEscapesWorkdir(t *testing.T) {
+	t.Parallel()
+	bad := []struct {
+		name string
+		src  string
+	}{
+		{
+			name: "run step",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"../elsewhere\"}",
+		},
+		{
+			name: "bare parent",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"..\"}",
+		},
+		{
+			name: "traversal that re-enters",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"sub/../../out\"}",
+		},
+		{
+			name: "defaults.run",
+			src:  "version: \"1\"\nsuite:\n  name: x\ndefaults:\n  run: {cwd: \"../elsewhere\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}",
+		},
+		{
+			name: "service",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: sleep 1, cwd: \"../elsewhere\"}\n    steps:\n      - run: {command: echo}",
+		},
+		{
+			name: "pty step",
+			src:  "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - pty: {command: cat, cwd: \"../elsewhere\"}",
+		},
+	}
+	for _, tt := range bad {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("s.atago.yaml", []byte(tt.src))
+			if err == nil {
+				t.Fatalf("cwd escaping the workdir was accepted:\n%s", tt.src)
+			}
+			if !strings.Contains(err.Error(), "escapes the scenario workdir") {
+				t.Errorf("err = %v, want an escapes-the-scenario-workdir rejection", err)
+			}
+		})
+	}
+
+	// What must keep loading: a sub-directory, the workdir itself, and an
+	// absolute path, which is explicit in a way `../..` is not.
+	good := []struct {
+		name string
+		src  string
+	}{
+		{"sub-directory", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: sub}"},
+		{"nested sub-directory", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"a/b/c\"}"},
+		{"dot", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \".\"}"},
+		{"re-entering traversal that stays inside", "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo, cwd: \"a/../b\"}"},
+	}
+	for _, tt := range good {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := LoadBytes("s.atago.yaml", []byte(tt.src)); err != nil {
+				t.Errorf("a workdir-relative cwd was rejected: %v\n%s", err, tt.src)
+			}
+		})
+	}
+}
+
+// TestLoadBytes_EveryBuiltinIsReserved is a regression: the engine seeds five
+// variables into every scenario store, and the guard that stops a store or a
+// matrix key from shadowing one knew about three. A `store: {name: specdir}`
+// was accepted and silently redefined ${specdir} for the rest of the scenario,
+// so a later step reading a committed file through it read somewhere else —
+// while `store: {name: workdir}` was rejected with advice to pick another name.
+func TestLoadBytes_EveryBuiltinIsReserved(t *testing.T) {
+	t.Parallel()
+	for _, name := range store.Builtins {
+		t.Run("store "+name, func(t *testing.T) {
+			t.Parallel()
+			src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - store: {name: " + name + ", from: {stdout: {trim: true}}}"
+			_, err := LoadBytes("s.atago.yaml", []byte(src))
+			if err == nil {
+				t.Fatalf("store named %q was accepted; it shadows a built-in", name)
+			}
+			if !strings.Contains(err.Error(), "shadows a built-in variable") {
+				t.Errorf("err = %v, want a shadowing rejection", err)
+			}
+		})
+		t.Run("matrix "+name, func(t *testing.T) {
+			t.Parallel()
+			src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: \"m ${" + name + "}\"\n    matrix:\n      - { " + name + ": v }\n    steps:\n      - run: {command: echo}"
+			_, err := LoadBytes("s.atago.yaml", []byte(src))
+			if err == nil {
+				t.Fatalf("matrix key %q was accepted; it shadows a built-in", name)
+			}
+			if !strings.Contains(err.Error(), "shadows a built-in variable") {
+				t.Errorf("err = %v, want a shadowing rejection", err)
+			}
+		})
+	}
+
+	// A name that merely resembles one is still the author's to use.
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - store: {name: workdir_path, from: {stdout: {trim: true}}}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+		t.Errorf("a non-builtin name was rejected: %v", err)
+	}
+}
+
+// TestLoadBytes_DuplicateTag is a regression: a tag list is a set, so repeating
+// an entry selects nothing extra — but `atago doc` counts tag occurrences, so a
+// scenario listing `smoke` twice made the summary read "smoke (2)" over a suite
+// where one scenario carries it. `atago list` showed "smoke,smoke" beside it.
+func TestLoadBytes_DuplicateTag(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [smoke, smoke, slow]\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("a repeated tag was accepted")
+	}
+	if !strings.Contains(err.Error(), `duplicate tag "smoke"`) {
+		t.Errorf("err = %v, want a duplicate-tag rejection", err)
+	}
+
+	// Distinct tags, and the same tag on two different scenarios, are the
+	// ordinary case and must keep loading.
+	ok := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [smoke, slow]\n    steps:\n      - run: {command: echo}\n  - name: b\n    tags: [smoke]\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("distinct tags were rejected: %v", err)
+	}
+}
+
+// TestLoadBytes_AssertNeedsItsProducingStep is a regression: the same
+// authoring mistake — an assertion whose producing step never ran — was
+// classified three different ways. `screen:` before a pty step was refused at
+// load (ATG2107), a `store from.header` after a run step errored at runtime
+// (exit 4), and `status:` or a leading `exit_code:` merely FAILED (exit 1, no
+// code), so a statically knowable mistake was counted as a product regression
+// by every dashboard reading the exit status. The loader sees the step order —
+// ATG2107 proves it — so the whole family is refused there.
+func TestLoadBytes_AssertNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"exit_code with no command",
+			specSteps("assert: {exit_code: 0}", "run: {command: echo}"),
+			"assert.exit_code requires a preceding run/pty step",
+		},
+		{
+			"stdout with no command",
+			specSteps("assert: {stdout: {contains: hi}}"),
+			"assert.stdout requires a preceding run/pty step",
+		},
+		{
+			"status with no http step",
+			specSteps("run: {command: echo}", "assert: {status: 200}"),
+			"assert.status requires a preceding http step",
+		},
+		{
+			"rows with no query",
+			specSteps("run: {command: echo}", "assert: {rows: {contains: x}}"),
+			"assert.rows requires a preceding query step",
+		},
+		{
+			"grpc_status with no grpc step",
+			specSteps("run: {command: echo}", "assert: {grpc_status: 0}"),
+			"assert.grpc_status requires a preceding grpc step",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_AssertAfterItsProducingStepLoads pins the accept side: every
+// ordering that CAN be fed must keep loading, including an assert fed by a step
+// earlier in the scenario and a teardown assert fed by the scenario's steps.
+func TestLoadBytes_AssertAfterItsProducingStepLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		specSteps("run: {command: echo}", "assert: {exit_code: 0}"),
+		specSteps("pty: {command: sh, session: [{send: \"\"}]}", "assert: {stdout: {contains: hi}}"),
+		specSteps("http: {runner: api, method: GET, path: /}", "assert: {status: 200}"),
+		specSteps("query: {runner: db, sql: \"SELECT 1\"}", "assert: {rows: {contains: x}}"),
+		specSteps("grpc: {runner: rpc, method: pkg.S/M}", "assert: {grpc_status: 0}"),
+		// An assert fed by a step two positions earlier is still fed.
+		specSteps("run: {command: echo}", "fixture: {file: f.txt, content: x}", "assert: {exit_code: 0}"),
+		// A teardown assert is fed by the scenario's own steps.
+		"version: \"1\"\nsuite:\n  name: x\nrunners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - assert: {exit_code: 0}\n",
+	}
+	runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n"
+	for i, src := range ok {
+		if !strings.Contains(src, "runners:") {
+			src = strings.Replace(src, "scenarios:", runners+"scenarios:", 1)
+		}
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
+	}
+}
+
+// suiteBlockSteps builds a spec whose suite.setup or suite.teardown holds the
+// given steps, with one trivial scenario so the suite has something to run.
+func suiteBlockSteps(block string, steps ...string) string {
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: x\n  " + block + ":\n")
+	for _, s := range steps {
+		b.WriteString("    - " + s + "\n")
+	}
+	b.WriteString("scenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert: {exit_code: 0}\n")
+	return b.String()
+}
+
+// TestLoadBytes_SuiteBlockAssertNeedsItsProducingStep is a regression: the
+// producing-step rule was applied to scenario steps and teardown but not to the
+// suite lifecycle, where the mistake is worse. A suite block admits neither pty
+// nor the runner-backed kinds, so a screen or status assertion there can never
+// be fed by any ordering — and a suite.teardown failure preserves the verdict by
+// contract, so such a spec printed SUITE TEARDOWN FAILED on every run while
+// exiting 0 forever.
+func TestLoadBytes_SuiteBlockAssertNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"setup stdout with no command",
+			suiteBlockSteps("setup", "fixture: {file: f.txt, content: x}", "assert: {stdout: {contains: hi}}"),
+			"suite.setup[1].assert.stdout requires a preceding run step",
+		},
+		{
+			"setup exit_code with no command",
+			suiteBlockSteps("setup", "assert: {exit_code: 0}"),
+			"suite.setup[0].assert.exit_code requires a preceding run step",
+		},
+		{
+			"setup screen can never be fed",
+			suiteBlockSteps("setup", "assert: {screen: {contains: hi}}"),
+			"pty steps are not allowed in a suite block",
+		},
+		{
+			"teardown status can never be fed",
+			suiteBlockSteps("teardown", "assert: {status: 200}"),
+			"http steps are not allowed in a suite block",
+		},
+		{
+			"teardown does not inherit the setup block's command",
+			"version: \"1\"\nsuite:\n  name: x\n  setup:\n    - run: {command: echo}\n  teardown:\n    - assert: {stdout: {contains: hi}}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n      - assert: {exit_code: 0}\n",
+			"suite.teardown[0].assert.stdout requires a preceding run step",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_SuiteBlockAssertAfterItsRunLoads pins the accept side: the
+// build-then-check bootstrap a suite.setup exists for must keep loading, in both
+// blocks, and filesystem-fed assertions stay unaffected.
+func TestLoadBytes_SuiteBlockAssertAfterItsRunLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		suiteBlockSteps("setup", "run: {command: echo}", "assert: {exit_code: 0}"),
+		suiteBlockSteps("setup", "run: {command: echo}", "assert: {stdout: {contains: hi}}"),
+		suiteBlockSteps("teardown", "run: {command: echo}", "assert: {stdout: {contains: hi}}"),
+		// A filesystem assertion has no unambiguous producer and is unaffected.
+		suiteBlockSteps("setup", "fixture: {file: f.txt, content: x}", "assert: {file: {path: f.txt, contains: x}}"),
+	}
+	for i, src := range ok {
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
+	}
+}
+
+// TestLoadBytes_StoreNeedsItsProducingStep is a regression: the commit that
+// refused a context-less assertion named a `store from.header` after a run step
+// as one of the three shapes of the same authoring mistake, and then fixed only
+// the assertion. A store whose source no step produces stayed a runtime error
+// (ATG4501, exit 4) while the identical assertion became a load error.
+func TestLoadBytes_StoreNeedsItsProducingStep(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		src  string
+		want string
+	}{
+		{
+			"stdout with no command",
+			specSteps("store: {name: v, from: {stdout: {matches: \"(.+)\"}}}", "run: {command: echo}"),
+			"store.from.stdout requires a preceding run/pty step",
+		},
+		{
+			"header with no http step",
+			specSteps("run: {command: echo}", "store: {name: v, from: {header: X-Token}}"),
+			"store.from.header requires a preceding http step",
+		},
+		{
+			"body with no http step",
+			specSteps("run: {command: echo}", "store: {name: v, from: {body: {matches: \"(.+)\"}}}"),
+			"store.from.body requires a preceding http step",
+		},
+		{
+			"rows with no query",
+			specSteps("run: {command: echo}", "store: {name: v, from: {rows: {matches: \"(.+)\"}}}"),
+			"store.from.rows requires a preceding query step",
+		},
+		{
+			"message with no grpc call",
+			specSteps("run: {command: echo}", "store: {name: v, from: {message: {matches: \"(.+)\"}}}"),
+			"store.from.message requires a preceding grpc step",
+		},
+		{
+			"suite block header can never be fed",
+			suiteBlockSteps("setup", "store: {name: v, from: {header: X-Token}}"),
+			"http steps are not allowed in a suite block",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			mustReject(t, c.name, c.src, c.want)
+		})
+	}
+}
+
+// TestLoadBytes_StoreAfterItsProducingStepLoads pins the accept side for stores,
+// including the sources with no unambiguous producer.
+func TestLoadBytes_StoreAfterItsProducingStepLoads(t *testing.T) {
+	t.Parallel()
+	ok := []string{
+		specSteps("run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		specSteps("pty: {command: sh, session: [{send: \"\"}]}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		specSteps("http: {runner: api, method: GET, path: /}", "store: {name: v, from: {header: X-Token}}"),
+		specSteps("query: {runner: db, sql: \"SELECT 1\"}", "store: {name: v, from: {rows: {matches: \"(.+)\"}}}"),
+		specSteps("grpc: {runner: rpc, method: pkg.S/M}", "store: {name: v, from: {message: {matches: \"(.+)\"}}}"),
+		// A file source may read what a fixture wrote, so it needs no command.
+		specSteps("fixture: {file: f.txt, content: \"{}\"}", "store: {name: v, from: {file: {path: f.txt, text: true}}}"),
+		// A suite.setup store reading the block's own run output is the ordinary
+		// bootstrap and must keep loading.
+		suiteBlockSteps("setup", "run: {command: echo}", "store: {name: v, from: {stdout: {matches: \"(.+)\"}}}"),
+		// A teardown store is fed by the scenario's steps.
+		"version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n    teardown:\n      - store: {name: v, from: {stdout: {matches: \"(.+)\"}}}\n",
+	}
+	runners := "runners:\n  api: {type: http, base_url: \"http://127.0.0.1:1\"}\n  db: {type: db, dsn: \"sqlite:./a.db\"}\n  rpc: {type: grpc, target: \"127.0.0.1:1\"}\n"
+	for i, src := range ok {
+		if !strings.Contains(src, "runners:") {
+			src = strings.Replace(src, "scenarios:", runners+"scenarios:", 1)
+		}
+		if _, err := LoadBytes("s.atago.yaml", []byte(src)); err != nil {
+			t.Errorf("case %d was rejected: %v\n%s", i, err, src)
+		}
+	}
+}
+
+// TestLoadWithSource_AppliesTheProjectManifest is a regression: LoadWithSource
+// is what `atago manifest` reads specs with, and it went straight to LoadBytes
+// — skipping the directory-manifest discovery every other command performs. A
+// spec under an atago.project.yaml therefore meant one thing to run/explain/doc
+// and another to manifest, which reported no project_path and none of the
+// configuration the file applies.
+func TestLoadWithSource_AppliesTheProjectManifest(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	proj := filepath.Join(dir, "atago.project.yaml")
+	if err := os.WriteFile(proj, []byte("env:\n  FROM_PROJECT: \"1\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	if err := os.WriteFile(specPath, []byte("version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	withSource, _, err := LoadWithSource(specPath)
+	if err != nil {
+		t.Fatalf("LoadWithSource: %v", err)
+	}
+	plain, err := Load(specPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if withSource.ProjectPath != plain.ProjectPath {
+		t.Errorf("project path = %q via LoadWithSource, %q via Load; the two must agree", withSource.ProjectPath, plain.ProjectPath)
+	}
+	if withSource.Suite.Env["FROM_PROJECT"] != "1" {
+		t.Errorf("the manifest's env was not applied: %v", withSource.Suite.Env)
+	}
+}
+
+// TestLoadBytes_EmptyTag is a regression: an empty tag loaded cleanly and then
+// corrupted every tag index — `atago list` rendered the column as ",smoke" and
+// `atago doc` summarized "Tags: “ (1)" — while selecting nothing, since no
+// usable --tag invocation names it. It is the remaining hole in the set
+// semantics the duplicate-tag rule guards.
+func TestLoadBytes_EmptyTag(t *testing.T) {
+	t.Parallel()
+	for _, tag := range []string{`""`, `"   "`} {
+		src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    tags: [" + tag + ", smoke]\n    steps:\n      - run: {command: echo}"
+		_, err := LoadBytes("s.atago.yaml", []byte(src))
+		if err == nil {
+			t.Fatalf("tag %s was accepted", tag)
+		}
+		if !strings.Contains(err.Error(), "tag must not be empty") {
+			t.Errorf("tag %s: err = %v, want an empty-tag rejection", tag, err)
+		}
+	}
+}
+
+// TestLoadBytes_ReadyStoreShadowsBuiltin is a regression: `store:` and `matrix:`
+// are refused when they would bind a built-in name, and a service's ready.store
+// is the third binding site the guard never learned — `ready: {file: f, store:
+// workdir}` silently redefined ${workdir} for the rest of the scenario.
+func TestLoadBytes_ReadyStoreShadowsBuiltin(t *testing.T) {
+	t.Parallel()
+	src := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: ./srv, ready: {file: marker.txt, store: workdir}}\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(src))
+	if err == nil {
+		t.Fatal("a ready.store shadowing ${workdir} was accepted")
+	}
+	if !strings.Contains(err.Error(), "shadows a built-in variable") {
+		t.Errorf("err = %v, want a built-in shadow rejection", err)
+	}
+
+	// A suite.setup service is the same binding site one scope up.
+	suiteSrc := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: s, command: ./srv, ready: {file: marker.txt, store: specdir}}\nscenarios:\n  - name: a\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(suiteSrc)); err == nil {
+		t.Error("a suite service ready.store shadowing ${specdir} was accepted")
+	}
+
+	// An ordinary capture name keeps loading.
+	ok := "version: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    services:\n      - {name: s, command: ./srv, ready: {file: marker.txt, store: addr}}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("an ordinary ready.store name was rejected: %v", err)
+	}
+}
+
+// TestLoadBytes_ScenarioServiceShadowsSuiteService is a regression: duplicate
+// names are refused within a scope, but a scenario service could reuse a
+// suite-level name, leaving a `signal:` step's target ambiguous with nothing
+// said. Mock servers had the identical cross-scope hole.
+func TestLoadBytes_ScenarioServiceShadowsSuiteService(t *testing.T) {
+	t.Parallel()
+	svc := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: peer, command: ./peer}\nscenarios:\n  - name: a\n    services:\n      - {name: peer, command: ./peer}\n    steps:\n      - run: {command: echo}"
+	_, err := LoadBytes("s.atago.yaml", []byte(svc))
+	if err == nil {
+		t.Fatal("a scenario service shadowing a suite service was accepted")
+	}
+	if !strings.Contains(err.Error(), "duplicate service name") {
+		t.Errorf("err = %v, want a duplicate-service rejection", err)
+	}
+
+	mock := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - mock_server: {name: api, routes: []}\nscenarios:\n  - name: a\n    mock_servers:\n      - {name: api, routes: []}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(mock)); err == nil {
+		t.Error("a scenario mock server shadowing a suite mock server was accepted")
+	}
+
+	// Distinct names across the scopes stay legal.
+	ok := "version: \"1\"\nsuite:\n  name: x\n  setup:\n    - service: {name: shared, command: ./peer}\nscenarios:\n  - name: a\n    services:\n      - {name: local, command: ./peer}\n    steps:\n      - run: {command: echo}"
+	if _, err := LoadBytes("s.atago.yaml", []byte(ok)); err != nil {
+		t.Errorf("distinct service names across scopes were rejected: %v", err)
 	}
 }

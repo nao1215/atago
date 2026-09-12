@@ -59,9 +59,12 @@ func FailsRun(st Status, allowFlaky, allowXPass bool) bool {
 		return !allowFlaky
 	case StatusXPass:
 		return !allowXPass
-	default:
+	case StatusPassed, StatusSkipped, StatusXFail:
+		// The three green verdicts. XFail belongs here on purpose: a known bug
+		// that is still broken is the outcome expect_fail asked for.
 		return false
 	}
+	return false
 }
 
 // StepResult records what happened for a single step.
@@ -97,6 +100,12 @@ type ScenarioResult struct {
 	Teardown   []StepResult
 	Duration   time.Duration
 	SkipReason string
+	// NotRun marks a scenario that was selected but never executed: --fail-fast
+	// stopped scheduling, or an interrupt ended the run before its turn came. It
+	// is reported as skipped, but that skip is a fact about the run, not a
+	// verdict on the scenario, so consumers that record what a run decided must
+	// leave its prior record alone.
+	NotRun bool
 	// SecurityViolation marks a scenario that errored because it breached the
 	// spec's security policy (e.g. a network-allowlist denial). It maps to exit
 	// code 6 rather than the generic execution-error code.
@@ -127,11 +136,33 @@ type ScenarioResult struct {
 func (s *ScenarioResult) PassedIterations() int {
 	n := 0
 	for _, st := range s.Iterations {
-		if st == StatusPassed || st == StatusSkipped {
+		if st.cleanIteration() {
 			n++
 		}
 	}
 	return n
+}
+
+// cleanIteration reports whether one --repeat iteration counted as "not a
+// failure": it passed, or a deterministic OS/env gate skipped it.
+//
+// It is the single definition both the fold's classification and the flake rate
+// the reports print are built from. They were written separately once, and the
+// console line then reported a rate the machine formats disagreed with.
+func (st Status) cleanIteration() bool {
+	switch st {
+	case StatusPassed, StatusSkipped:
+		return true
+	case StatusFailed, StatusError:
+		return false
+	case StatusXFail, StatusXPass, StatusFlaky:
+		// Unreachable for an iteration: an expect_fail scenario never repeats
+		// (runScenarioWithPolicy short-circuits it to a single run), and a single
+		// runScenario call never folds to flaky. Named rather than defaulted so a
+		// new status has to answer the question instead of inheriting an answer.
+		return false
+	}
+	return false
 }
 
 // TeardownFailed reports whether any teardown step failed or errored. Reports

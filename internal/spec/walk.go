@@ -46,163 +46,124 @@ func CollectVars(set map[string]bool, fields ...string) {
 	}
 }
 
-// CollectServiceVars folds every ${name} reference in a service's fields
-// (command, cwd, env values) into set. Shared by explain and manifest so their
-// "variables used" summaries agree on a scenario's services.
-func CollectServiceVars(set map[string]bool, svc *Service) {
-	CollectVars(set, svc.Command, svc.Cwd)
-	for _, v := range svc.Env {
-		CollectVars(set, v)
-	}
-	// The readiness file/port/log probes are ${name}-expanded by the engine
-	// (expandService), so a `ready: {port: ${db.port}}` or a log regexp with
-	// ${workdir} references variables the summaries must report.
-	if svc.Ready != nil {
-		CollectVars(set, svc.Ready.File, svc.Ready.Port, svc.Ready.Log)
+// collecting returns a walker visit that records each ${name} reference into
+// set and leaves the string unchanged. Passing it to the same Walk*Strings
+// walker the engine expands with is what keeps collection and expansion in
+// exact lockstep, field for field.
+func collecting(set map[string]bool) func(string) string {
+	return func(s string) string {
+		CollectVars(set, s)
+		return s
 	}
 }
 
-// CollectStepVars folds every ${name} reference in a step's fields into set.
-// It is the single source of truth for which fields of each step kind carry
-// variables, so the explain summary and the manifest never disagree about a
-// step's referenced variables (they previously drifted: explain under-reported
-// run env, http body_file/body_to/form/files, and cdp upload/download).
-func CollectStepVars(set map[string]bool, step *Step) {
+// CollectServiceVars folds every ${name} reference the engine would expand in a
+// service into set — the walker is the field list, shared with expandService.
+func CollectServiceVars(set map[string]bool, svc *Service) {
+	WalkServiceStrings(svc, collecting(set))
+}
+
+// StepRunner returns the runner a step names, or "" for a kind that carries no
+// runner. It is the one definition of that mapping: the variable walk and the
+// security summary both need to reach a step's runner definition, and spelling
+// the switch twice is how they would come to disagree about which steps have
+// one.
+func StepRunner(step *Step) string {
+	switch step.Kind() {
+	case StepRun:
+		return step.Run.Runner
+	case StepHTTP:
+		return step.HTTP.Runner
+	case StepQuery:
+		return step.Query.Runner
+	case StepGRPC:
+		return step.GRPC.Runner
+	case StepCDP:
+		return step.CDP.Runner
+	case StepFixture, StepAssert, StepStore, StepService, StepPTY, StepSignal, StepMockServer:
+		// No runner to name: none of these payloads carries a `runner:` key.
+		return ""
+	}
+	return ""
+}
+
+// RunnerVarFields returns the runner fields the engine ${name}-expands at use
+// time — a cmd runner's cwd, an http base_url, a db dsn, a grpc target, and an
+// ssh runner's address and credentials. It is shared by the variable walk and
+// the security summary so both read one list of what a runner interpolates.
+func RunnerVarFields(r Runner) []string {
+	return []string{r.Cwd, r.BaseURL, r.DSN, r.Target, r.Host, r.User, r.Password, r.KeyFile, r.KnownHosts}
+}
+
+// CollectRunnerVars folds every ${name} reference in a runner definition into
+// set. A runner is expanded when a step uses it, so a `${env:DB_PASSWORD}` in a
+// dsn is a genuine dependency of every scenario that queries through it.
+func CollectRunnerVars(set map[string]bool, r Runner) {
+	CollectVars(set, RunnerVarFields(r)...)
+}
+
+// CollectStepVars folds every ${name} reference the engine would expand in a
+// step into set, including those in the definition of the runner it names.
+// Each kind is read through the same Walk*Strings walker the engine expands
+// with (internal/spec/stepstrings.go), so the field lists cannot drift apart —
+// they had, repeatedly: explain under-reported run env, http
+// body_file/body_to/form/files, cdp upload/download, and pty paste/exec, and
+// the whole assert kind was uncounted, each because this function kept its own
+// copy of what a kind expands. The retry `until:` assertion is the one
+// addition on top of the walkers: the poll loop expands it per attempt through
+// WalkAssertStrings, so its references are just as live.
+func CollectStepVars(set map[string]bool, step *Step, runners map[string]Runner) {
+	if name := StepRunner(step); name != "" {
+		if r, ok := runners[name]; ok {
+			CollectRunnerVars(set, r)
+		}
+	}
+	collect := collecting(set)
 	switch step.Kind() {
 	case StepFixture:
-		// From is ${name}-expanded by the engine (expandFixture), so a
-		// `from: ${srcdir}/seed.bin` reference is a real variable use and must be
-		// counted like file/content/symlink — omitting it under-reported it.
-		CollectVars(set, step.Fixture.File, step.Fixture.Content, step.Fixture.Symlink, step.Fixture.From)
+		WalkFixtureStrings(step.Fixture, collect)
 	case StepService:
-		// Delegate to CollectServiceVars — the single source of truth for a
-		// service's variable-bearing fields — instead of re-listing them here.
-		// This case had drifted: it collected only command/cwd, missing the env
-		// values and ready.file/port/log that expandService actually expands, so a
-		// suite.setup `service:` with `env: {DSN: ${...}}` or `ready: {file:
-		// ${suitedir}/ready}` was under-reported by `atago manifest` (#244).
 		CollectServiceVars(set, step.Service)
 	case StepRun:
-		r := step.Run
-		// stdout_to/stderr_to are ${name}-expanded by the engine (expandRun), so a
-		// redirect target like `out-${who}.txt` is a real variable use and must be
-		// counted like cwd/stdin — omitting it under-reported it.
-		CollectVars(set, r.Command, r.Cwd, r.Stdin.Inline, r.Stdin.File, r.StdoutTo, r.StderrTo)
-		for _, v := range r.Env {
-			CollectVars(set, v)
-		}
+		WalkRunStrings(step.Run, collect)
+		collectRetryVars(set, step.Run.Retry)
 	case StepHTTP:
-		h := step.HTTP
-		CollectVars(set, h.Path, h.Body, h.BodyFile, h.BodyTo)
-		for _, v := range h.Form {
-			CollectVars(set, v)
-		}
-		// Header values and the JSON request body are ${name}-expanded by the
-		// engine (expandHTTP: ExpandMap(header), WalkJSONValueStrings(json)), the
-		// exact binding that flows a stored token into `Authorization: Bearer
-		// ${token}` or a request body. Omitting them under-reported those vars.
-		for _, v := range h.Header {
-			CollectVars(set, v)
-		}
-		collectJSONVars(set, h.JSON)
-		for _, f := range h.Files {
-			CollectVars(set, f.Path)
-		}
+		WalkHTTPStrings(step.HTTP, collect)
+		collectRetryVars(set, step.HTTP.Retry)
 	case StepQuery:
-		CollectVars(set, step.Query.SQL)
+		WalkQueryStrings(step.Query, collect)
 	case StepGRPC:
-		g := step.GRPC
-		CollectVars(set, g.Method)
-		// Header values and the JSON request message are ${name}-expanded by the
-		// engine (expandGRPC), mirroring http; count them so a metadata or
-		// message reference is not silently dropped.
-		for _, v := range g.Header {
-			CollectVars(set, v)
-		}
-		collectJSONVars(set, g.JSON)
+		WalkGRPCStrings(step.GRPC, collect)
 	case StepCDP:
-		for _, a := range step.CDP.Actions {
-			collectCDPActionVars(set, a)
-		}
+		WalkCDPStrings(step.CDP, collect)
 	case StepPTY:
-		pt := step.PTY
-		CollectVars(set, pt.Command, pt.Cwd)
-		for _, v := range pt.Env {
-			CollectVars(set, v)
-		}
-		for _, a := range pt.Session {
-			if a.Send != nil && a.Send.Text != nil {
-				CollectVars(set, *a.Send.Text)
-			}
-			CollectVars(set, a.Expect)
-			if a.ExpectScreen != nil {
-				WalkPTYExpectScreenStrings(a.ExpectScreen, func(s string) string {
-					CollectVars(set, s)
-					return s
-				})
-			}
-		}
+		WalkPTYStrings(step.PTY, collect)
 	case StepSignal:
-		CollectVars(set, step.Signal.Service)
+		WalkSignalStrings(step.Signal, collect)
 	case StepAssert:
-		// An assert step's matcher arguments are ${name}-expanded by the engine
-		// (expandAssert -> WalkAssertStrings), so an `equals: ${expected}` or a
-		// `path: ${dir}/out.txt` is a genuine variable use. Walking through the
-		// SAME helper the engine expands with keeps collection and expansion in
-		// exact lockstep; the whole StepAssert kind was previously uncounted.
-		if step.Assert != nil {
-			WalkAssertStrings(step.Assert, func(s string) string {
-				CollectVars(set, s)
-				return s
-			})
-		}
+		WalkAssertStrings(step.Assert, collect)
 	case StepStore:
-		// The engine ${name}-expands a store's file-source path (expandStore),
-		// so `store: {from: {file: {path: ${workdir}/out.json}}}` references a
-		// variable the summaries must report.
-		if step.Store != nil && step.Store.From != nil && step.Store.From.File != nil {
-			CollectVars(set, step.Store.From.File.Path)
-		}
+		WalkStoreStrings(step.Store, collect)
+	case StepMockServer:
+		// A mock server is started verbatim; nothing in it is expanded, so it has
+		// no references to collect. WalkStepStrings says the same for the same
+		// reason, and the two have to agree: a kind this function forgets is a
+		// kind explain and the security summary under-report.
 	}
 }
 
-// collectJSONVars folds every ${name} reference in the string leaves of a
-// decoded JSON request body (http/grpc `json:`) into set. The engine expands
-// those leaves through WalkJSONValueStrings at request time
-// (expandHTTP/expandGRPC), so a body like {token: "${token}"} references a
-// variable the manifest and explain summaries must report.
-func collectJSONVars(set map[string]bool, v any) {
-	WalkJSONValueStrings(v, func(s string) string {
+// collectRetryVars folds the ${name} references of a retry's until assertion
+// into set. The engine expands it before each evaluation (pollUntil ->
+// expandAssert), so a reference there is as live as one in the step's own
+// fields; run and http share the retry shape and so share this walk.
+func collectRetryVars(set map[string]bool, r *Retry) {
+	if r == nil || r.Until == nil {
+		return
+	}
+	WalkAssertStrings(r.Until, func(s string) string {
 		CollectVars(set, s)
 		return s
 	})
-}
-
-// collectCDPActionVars folds the ${name} references of one browser action into
-// set, covering every field the action set can carry.
-func collectCDPActionVars(set map[string]bool, a CDPAction) {
-	CollectVars(set, a.Navigate, a.WaitVisible, a.WaitHidden, a.Click, a.Check, a.Uncheck, a.Text, a.Eval)
-	if a.SendKeys != nil {
-		CollectVars(set, a.SendKeys.Selector, a.SendKeys.Value)
-	}
-	if a.Press != nil {
-		CollectVars(set, a.Press.Selector, a.Press.Key)
-	}
-	if a.Select != nil {
-		CollectVars(set, a.Select.Selector, a.Select.Value)
-	}
-	if a.Screenshot != nil {
-		CollectVars(set, a.Screenshot.Path, a.Screenshot.Selector)
-	}
-	if a.Attribute != nil {
-		CollectVars(set, a.Attribute.Selector, a.Attribute.Name)
-	}
-	if a.Upload != nil {
-		CollectVars(set, a.Upload.Selector, a.Upload.File)
-	}
-	if a.Download != nil {
-		CollectVars(set, a.Download.Click, a.Download.Dir)
-	}
 }
 
 // WalkPTYExpectScreenStrings returns a copy of a session-local expect_screen

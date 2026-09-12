@@ -14,6 +14,14 @@ suite:
     handle differently — and each of which must not be confused for the others.
 
 # The unicode and `jq empty` contracts live in extra.atago.yaml.
+defaults:
+  scenario:
+    # Every scenario here drives jq. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: jq --version
+
 scenarios:
   - name: identity filter echoes the document from stdin
     steps:

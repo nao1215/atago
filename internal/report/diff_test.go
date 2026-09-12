@@ -182,6 +182,16 @@ func TestColorizeDiff(t *testing.T) {
 	if !strings.Contains(yaml, cGreen+"+++"+cReset) {
 		t.Errorf("added ++ content not green: %q", yaml)
 	}
+	// The file labels are structural only at the top of the diff: a removed
+	// content line "-- select" renders "--- select" — the label prefix with the
+	// trailing space — and must keep its removal color, as must its added twin.
+	content := colorizeDiff(true, "--- expected\n+++ actual\n@@ -1,1 +1,1 @@\n--- select\n+++ insert")
+	if !strings.Contains(content, cRed+"--- select"+cReset) {
+		t.Errorf("removed '-- select' content line not red: %q", content)
+	}
+	if !strings.Contains(content, cGreen+"+++ insert"+cReset) {
+		t.Errorf("added '++ insert' content line not green: %q", content)
+	}
 }
 
 // TestUnifiedDiff_OutputTruncationAndMultiHunk covers the rendered-output cap

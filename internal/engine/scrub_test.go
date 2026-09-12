@@ -88,3 +88,50 @@ func TestEngine_ScrubDeterminizesSnapshot(t *testing.T) {
 		t.Fatalf("no-scrub status = %s, want failed (raw id must not match the placeholder golden)", res.Status)
 	}
 }
+
+// TestEngine_ScrubIsSnapshotOnly pins the layer scrub applies at. It rewrites
+// captured output during snapshot normalization and nowhere else, so the text
+// matchers still see what the program actually printed. Widening it would be a
+// trap: a `contains:` written against the placeholder would pass without the
+// program ever emitting the value, and a failure diff would show text that was
+// never on screen.
+func TestEngine_ScrubIsSnapshotOnly(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	dir := t.TempDir()
+	specPath := filepath.Join(dir, "s.atago.yaml")
+	src := `
+version: "1"
+suite:
+  name: scrub-scope
+scrub:
+  - {pattern: 'id=\d+', placeholder: 'id=<ID>'}
+scenarios:
+  - name: text matchers see the raw output
+    steps:
+      - run:
+          shell: true
+          command: echo "user id=4711"
+      - assert:
+          stdout:
+            contains: "id=4711"
+  - name: text matchers do not see the placeholder
+    steps:
+      - run:
+          shell: true
+          command: echo "user id=4711"
+      - assert:
+          stdout:
+            not_contains: "id=<ID>"
+`
+	if err := os.WriteFile(specPath, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := loader.LoadBytes(specPath, []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if res := New().Run(context.Background(), s, specPath); res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed (scrub must not reach the text matchers): %+v", res.Status, res.Scenarios)
+	}
+}

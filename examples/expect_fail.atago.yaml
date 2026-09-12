@@ -25,6 +25,11 @@ version: "1"
 # apart from a test somebody gave up on. `issue` is optional and is what makes
 # the XPASS message actionable.
 #
+# A snapshot assertion inside an expect_fail scenario is exempt from
+# `--update-snapshots`: its golden holds the output the fix should produce, so
+# rewriting it with today's wrong output would erase what the scenario
+# documents. Drop expect_fail: to re-record such a golden.
+#
 # Runs green as-is: atago run examples/expect_fail.atago.yaml
 
 suite:

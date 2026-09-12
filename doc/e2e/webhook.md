@@ -8,6 +8,7 @@
   - [an HMAC signature is verified against an independent oracle](#scenario-an-hmac-signature-is-verified-against-an-independent-oracle)
   - [the http-methods allowlist rejects the wrong verb](#scenario-the-http-methods-allowlist-rejects-the-wrong-verb)
   - [a command that exits non-zero surfaces as a 500](#scenario-a-command-that-exits-non-zero-surfaces-as-a-500)
+
 ## webhook (self-hosted webhook receiver)
 [webhook](https://github.com/adnanh/webhook) turns an HTTP request into a
 command execution, which makes it a piece of security-relevant plumbing:
@@ -24,11 +25,14 @@ allowed-methods list rejects the wrong verb. And a command that exits
 non-zero surfaces as a 500 instead of being reported as success.
 
 Source: `test/e2e/thirdparty/webhook/webhook.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: a post runs the command, returns its output, and writes its file
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18094`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -52,8 +56,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/greet
-# HTTP POST /hooks/nope
+# HTTP POST /hooks/greet via hooks_a
+# HTTP POST /hooks/nope via hooks_a
 ```
 #### Then
 - after `HTTP POST /hooks/greet`:
@@ -62,11 +66,14 @@ _Fixture `hooks.json`:_
   - file `out.txt` contains `handled Alice`
 - after `HTTP POST /hooks/nope`:
   - HTTP status is `404`
+
 ### Scenario: a trigger-rule gates execution and blocks it when unsatisfied
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18095`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -94,8 +101,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/guarded
-# HTTP POST /hooks/guarded
+# HTTP POST /hooks/guarded via hooks_b
+# HTTP POST /hooks/guarded via hooks_b
 ```
 #### Then
 - after `HTTP POST /hooks/guarded`:
@@ -105,11 +112,14 @@ _Fixture `hooks.json`:_
 - after `HTTP POST /hooks/guarded`:
   - HTTP status is `200`
   - file `ran.txt` contains `executed`
+
 ### Scenario: an HMAC signature is verified against an independent oracle
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18096`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -137,8 +147,8 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/signed
-# HTTP POST /hooks/signed
+# HTTP POST /hooks/signed via hooks_c
+# HTTP POST /hooks/signed via hooks_c
 ```
 #### Then
 - after `HTTP POST /hooks/signed`:
@@ -148,11 +158,14 @@ _Fixture `hooks.json`:_
 - after `HTTP POST /hooks/signed`:
   - HTTP status is `200`
   - file `ran.txt` contains `signed`
+
 ### Scenario: the http-methods allowlist rejects the wrong verb
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18097`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -173,15 +186,18 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP GET /hooks/postonly
+# HTTP GET /hooks/postonly via hooks_d
 ```
 #### Then
 - HTTP status is `405`
+
 ### Scenario: a command that exits non-zero surfaces as a 500
+_only when `webhook -version` succeeds_
 #### Given
 - Background service `webhook` is started: `webhook -hooks hooks.json -ip 127.0.0.1 -port 18098`.
 - Fixture file `handler.sh` is created.
 - Fixture file `hooks.json` is created.
+
 #### Inputs
 _Fixture `handler.sh`:_
 ```text
@@ -202,7 +218,7 @@ _Fixture `hooks.json`:_
 ```
 #### When
 ```shell
-# HTTP POST /hooks/failer
+# HTTP POST /hooks/failer via hooks_e
 ```
 #### Then
 - HTTP status is `500`

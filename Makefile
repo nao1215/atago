@@ -1,4 +1,4 @@
-.PHONY: build test coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
+.PHONY: build test test-race coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
 
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
@@ -31,6 +31,9 @@ test: ## Run tests with coverage output
 	env GOOS=$(GOOS) $(GO_TEST) -cover -coverpkg=./... -coverprofile=cover.out $(GO_PKGROOT)
 	$(GO_TOOL) cover -html=cover.out -o cover.html
 
+test-race: ## Run tests under the race detector (CGO required, so no CGO_ENABLED=0)
+	$(GO_TEST) -race -timeout 10m $(GO_PKGROOT)
+
 coverage: ## Combine unit + self-hosted E2E coverage into cover.out / cover.html (uses a `go build -cover` atago; scratch under .coverage/)
 	env PARALLEL=$(PARALLEL) bash ./scripts/coverage.sh
 
@@ -40,11 +43,14 @@ vet: ## Run go vet
 fmt: ## Format Go source code
 	$(GO_FORMAT) $(GO_PKGROOT)
 
-lint: ## Run golangci-lint
-	golangci-lint run --config .golangci.yml
+lint: ## Run golangci-lint for every target OS (a linter only sees the files that build for its GOOS)
+	for goos in linux darwin windows freebsd openbsd netbsd; do \
+		echo "==> golangci-lint (GOOS=$$goos)"; \
+		env GOOS=$$goos golangci-lint run --config .golangci.yml || exit 1; \
+	done
 
 tools: ## Install developer tools used by this repository
-	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 release-smoke: ## Build release artifacts locally and smoke-test them (requires goreleaser; syft adds the SBOM check)
 	@if command -v syft >/dev/null; then \
@@ -95,10 +101,25 @@ dogfood-mimixbox: ## Full mimixbox applet e2e (builds + --full-installs applets;
 dogfood-mobilepkg: ## Full mobilepkg e2e (builds latest mobilepkg; set MOBILEPKG_REPO)
 	bash ./test/e2e/tools/mobilepkg/run.sh --parallel $(PARALLEL)
 
-docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
+docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error reference in doc/errors.md
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
+	env UPDATE_ERRORS=1 $(GO) test -run TestDocs_ErrorReferenceInSync .
 	./dist/$(APP) doc --out doc/e2e/atago.md      ./test/e2e/atago
 	./dist/$(APP) doc --out doc/e2e/actionlint.md  ./test/e2e/thirdparty/actionlint
+	./dist/$(APP) doc --out doc/e2e/bats.md        ./test/e2e/thirdparty/bats
+	./dist/$(APP) doc --out doc/e2e/shellspec.md   ./test/e2e/thirdparty/shellspec
+	./dist/$(APP) doc --out doc/e2e/rbenv.md       ./test/e2e/thirdparty/rbenv
+	./dist/$(APP) doc --out doc/e2e/git-secrets.md ./test/e2e/thirdparty/git-secrets
+	./dist/$(APP) doc --out doc/e2e/getoptions.md  ./test/e2e/thirdparty/getoptions
+	./dist/$(APP) doc --out doc/e2e/shdotenv.md    ./test/e2e/thirdparty/shdotenv
+	./dist/$(APP) doc --out doc/e2e/git-open.md    ./test/e2e/thirdparty/git-open
+	./dist/$(APP) doc --out doc/e2e/git-extras.md  ./test/e2e/thirdparty/git-extras
+	./dist/$(APP) doc --out doc/e2e/transcrypt.md  ./test/e2e/thirdparty/transcrypt
+	./dist/$(APP) doc --out doc/e2e/nb.md          ./test/e2e/thirdparty/nb
+	./dist/$(APP) doc --out doc/e2e/mommy.md       ./test/e2e/thirdparty/mommy
+	./dist/$(APP) doc --out doc/e2e/asdf.md        ./test/e2e/thirdparty/asdf
+	./dist/$(APP) doc --out doc/e2e/pyenv.md       ./test/e2e/thirdparty/pyenv
+	./dist/$(APP) doc --out doc/e2e/curl.md        ./test/e2e/thirdparty/curl
 	./dist/$(APP) doc --out doc/e2e/aqua.md        ./test/e2e/thirdparty/aqua
 	./dist/$(APP) doc --out doc/e2e/ecspresso.md   ./test/e2e/thirdparty/ecspresso
 	./dist/$(APP) doc --out doc/e2e/git.md         ./test/e2e/thirdparty/git
@@ -132,6 +153,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/age.md         ./test/e2e/thirdparty/age
 	./dist/$(APP) doc --out doc/e2e/sops.md        ./test/e2e/thirdparty/sops
 	./dist/$(APP) doc --out doc/e2e/kustomize.md   ./test/e2e/thirdparty/kustomize
+	./dist/$(APP) doc --out doc/e2e/kubectx.md     ./test/e2e/thirdparty/kubectx
 	./dist/$(APP) doc --out doc/e2e/prometheus.md  ./test/e2e/thirdparty/prometheus
 	./dist/$(APP) doc --out doc/e2e/rclone.md      ./test/e2e/thirdparty/rclone
 	./dist/$(APP) doc --out doc/e2e/restic.md      ./test/e2e/thirdparty/restic
@@ -140,6 +162,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ from the specs
 	./dist/$(APP) doc --out doc/e2e/mailpit.md     ./test/e2e/thirdparty/mailpit
 	./dist/$(APP) doc --out doc/e2e/ntfy.md        ./test/e2e/thirdparty/ntfy
 	./dist/$(APP) doc --out doc/e2e/transfersh.md  ./test/e2e/thirdparty/transfersh
+	./dist/$(APP) doc --out doc/e2e/gpg.md         ./test/e2e/thirdparty/gpg
 	./dist/$(APP) doc --out doc/e2e/gotify.md      ./test/e2e/thirdparty/gotify
 	./dist/$(APP) doc --out doc/e2e/grafana.md     ./test/e2e/thirdparty/grafana
 	./dist/$(APP) doc --out doc/e2e/openfga.md     ./test/e2e/thirdparty/openfga

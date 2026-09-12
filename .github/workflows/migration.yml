@@ -31,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "go.mod"
+          go-version: "stable"
 
       - name: Install Bats (pinned)
         # Bats-core v1.14.0 — the release the migration guide is written

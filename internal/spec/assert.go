@@ -75,8 +75,11 @@ type Assert struct {
 }
 
 // ChangesAssert pins the exact delta the immediately preceding run/pty step
-// made to the scenario workdir (#70). The delta is content-based (hash, not
-// mtime). Each set field is EXHAUSTIVE in both directions: every observed path
+// made to the scenario workdir (#70). An entry is compared by what a step can
+// observably change about it — content (hash, not mtime), symlink target, kind,
+// and POSIX permission bits — so a chmod counts as a modification and a planted
+// FIFO or socket counts as a creation. Directories are not entries of their
+// own; the files inside them are. Each set field is EXHAUSTIVE in both directions: every observed path
 // must be matched by an entry (an exact workdir-relative path or a /-glob) and
 // every entry must match at least one observed path — so `modified: []` asserts
 // "modified nothing". An omitted (nil) field is unconstrained.
@@ -296,6 +299,10 @@ func (e ExitCode) MarshalYAML() (any, error) {
 	case len(e.In) > 0:
 		return map[string][]int{"in": e.In}, nil
 	default:
+		//nolint:nilnil // yaml.Marshaler's way of saying "no value": nil emits null rather
+		// than the bogus three-field map the default struct marshal would write. The loader
+		// rejects a matcher-less exit_code (ATG-2104), so this is unreachable for any spec
+		// that was parsed, and TestExitCode_MarshalYAML_AllShapes pins the shape.
 		return nil, nil
 	}
 }

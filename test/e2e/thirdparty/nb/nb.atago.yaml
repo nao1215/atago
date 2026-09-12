@@ -1,0 +1,246 @@
+version: "1"
+
+suite:
+  name: nb (notes kept as git history)
+  description: |
+    [nb](https://xwmx.github.io/nb/) is a note-taking CLI that keeps every
+    notebook as a git repository, so each thing it does to a note is a commit.
+    It keeps its own test suite in Bats; what those tests check is pinned here
+    from outside.
+
+    That design makes the oracle obvious: after add, edit and delete, the
+    assertion is the git log of the notebook, plus the files on disk. The first
+    run is asserted too, in both shapes — refused with an explanation when git
+    has no identity to attribute edits to, and completed on a terminal, where nb
+    asks for the name and email and writes them into the home it was given.
+
+    Everything lands under a sandboxed home, so the suite also proves nb keeps
+    its notes where it says it does.
+
+defaults:
+  scenario:
+    only:
+      command: command -v nb
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: without a git identity the first run explains itself and stops
+    steps:
+      - run:
+          command: nb add --content "a note"
+      - assert:
+          # Every note is a commit, so nb refuses to start until git can say who
+          # made it. The message is about the missing setup rather than about
+          # git failing somewhere deeper.
+          exit_code: 1
+          stdout:
+            contains:
+              - "Welcome to nb!"
+              - "Git requires some additional setup before using nb."
+              - "Enter the name and email address you'd like to use with Git."
+
+  - name: on a terminal the first run asks for the identity and keeps it
+    steps:
+      - pty:
+          command: nb add --content "a note" --filename first.md
+          cols: 100
+          rows: 30
+          timeout: 60s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            # The prompts are colored, so the label and its colon are not
+            # adjacent in the transcript.
+            - expect: "Name"
+            - send: "Test Person"
+            - send: {key: enter}
+            - expect: "Email"
+            - send: "test@example.com"
+            - send: {key: enter}
+      - assert:
+          # The answers are written to the git configuration in the home nb was
+          # given — not the real one, which is what the sandbox proves.
+          file:
+            path: .atago-home/.gitconfig
+            contains:
+              - "name = Test Person"
+              - "email = test@example.com"
+      - assert:
+          # And the notebook exists, in the default place: a directory under the
+          # home directory.
+          dir:
+            path: .atago-home/.nb/home
+            exists: true
+
+  - name: the first command initializes the notebook instead of doing what it was asked
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author'
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb add --content "the first note" --filename note1.md
+      - assert:
+          # Pinned as observed: with the identity in place, the first command
+          # creates the notebook, prints the welcome screen, and does not add
+          # anything. A setup script that runs `nb add` once has an empty
+          # notebook and an exit code that says everything went fine.
+          exit_code: 0
+          stdout:
+            contains:
+              - "Welcome to"
+              - "0 items."
+      - assert:
+          file:
+            path: .atago-home/.nb/home/note1.md
+            exists: false
+      - run:
+          command: nb add --content "the first note" --filename note1.md
+      - assert:
+          # The same command, run again, does what it said the first time.
+          exit_code: 0
+          stdout:
+            contains: "Added: [1] note1.md"
+      - assert:
+          file:
+            path: .atago-home/.nb/home/note1.md
+            exists: true
+
+  - name: adding a note writes a file and commits it
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb add --content "the first note" --filename note1.md
+      - assert:
+          # The identifier in the message is the number the rest of the commands
+          # take, and it is assigned by nb rather than chosen by the caller.
+          exit_code: 0
+          stdout:
+            contains: "Added: [1] note1.md"
+      - assert:
+          file:
+            path: .atago-home/.nb/home/note1.md
+            equals: "the first note\n\n"
+      - run:
+          command: git -C .atago-home/.nb/home log --oneline
+      - assert:
+          # Two commits: the notebook's own creation, and the note. Nothing about
+          # a note is kept outside the repository that holds it.
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ \\[nb\\] Add: note1\\.md\\n[0-9a-f]+ \\[nb\\] Initialize\\n$"
+      - run:
+          command: nb list
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: '[1] note1.md · "the first note"'
+      - run:
+          command: nb show 1 --print
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "the first note"
+
+  - name: editing appends to the note and commits the change
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb add --content "the first line" --filename note1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb edit 1 --content "a second line"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Updated: [1] note1.md"
+      - assert:
+          # Worth knowing before scripting it: --content adds to the note rather
+          # than replacing what is there, so the first line survives.
+          file:
+            path: .atago-home/.nb/home/note1.md
+            contains:
+              - "the first line"
+              - "a second line"
+      - run:
+          command: git -C .atago-home/.nb/home log --oneline
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ \\[nb\\] Edit: note1\\.md\\n"
+
+  - name: deleting removes the file and records that too
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb add --content "a note" --filename note1.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb delete 1 --force
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "Deleted:  [1] note1.md"
+      - assert:
+          file:
+            path: .atago-home/.nb/home/note1.md
+            exists: false
+      - run:
+          command: git -C .atago-home/.nb/home log --oneline
+      - assert:
+          # The note is gone from the working tree and kept in the history, which
+          # is the difference between a note-taking tool built on git and one
+          # built on files.
+          exit_code: 0
+          stdout:
+            matches: "^[0-9a-f]+ \\[nb\\] Delete: note1\\.md\\n[0-9a-f]+ \\[nb\\] Add: note1\\.md\\n[0-9a-f]+ \\[nb\\] Initialize\\n$"
+      - run:
+          command: nb list
+      - assert:
+          # And the empty notebook is not an error: it is an invitation.
+          exit_code: 0
+          stdout:
+            contains:
+              - "0 items."
+              - "Add a note:"
+
+  - name: search reads the notes rather than their names
+    steps:
+      - run:
+          shell: true
+          command: git config --global user.email author@example.com && git config --global user.name 'A Author' && nb notebooks && nb add --content "buy milk and bread" --filename groceries.md && nb add --content "call the plumber" --filename chores.md
+      - assert:
+          exit_code: 0
+      - run:
+          command: nb search "plumber"
+      - assert:
+          # The match is reported with the note it is in and the line it is on.
+          exit_code: 0
+          stdout:
+            contains:
+              - "[2] chores.md"
+              - "call the plumber"
+            not_contains: "groceries.md"
+      - run:
+          command: nb search "not in any note"
+      - assert:
+          # A search that matches nothing is exit 1, with the notice on stderr
+          # and stdout left empty for whatever was reading the matches.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: "! Not found"

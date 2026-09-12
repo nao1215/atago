@@ -399,6 +399,25 @@ scenarios:
               # `fg: default` is how "no color was set" is stated.
               - { text: plain, fg: default, bold: false }
               - { text: SELECTED, reverse: true, row: 2 }
+      # The rest of the vocabulary. Each of these was implemented and documented
+      # with nothing exercising it, so a regression in any one would have been
+      # invisible: the styles a TUI actually uses for emphasis, and a background
+      # color, which reads from a different cell field than `fg`.
+      - pty:
+          shell: true
+          command: "printf '\\033[3mITAL\\033[0m \\033[4mUNDER\\033[0m \\033[5mBLINK\\033[0m \\033[41mONRED\\033[0m\\r\\n'"
+          rows: 6
+          cols: 40
+      - assert:
+          screen:
+            attrs:
+              - { text: ITAL, italic: true }
+              - { text: UNDER, underline: true }
+              - { text: BLINK, blink: true }
+              - { text: ONRED, bg: red }
+              # Absence is a claim too, and `bg: default` is how "no background
+              # was set" is stated.
+              - { text: ITAL, underline: false, blink: false, bg: default }
       # A styling claim that does not hold fails, and the message says what was
       # found instead — without that, the feature would be a way to write
       # assertions that quietly pass.
@@ -427,6 +446,33 @@ scenarios:
           stdout:
             contains:
               - "fg=red (wanted green)"
+      # The same for a styling flag: a boolean claim that does not hold has to
+      # fail on its own, and name the flag rather than only the colors.
+      - fixture:
+          file: badflag.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: plain text is not italic
+                steps:
+                  - pty:
+                      shell: true
+                      command: "printf 'PLAIN\\r\\n'"
+                      rows: 4
+                      cols: 20
+                  - assert:
+                      screen:
+                        attrs:
+                          - {text: PLAIN, italic: true}
+      - run:
+          command: ${atago} run badflag.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "italic"
 
   - name: an unknown key name is a load-time error listing the vocabulary
     steps:
@@ -471,6 +517,71 @@ scenarios:
       - assert:
           stdout:
             contains: loading
+
+  # #503: a wide character reaches the right margin from the second-to-last
+  # column, and the emulator arms pending wrap only from the last one — so `X`
+  # used to overwrite the second half of `本` (blanking its first half) instead
+  # of starting row 2, and a wide character that no longer fits was dropped.
+  # atago arms the wrap itself; these are what a terminal shows.
+  - name: a wide character at the right margin autowraps
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '日本X'; sleep 0.2"
+          rows: 5
+          cols: 4
+      - assert:
+          screen:
+            line: 1
+            equals: "日本"
+      - assert:
+          screen:
+            line: 2
+            equals: "X"
+
+  - name: a wide character that no longer fits wraps instead of vanishing
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '日本語'; sleep 0.2"
+          rows: 5
+          cols: 5
+      - assert:
+          screen:
+            line: 1
+            equals: "日本"
+      - assert:
+          screen:
+            line: 2
+            equals: "語"
+
+  # #505: the emulator commits an ASCII character to the screen the moment it
+  # arrives, so a combining mark that follows could never join it and was
+  # dropped — `screen:` saw `e` where the program wrote a decomposed `é`. The
+  # expected text is written with an explicit \u escape on both sides of the
+  # comparison, because a screen assertion compares the bytes the program wrote:
+  # a decomposed grapheme and its precomposed spelling look identical and are
+  # not the same text.
+  - name: screen preserves a decomposed grapheme's combining mark
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\303\\251 e\\314\\201'; sleep 0.2"
+          rows: 5
+          cols: 10
+      - assert:
+          screen:
+            line: 1
+            equals: "\u00e9 e\u0301"
+      - assert:
+          screen:
+            contains: "e\u0301"
 
   - name: a screen snapshot round-trips through update and compare
     skip:
@@ -558,3 +669,84 @@ scenarios:
             contains:
               - "no variable with that name is defined"
               - "$${no_such_var}"
+
+  # An expect that matches only the terminal's echo of the send before it has
+  # asserted that atago can type, not that the program answered. The inner
+  # program stays alive and silent after its greeting, so the echo is the only
+  # possible source of the text; the expect must run out its budget rather than
+  # report a green scenario that tested nothing.
+  #
+  # The program sleeps rather than exiting, which is what makes this portable: a
+  # write to a terminal whose child has gone is EIO on macOS and accepted on
+  # Linux, so a dead program would test the platform's pty semantics instead of
+  # the rule under test here.
+  - name: an expect does not match the echo of its own send
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: echo.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: echo
+            scenarios:
+              - name: the program never produced this
+                steps:
+                  - pty:
+                      command: "sh -c 'echo ready; sleep 30'"
+                      timeout: 4s
+                      session:
+                        - expect: "ready"
+                        - send: "NEVER-PRODUCED-BY-THE-PROGRAM\n"
+                        - expect: "NEVER-PRODUCED-BY-THE-PROGRAM"
+      - run:
+          command: ${atago} run echo.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "pty expect /NEVER-PRODUCED-BY-THE-PROGRAM/"
+              - "never appeared in the terminal transcript"
+
+  # The other side of the same rule: a program that prints the line back keeps
+  # its own copy, so the ordinary shape — type a line, expect the answer — still
+  # works. `cat` produces the text twice (the line discipline echoes it and cat
+  # prints it); only the echo is discounted.
+  - name: a program's own copy of the input still satisfies an expect
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: cat
+          timeout: 15s
+          session:
+            - send: "ROUNDTRIP\n"
+            - expect: "ROUNDTRIP"
+            - send: ""
+      - assert:
+          exit_code: 0
+
+  # A pty step reports an exit code by the same rule a run step does: a child a
+  # signal terminated is 128+signal, not Go's -1. A TUI or REPL that quits on
+  # Ctrl-C is exactly the program a pty step is written for, so exit_code: 130
+  # has to be assertable from here as well as from run:.
+  - name: a signaled child reports 128+signal from both runners
+    skip:
+      os: windows
+    steps:
+      - pty:
+          command: "sh -c 'kill -TERM $$'"
+          timeout: 10s
+      - assert:
+          exit_code: 143
+      - run:
+          shell: true
+          command: "kill -TERM $$"
+      - assert:
+          exit_code: 143
+      - pty:
+          command: "sh -c 'kill -INT $$'"
+          timeout: 10s
+      - assert:
+          exit_code: 130

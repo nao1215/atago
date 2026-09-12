@@ -1,0 +1,434 @@
+version: "1"
+
+suite:
+  name: shellspec (what a specfile can do)
+  description: |
+    The parts of [ShellSpec](https://shellspec.info/) a specfile author leans on:
+    the hooks around each example, `Include` and the difference between calling a
+    function and running it, `Data` for standard input, `Parameters` for one
+    example per row, command mocks and their scope, and the sandbox that takes
+    PATH away so an unmocked command cannot be reached by accident.
+
+    Ordering and "did this even run" are pinned with an append-only log the
+    specfile writes, so a hook that stops firing is a diff rather than a missing
+    line nobody reads. The last scenarios cover the project side — the scaffold
+    `--init` writes, the support commands `--gen-bin` generates, the options file
+    every run reads — and the colors the reports are drawn in, checked on a real
+    terminal because that is the only place they exist.
+
+defaults:
+  scenario:
+    only:
+      command: shellspec --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+
+scenarios:
+  - name: hooks run around every example, and once around them all
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/hooks_spec.sh
+          content: |
+            Describe 'hooks'
+              BeforeAll 'echo before_all >> hooks.log'
+              AfterAll 'echo after_all >> hooks.log'
+              BeforeEach 'echo before_each >> hooks.log'
+              AfterEach 'echo after_each >> hooks.log'
+
+              It 'first'
+                When call echo first
+                The output should equal first
+                echo body_first >> hooks.log
+              End
+
+              It 'second'
+                When call echo second
+                The output should equal second
+                echo body_second >> hooks.log
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - hooks first
+              ok 2 - hooks second
+          changes:
+            created: [hooks.log]
+            modified: []
+            deleted: []
+      - assert:
+          # The whole sequence: the All pair wraps the group, the Each pair wraps
+          # each example, and the examples run in the order they are written.
+          file:
+            path: hooks.log
+            equals: |
+              before_all
+              before_each
+              body_first
+              after_each
+              before_each
+              body_second
+              after_each
+              after_all
+
+  - name: a script is included and its functions are called or run
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: mylib.sh
+          content: |
+            greet() {
+              echo "hello, $1"
+            }
+
+            bail_out() {
+              echo "boom" >&2
+              exit 3
+            }
+      - fixture:
+          file: spec/mylib_spec.sh
+          content: |
+            Describe 'mylib.sh'
+              Include ./mylib.sh
+
+              It 'calls a function in the current shell'
+                When call greet world
+                The output should equal "hello, world"
+                The status should be success
+              End
+
+              It 'runs a function that exits, in a subshell'
+                When run bail_out
+                The status should equal 3
+                The stderr should equal boom
+                The output should be blank
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # `call` keeps the function in the current shell, so it can see and
+          # change the spec's variables; `run` puts it in a subshell, which is
+          # the only way an `exit 3` can be observed instead of ending the run.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - mylib.sh calls a function in the current shell
+              ok 2 - mylib.sh runs a function that exits, in a subshell
+
+  - name: a data block is the example's standard input
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/data_spec.sh
+          content: |
+            Describe 'standard input'
+              Data
+                #|first line
+                #|second line
+                #|third line
+              End
+
+              It 'reads the block'
+                When call wc -l
+                The output should match pattern '*3*'
+              End
+
+              It 'sees the lines in order'
+                When call head -n 1
+                The output should equal 'first line'
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - standard input reads the block
+              ok 2 - standard input sees the lines in order
+
+  - name: parameters turn one example into one per row
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/params_spec.sh
+          content: |
+            Describe 'addition'
+              Parameters
+                1 2 3
+                4 5 9
+                10 20 30
+              End
+
+              It "adds $1 and $2"
+                When call expr "$1" + "$2"
+                The output should equal "$3"
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # Each row is its own example, named with its own values, so a failing
+          # row is identified in the report rather than inside a loop.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..3
+              ok 1 - addition adds 1 and 2
+              ok 2 - addition adds 4 and 5
+              ok 3 - addition adds 10 and 20
+
+  - name: a mock replaces a command only inside the group that declares it
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mock_spec.sh
+          content: |
+            Describe 'mocking'
+              Describe 'inside the group'
+                Mock date
+                  echo "2001-02-03"
+                End
+
+                It 'sees the mock'
+                  When call date
+                  The output should equal "2001-02-03"
+                End
+              End
+
+              It 'sees the real command outside it'
+                When call date +%Y
+                The output should match pattern '[0-9][0-9][0-9][0-9]'
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # The mock is lexically scoped to its group: no teardown to forget, and
+          # no way for it to leak into the example after it.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..2
+              ok 1 - mocking inside the group sees the mock
+              ok 2 - mocking sees the real command outside it
+
+  - name: the sandbox takes PATH away so an unmocked command cannot be reached
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/sandbox_spec.sh
+          content: |
+            Describe 'an external command'
+              It 'is reachable without the sandbox'
+                When run command uname
+                The status should be success
+                The output should not be blank
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - an external command is reachable without the sandbox
+      - run:
+          command: shellspec --sandbox --format tap
+      - assert:
+          # Under --sandbox the same example cannot find the command at all: the
+          # shell's own 127 comes back, which is how a spec proves it depends on
+          # a real binary rather than on a mock it forgot to write.
+          exit_code: 101
+          stdout:
+            contains:
+              - "not ok 1 - an external command is reachable without the sandbox # FAILED"
+              - "got: failure (non-zero) [status: 127]"
+
+  - name: the scaffold init writes is runnable, and writing it twice changes nothing
+    steps:
+      - run:
+          command: shellspec --init spec git
+      - assert:
+          exit_code: 0
+          # The project file, the helper, a sample specfile named after the
+          # directory, and the ignore rules for the files a run generates.
+          changes:
+            created:
+              - .shellspec
+              - spec/spec_helper.sh
+              - spec/*_spec.sh
+              - .gitignore
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .gitignore
+            contains:
+              - "/.shellspec-quick.log"
+              - "/report/"
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # The sample specfile is a pending example, so a fresh project is green
+          # from the first run: a scaffold that does not fail before it is used.
+          exit_code: 0
+          stdout:
+            matches: "^1\\.\\.1\\nnot ok 1 - .* # TODO You should implement hello function\\n"
+      - run:
+          command: shellspec --init spec git
+      - assert:
+          # Rerunning reports what already exists and rewrites none of it.
+          exit_code: 0
+          stdout:
+            contains: "   exist   "
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: support commands are generated as executables under the helper directory
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - run:
+          command: shellspec --gen-bin @true @cat
+      - assert:
+          # The helper directory is where they belong, so it has to exist first.
+          # The refusal names the exact path rather than creating it silently.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            matches: "^shellspec helper directory not found: .*/spec\\n$"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - fixture:
+          file: spec/spec_helper.sh
+          content: ""
+      - run:
+          command: shellspec --gen-bin @true @cat
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Generate @true (spec/support/bin/@true)"
+              - "Generate @cat (spec/support/bin/@cat)"
+          changes:
+            created:
+              - spec/support/bin/@true
+              - spec/support/bin/@cat
+            modified: []
+            deleted: []
+      - assert:
+          # They are meant to be run from a mock, so they have to be executable.
+          file:
+            path: spec/support/bin/@cat
+            executable: true
+
+  - name: the options file is read on every run
+    steps:
+      - fixture:
+          file: .shellspec
+          content: |
+            --format tap
+      - fixture:
+          file: spec/simple_spec.sh
+          content: |
+            Describe 'options file'
+              It 'is applied without being asked for'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec
+      - assert:
+          # No --format on the command line, and the output is TAP: the project
+          # decides its defaults, and a contributor does not have to know them.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - options file is applied without being asked for
+      - run:
+          command: shellspec --format failures
+      - assert:
+          # The command line still wins over the file.
+          exit_code: 0
+          stdout:
+            empty: true
+
+  - name: the report is colored on a terminal and plain when colors are refused
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/simple_spec.sh
+          content: |
+            Describe 'colors'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+            End
+      - pty:
+          command: shellspec
+          cols: 80
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          session:
+            - expect: "1 example, 0 failures"
+      - assert:
+          # Color is on because the output is a terminal, and the summary is
+          # green — the fact a person reads first, drawn rather than spelled.
+          screen:
+            attrs:
+              - text: "1 example, 0 failures"
+                fg: green
+      - pty:
+          command: shellspec
+          cols: 80
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            NO_COLOR: "1"
+          session:
+            - expect: "1 example, 0 failures"
+      - assert:
+          # Same terminal, same text, no color: NO_COLOR is honored, and the
+          # claim is checked on the drawn cells rather than on escape sequences.
+          screen:
+            contains: "1 example, 0 failures"
+            attrs:
+              - text: "1 example, 0 failures"
+                fg: default

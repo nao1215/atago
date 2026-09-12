@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -35,10 +36,10 @@ func resolveConn[T io.Closer](
 	}
 	rdef, ok := rc.runners[name]
 	if !ok {
-		return zero, fmt.Errorf("%s references unknown runner %q", stepVerb, name)
+		return zero, diag.InternalError.Errorf("%s references unknown runner %q", stepVerb, name)
 	}
 	if rdef.Type != wantType {
-		return zero, fmt.Errorf("runner %q is not a %s runner (type %q)", name, wantType, rdef.Type)
+		return zero, diag.InternalError.Errorf("runner %q is not a %s runner (type %q)", name, wantType, rdef.Type)
 	}
 	timeoutStr := rdef.Timeout
 	if defaultBounded {
@@ -48,7 +49,7 @@ func resolveConn[T io.Closer](
 	if timeoutStr != "" {
 		d, err := time.ParseDuration(timeoutStr)
 		if err != nil {
-			return zero, fmt.Errorf("runner %q has invalid timeout %q: %w", name, timeoutStr, err)
+			return zero, diag.InternalError.Errorf("runner %q has invalid timeout %q: %w", name, timeoutStr, err)
 		}
 		timeout = d
 	}

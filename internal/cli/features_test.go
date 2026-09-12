@@ -116,6 +116,60 @@ func TestCompletion_MissingArg(t *testing.T) {
 
 // TestCompletion_Golden guards the deterministic completion output so adding or
 // removing a subcommand/flag is an intentional, reviewable diff.
+// TestCompletion_RunFlagsMatchTheCommand is a regression: runFlags was a
+// hand-kept copy of the run command's flag set — its own comment said "keep it
+// in sync" — and three flags added later never reached it. `atago run
+// --allow-<TAB>` offered nothing, and --profile was invisible to every shell.
+// The command's own usage is the source of truth here, so the next flag that
+// skips the list fails this test rather than silently going missing.
+func TestCompletion_RunFlagsMatchTheCommand(t *testing.T) {
+	t.Parallel()
+	var out, errb bytes.Buffer
+	Main([]string{"run", "--help"}, &out, &errb)
+
+	declared := map[string]bool{}
+	for _, line := range strings.Split(out.String()+errb.String(), "\n") {
+		rest, ok := strings.CutPrefix(line, "  -")
+		if !ok {
+			continue
+		}
+		name, _, _ := strings.Cut(rest, " ")
+		if name != "" {
+			declared["--"+name] = true
+		}
+	}
+	if len(declared) == 0 {
+		t.Fatalf("no flags parsed out of run --help:\n%s%s", out.String(), errb.String())
+	}
+
+	offered := map[string]bool{}
+	for _, f := range runFlags {
+		offered[f] = true
+	}
+	for f := range declared {
+		if !offered[f] {
+			t.Errorf("`atago run` accepts %s but shell completion does not offer it", f)
+		}
+	}
+	for f := range offered {
+		if !declared[f] {
+			t.Errorf("shell completion offers %s but `atago run` does not accept it", f)
+		}
+	}
+
+	// The subcommand list is the same kind of hand-kept copy, held to the same
+	// rule before it drifts the same way.
+	out.Reset()
+	errb.Reset()
+	Main([]string{"help"}, &out, &errb)
+	help := out.String() + errb.String()
+	for _, name := range subcommandNames {
+		if !strings.Contains(help, "\n  "+name+" ") {
+			t.Errorf("shell completion offers the %q subcommand but `atago help` does not list it", name)
+		}
+	}
+}
+
 func TestCompletion_Golden(t *testing.T) {
 	for _, shell := range []string{"bash", "zsh", "fish", "powershell"} {
 		script, ok := completionScript(shell)
@@ -203,6 +257,59 @@ func TestListCmd_JSON(t *testing.T) {
 	}
 	if got := doc.Scenarios[1].Artifacts; len(got) == 0 {
 		t.Errorf("beta scenario should report a generated artifact, got %v", got)
+	}
+}
+
+// TestListCmd_ExpectFail is a regression: a scenario documenting a known bug
+// was indistinguishable from a healthy one in `atago list`. explain prints the
+// marker precisely so a reviewer sees which scenarios are documentation of a
+// bug rather than guarantees, doc renders it, and the manifest carries the
+// block — the inventory was the one surface where a suite silently read as
+// promising more than it does.
+func TestListCmd_ExpectFail(t *testing.T) {
+	const src = `version: "1"
+suite:
+  name: xfail
+scenarios:
+  - name: known bug
+    expect_fail:
+      reason: "upstream renders the wrong width"
+      issue: "https://example.com/issues/42"
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: healthy
+    steps:
+      - run: {shell: true, command: "true"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	p := writeSpec(t, dir, "s.atago.yaml", src)
+
+	var out, errb bytes.Buffer
+	if got := Main([]string{"list", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d (stderr=%s)", got, errb.String())
+	}
+	table := out.String()
+	if !strings.Contains(table, "XFAIL") {
+		t.Errorf("list table does not mark the expect_fail scenario:\n%s", table)
+	}
+
+	out.Reset()
+	errb.Reset()
+	if got := Main([]string{"list", "--json", p}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d (stderr=%s)", got, errb.String())
+	}
+	var doc listDocument
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out.String())
+	}
+	ef := doc.Scenarios[0].ExpectFail
+	if ef == nil || ef.Reason != "upstream renders the wrong width" || ef.Issue != "https://example.com/issues/42" {
+		t.Errorf("expect_fail = %+v, want the reason and issue", ef)
+	}
+	if doc.Scenarios[1].ExpectFail != nil {
+		t.Errorf("a healthy scenario carries expect_fail: %+v", doc.Scenarios[1].ExpectFail)
 	}
 }
 
@@ -389,18 +496,11 @@ scenarios:
 // dir to avoid touching the repo.
 func withWorkdir(t *testing.T, dir string, fn func()) {
 	t.Helper()
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Chdir(orig); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	// t.Chdir restores the original directory itself, including on a panic, and it
+	// fails a test that has called t.Parallel. That is the outcome to want here:
+	// the rerun ledger's path is resolved against a process-global cwd, so two
+	// tests changing directory at once would read each other's state.
+	t.Chdir(dir)
 	fn()
 }
 
@@ -527,6 +627,135 @@ scenarios:
 		want := []string{"also-fails", "fails"}
 		if !reflect.DeepEqual(names, want) {
 			t.Errorf("recorded failures = %v, want %v", names, want)
+		}
+	})
+}
+
+// TestRerunFailed_OutOfTargetEntriesAreNotBlamedOnARename pins the difference
+// between "the scenario is gone" and "you asked for a different spec". A rerun
+// narrowed to one spec leaves the other spec's recorded failures unexecuted, and
+// blaming a rename sends the reader after a spec change that never happened —
+// the entry is still there, and so is its spec.
+func TestRerunFailed_OutOfTargetEntriesAreNotBlamedOnARename(t *testing.T) {
+	const failing = `version: "1"
+suite:
+  name: rerun
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", failing)
+	writeSpec(t, dir, "b.atago.yaml", failing)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "a.atago.yaml"}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "did not match the current specs") {
+			t.Errorf("stderr = %q, want no rename/removal blame for a spec that was simply not targeted", errb.String())
+		}
+		if !strings.Contains(errb.String(), "outside this run's targets") {
+			t.Errorf("stderr = %q, want the untouched recorded failure reported as out of scope", errb.String())
+		}
+		if !strings.Contains(errb.String(), "b.atago.yaml / fails") {
+			t.Errorf("stderr = %q, want the out-of-scope entry named", errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatalf("rerun state unreadable: %v", err)
+		}
+		if len(st.Failed) != 2 {
+			t.Errorf("recorded failures = %+v, want both entries preserved", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_UnmatchedWarningAgreesInNumberAndIsBounded pins the shape of
+// the mismatch warning itself: the verb follows the count, and a ledger that
+// accumulated many stale entries is summarized instead of printed in full — the
+// warning is read before the run's own result, so it cannot be a wall of text.
+func TestRerunFailed_UnmatchedWarningAgreesInNumberAndIsBounded(t *testing.T) {
+	scenario := func(name string) string {
+		return "  - name: " + name + "\n    steps:\n      - run: {shell: true, command: \"exit 1\"}\n      - assert: {exit_code: 0}\n"
+	}
+	head := "version: \"1\"\nsuite:\n  name: rerun\nscenarios:\n"
+	var before, after strings.Builder
+	before.WriteString(head)
+	after.WriteString(head)
+	before.WriteString(scenario("kept"))
+	after.WriteString(scenario("kept"))
+	for i := range 8 {
+		before.WriteString(scenario("gone" + strconv.Itoa(i)))
+		after.WriteString(scenario("renamed" + strconv.Itoa(i)))
+	}
+
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", before.String())
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// Every recorded failure but one is renamed while still broken.
+		writeSpec(t, dir, "s.atago.yaml", after.String())
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "8 recorded failing scenarios did not match the current specs (renamed or removed?) and were not rerun") {
+			t.Errorf("stderr = %q, want a plural subject and a plural verb", errb.String())
+		}
+		if !strings.Contains(errb.String(), "and 3 more") {
+			t.Errorf("stderr = %q, want the named entries bounded with a count of the rest", errb.String())
+		}
+		if n := strings.Count(errb.String(), "s.atago.yaml / gone"); n != maxNamedRerunEntries {
+			t.Errorf("named entries = %d, want %d", n, maxNamedRerunEntries)
+		}
+	})
+}
+
+// TestRerunFailed_SingularWarningKeepsItsVerb guards the other half of the
+// agreement fix: one unmatched entry keeps the singular noun and verb.
+func TestRerunFailed_SingularWarningKeepsItsVerb(t *testing.T) {
+	const spec = `version: "1"
+suite:
+  name: rerun
+scenarios:
+  - name: fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: also-fails
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", spec)
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		writeSpec(t, dir, "s.atago.yaml", strings.ReplaceAll(spec, "name: fails\n", "name: fails-renamed\n"))
+
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "1 recorded failing scenario did not match the current specs (renamed or removed?) and was not rerun") {
+			t.Errorf("stderr = %q, want the singular noun and verb", errb.String())
 		}
 	})
 }
@@ -780,6 +1009,159 @@ func TestRerunFailed_FilterExcludedFailurePreserved(t *testing.T) {
 		}
 		if !names["beta_fail"] {
 			t.Errorf("ledger after filtered rerun = %+v, want beta_fail preserved (excluded by --filter, never re-verified)", st.Failed)
+		}
+	})
+}
+
+// TestFailFast_UnrunScenarioKeepsRecordedFailure is a regression: --fail-fast
+// stops scheduling, so a scenario after the first red one never runs and is
+// reported as "skipped after fail-fast". The ledger read that skip as a verdict
+// and dropped the failure it had already recorded, so the next --rerun-failed
+// exited 0 with the scenario still broken.
+func TestFailFast_UnrunScenarioKeepsRecordedFailure(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		// A full run records both alpha_fail and beta_fail.
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+
+		// --parallel 1 makes fail-fast deterministic: alpha_fail turns the run red
+		// before beta_fail is ever scheduled.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[string]bool{}
+		for _, e := range st.Failed {
+			names[e.Scenario] = true
+		}
+		if !names["beta_fail"] {
+			t.Fatalf("ledger after a fail-fast run = %+v, want beta_fail preserved (never ran, so never re-verified)", st.Failed)
+		}
+
+		// Fix only alpha: the red-green loop must still be red, because beta was
+		// never re-verified.
+		writeSpec(t, dir, "s.atago.yaml", `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_fail
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`)
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("--rerun-failed exit = %d, want %d (beta_fail is still broken); stderr=%s", got, ExitFailures, errb.String())
+		}
+	})
+}
+
+// TestRerunFailed_FailFastUnrunEntryNotBlamedOnRename is a regression: a
+// recorded failure --fail-fast never got to still exists in the specs, so the
+// run must not blame a rename or a removal for it.
+func TestRerunFailed_FailFastUnrunEntryNotBlamedOnRename(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr blamed a rename/removal for a scenario --fail-fast never scheduled:\n%s", errb.String())
+		}
+	})
+}
+
+// TestRerunFailed_FailFastUnreachedSpecNotBlamedOnRename is the cross-spec half
+// of the case above: --fail-fast also stops scheduling whole spec files, and a
+// spec that was never loaded contributes no scenarios at all. Its recorded
+// failures are correctly kept, but calling them renamed or removed sends the
+// reader looking for a spec change that never happened.
+func TestRerunFailed_FailFastUnreachedSpecNotBlamedOnRename(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "a.atago.yaml", singleFailSpec("a", false))
+	writeSpec(t, dir, "b.atago.yaml", singleFailSpec("b", false))
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// a.atago.yaml fails, so b.atago.yaml is never loaded.
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("fail-fast rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr blamed a rename/removal for a spec --fail-fast never loaded:\n%s", errb.String())
+		}
+		st, err := loadRerunState()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(st.Failed) != 2 {
+			t.Errorf("ledger = %+v, want both failures kept (b was never re-verified)", st.Failed)
+		}
+	})
+}
+
+// TestRerunFailed_RenamedScenarioStillWarnsUnderFailFast guards the other side:
+// suppressing the warning for specs a fail-fast never reached must not suppress
+// it for a spec the run did load, where a recorded scenario really is gone.
+func TestRerunFailed_RenamedScenarioStillWarnsUnderFailFast(t *testing.T) {
+	dir := t.TempDir()
+	writeSpec(t, dir, "s.atago.yaml", twoFailingSpec)
+
+	withWorkdir(t, dir, func() {
+		var out, errb bytes.Buffer
+		if got := Main([]string{"run", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("first run exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		// alpha_fail is renamed while still broken. The rerun loads the spec and
+		// runs beta_fail, so alpha_fail really has gone missing.
+		writeSpec(t, dir, "s.atago.yaml", `version: "1"
+suite:
+  name: multi
+scenarios:
+  - name: alpha_renamed
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+  - name: beta_fail
+    steps:
+      - run: {shell: true, command: "exit 1"}
+      - assert: {exit_code: 0}
+`)
+		out.Reset()
+		errb.Reset()
+		if got := Main([]string{"run", "--rerun-failed", "--fail-fast", "--parallel", "1", "."}, &out, &errb); got != ExitFailures {
+			t.Fatalf("rerun exit = %d, want %d (stderr=%s)", got, ExitFailures, errb.String())
+		}
+		if !strings.Contains(errb.String(), "renamed or removed") {
+			t.Errorf("stderr = %q, want the rename/removal warning for alpha_fail", errb.String())
 		}
 	})
 }

@@ -14,10 +14,10 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// defaultSessionTimeout bounds a pty session when the spec sets none: an
-// interactive program that never produces the expected prompt (or never
-// exits) must fail loudly instead of hanging the run.
-const defaultSessionTimeout = 30 * time.Second
+// defaultSessionTimeout bounds a pty session when the spec sets none. The value
+// is the spec package's, so the loader validating a stable_for against this
+// budget and the runtime enforcing it cannot drift apart.
+const defaultSessionTimeout = spec.DefaultPTYSessionTimeout
 
 // defaultRows / defaultCols are the terminal size when the spec sets none.
 const (

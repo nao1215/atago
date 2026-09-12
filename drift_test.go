@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image/png"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/cli"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/docgen"
 	"github.com/nao1215/atago/internal/engine"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/sitegen"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // This file holds the drift guards over committed generated artifacts: the
@@ -72,17 +76,17 @@ var referenceSubcommandRowRe = regexp.MustCompile("(?m)^\\| `atago ([a-z][a-z-]*
 // subcommand fails the build instead of quietly misleading readers.
 func TestDocs_ReferenceSubcommandsAreReal(t *testing.T) {
 	ref := readDoc(t, "website/content/reference.md")
-	real := map[string]bool{}
+	known := map[string]bool{}
 	for _, name := range cli.Subcommands() {
-		real[name] = true
+		known[name] = true
 	}
 	rows := referenceSubcommandRowRe.FindAllStringSubmatch(ref, -1)
 	if len(rows) == 0 {
 		t.Fatal("no `| `atago <name>`` Subcommands rows found in website/content/reference.md")
 	}
 	for _, m := range rows {
-		if !real[m[1]] {
-			t.Errorf("website/content/reference.md Subcommands table lists `atago %s`, which is not a real subcommand (real inventory: %v)", m[1], cli.Subcommands())
+		if !known[m[1]] {
+			t.Errorf("website/content/reference.md Subcommands table lists `atago %s`, which is not a known subcommand (known inventory: %v)", m[1], cli.Subcommands())
 		}
 	}
 }
@@ -158,9 +162,6 @@ var (
 	// thirdpartyDirRe extracts each suite directory the thirdparty.yml CI matrix
 	// runs (`dir: ./test/e2e/thirdparty/<name>`).
 	thirdpartyDirRe = regexp.MustCompile(`dir:\s*\./test/e2e/thirdparty/([a-zA-Z0-9_-]+)`)
-	// windowsSpecRe extracts each ./test/e2e spec path listed in the single-source
-	// scripts/windows_portable_specs.sh.
-	windowsSpecRe = regexp.MustCompile(`(\./test/e2e/\S+)`)
 	// thirdpartyRunsOnRe extracts the thirdparty workflow's Linux runner label.
 	thirdpartyRunsOnRe = regexp.MustCompile(`(?m)^\s*runs-on:\s*(\S+)\s*$`)
 )
@@ -414,25 +415,127 @@ func TestThirdParty_InstallersArePinned(t *testing.T) {
 	}
 }
 
-// TestWindowsPortableSubset_Exists asserts every spec path in the single-source
-// scripts/windows_portable_specs.sh resolves to a real file or directory, so a
-// spec rename fails here — a fast unit test — instead of only in the Windows CI
-// legs that read the script (e2e.yml and e2e-cross.yml).
-func TestWindowsPortableSubset_Exists(t *testing.T) {
-	data, err := os.ReadFile("scripts/windows_portable_specs.sh")
+// windowsSpecsTSV is the single source of truth for which self-hosted E2E
+// targets run on Windows and under which shell. Both Windows CI legs (e2e.yml
+// and e2e-cross.yml) expand it through scripts/windows_specs.sh.
+const windowsSpecsTSV = "scripts/windows_specs.tsv"
+
+// windowsBuckets are the classifications a row may carry. `none` is the only
+// one that must be justified, because it is the only one that means a target
+// goes untested on a supported OS.
+var windowsBuckets = map[string]bool{"cmd": true, "bash": true, "none": true}
+
+// windowsSpecRow is one classified target.
+type windowsSpecRow struct {
+	target string
+	bucket string
+	reason string
+	line   int
+}
+
+// readWindowsSpecs parses the classification table, failing on any row that is
+// not exactly target/bucket[/reason].
+func readWindowsSpecs(t *testing.T) []windowsSpecRow {
+	t.Helper()
+	data, err := os.ReadFile(windowsSpecsTSV)
 	if err != nil {
-		t.Fatalf("read scripts/windows_portable_specs.sh: %v", err)
+		t.Fatalf("read %s: %v", windowsSpecsTSV, err)
 	}
-	var paths []string
-	for _, m := range windowsSpecRe.FindAllSubmatch(data, -1) {
-		paths = append(paths, string(m[1]))
+	var rows []windowsSpecRow
+	for i, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 2 || len(fields) > 3 {
+			t.Fatalf("%s:%d: want target<TAB>bucket[<TAB>reason], got %q", windowsSpecsTSV, i+1, line)
+		}
+		row := windowsSpecRow{target: fields[0], bucket: fields[1], line: i + 1}
+		if len(fields) == 3 {
+			row.reason = fields[2]
+		}
+		rows = append(rows, row)
 	}
-	if len(paths) == 0 {
-		t.Fatal("no ./test/e2e spec paths found in scripts/windows_portable_specs.sh")
+	if len(rows) == 0 {
+		t.Fatalf("%s classifies nothing", windowsSpecsTSV)
 	}
-	for _, p := range paths {
-		if _, err := os.Stat(filepath.FromSlash(p)); err != nil {
-			t.Errorf("scripts/windows_portable_specs.sh lists %q which does not resolve: %v", p, err)
+	return rows
+}
+
+// TestWindowsSpecs_EveryTargetClassified is what keeps the Windows legs from
+// being a subset nobody decided on. Every spec under test/e2e/atago must appear
+// in the table exactly once, so a spec added without a thought about Windows
+// fails a fast unit test rather than silently going untested on a supported OS
+// for as long as nobody looks — which is how the subset came to hold under half
+// of them.
+func TestWindowsSpecs_EveryTargetClassified(t *testing.T) {
+	t.Parallel()
+	classified := map[string]int{}
+	for _, row := range readWindowsSpecs(t) {
+		classified[row.target]++
+	}
+	found := map[string]bool{}
+	entries, err := os.ReadDir(filepath.Join("test", "e2e", "atago"))
+	if err != nil {
+		t.Fatalf("read the self-hosted spec directory: %v", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".atago.yaml") {
+			continue
+		}
+		found["./test/e2e/atago/"+e.Name()] = true
+	}
+	if len(found) == 0 {
+		t.Fatal("no self-hosted specs found; the directory layout moved")
+	}
+	for target := range found {
+		switch classified[target] {
+		case 1:
+		case 0:
+			t.Errorf("%s is not classified in %s; add it as cmd, bash, or none with a reason", target, windowsSpecsTSV)
+		default:
+			t.Errorf("%s is classified %d times in %s", target, classified[target], windowsSpecsTSV)
+		}
+	}
+}
+
+// TestWindowsSpecs_RowsAreWellFormed checks the three properties a row can get
+// wrong: an unknown bucket, a target that does not resolve, and an unjustified
+// `none`. The last is the point of the file — a target excluded from Windows
+// has to state a reason about the platform, not leave the exclusion implicit.
+func TestWindowsSpecs_RowsAreWellFormed(t *testing.T) {
+	t.Parallel()
+	for _, row := range readWindowsSpecs(t) {
+		if !windowsBuckets[row.bucket] {
+			t.Errorf("%s:%d: unknown bucket %q (want cmd, bash, or none)", windowsSpecsTSV, row.line, row.bucket)
+		}
+		if _, err := os.Stat(filepath.FromSlash(row.target)); err != nil {
+			t.Errorf("%s:%d: %q does not resolve: %v", windowsSpecsTSV, row.line, row.target, err)
+		}
+		switch row.bucket {
+		case "none":
+			if strings.TrimSpace(row.reason) == "" {
+				t.Errorf("%s:%d: %q is excluded from Windows with no reason", windowsSpecsTSV, row.line, row.target)
+			}
+		case "cmd", "bash":
+			if strings.TrimSpace(row.reason) != "" {
+				t.Errorf("%s:%d: %q runs on Windows, so the reason column must be empty", windowsSpecsTSV, row.line, row.target)
+			}
+		}
+	}
+}
+
+// TestWindowsSpecs_WorkflowsReadTheTable pins that both Windows CI legs expand
+// the classification rather than carrying a list of their own. The file only
+// prevents drift as long as it is what actually runs.
+func TestWindowsSpecs_WorkflowsReadTheTable(t *testing.T) {
+	t.Parallel()
+	for _, wf := range []string{".github/workflows/e2e.yml", ".github/workflows/e2e-cross.yml"} {
+		yml := readDoc(t, wf)
+		for _, bucket := range []string{"cmd", "bash"} {
+			if !strings.Contains(yml, "windows_specs.sh "+bucket) {
+				t.Errorf("%s does not run the %q bucket via scripts/windows_specs.sh", wf, bucket)
+			}
 		}
 	}
 }
@@ -461,10 +564,189 @@ func TestSite_InSync(t *testing.T) {
 			t.Errorf("missing generated site file %s: %v (run `make site`)", name, err)
 			continue
 		}
+		if strings.HasSuffix(name, ".png") {
+			// PNG bytes are not reproducible across Go releases: image/png
+			// deflates its pixel data with compress/flate, whose output changed
+			// in Go 1.27, so byte equality fails on one toolchain or the other
+			// with the picture itself identical. Since the unit-test matrix runs
+			// the go.mod floor AND the newest release, no single committed byte
+			// sequence can satisfy both. What the site publishes is the image,
+			// so that is what is compared.
+			if err := samePNG(got, want); err != nil {
+				t.Errorf("%s is out of date with the generator (%v); regenerate with `make site`", name, err)
+			}
+			continue
+		}
 		if !bytes.Equal(got, want) {
 			t.Errorf("%s is out of date with the generator; regenerate with `make site`", name)
 		}
 	}
+}
+
+// samePNG reports whether two encoded PNGs carry the same picture, comparing
+// decoded pixels rather than compressed bytes.
+func samePNG(got, want []byte) error {
+	gotImg, err := png.Decode(bytes.NewReader(got))
+	if err != nil {
+		return fmt.Errorf("committed file is not a decodable PNG: %w", err)
+	}
+	wantImg, err := png.Decode(bytes.NewReader(want))
+	if err != nil {
+		return fmt.Errorf("generated file is not a decodable PNG: %w", err)
+	}
+	gotB, wantB := gotImg.Bounds(), wantImg.Bounds()
+	if gotB != wantB {
+		return fmt.Errorf("bounds %v, want %v", gotB, wantB)
+	}
+	for y := gotB.Min.Y; y < gotB.Max.Y; y++ {
+		for x := gotB.Min.X; x < gotB.Max.X; x++ {
+			gr, gg, gb, ga := gotImg.At(x, y).RGBA()
+			wr, wg, wb, wa := wantImg.At(x, y).RGBA()
+			if gr != wr || gg != wg || gb != wb || ga != wa {
+				return fmt.Errorf("pixel (%d,%d) is %v, want %v",
+					x, y, [4]uint32{gr, gg, gb, ga}, [4]uint32{wr, wg, wb, wa})
+			}
+		}
+	}
+	return nil
+}
+
+// TestDocs_ErrorReferenceInSync keeps the published error reference in lockstep
+// with the diagnostic registry that produces the codes. The registry is the
+// only place a code can be created, and this is what makes its documentation
+// arrive with it: a code added, reworded, or retired without regenerating the
+// page fails here. Regenerate with `make docs` (or `UPDATE_ERRORS=1 go test
+// -run TestDocs_ErrorReferenceInSync .`).
+func TestDocs_ErrorReferenceInSync(t *testing.T) {
+	const path = "doc/errors.md"
+	want := diag.Markdown()
+
+	if os.Getenv("UPDATE_ERRORS") == "1" {
+		if err := os.WriteFile(path, want, 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		return
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v (run `make docs`)", path, err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("%s is out of date with the diagnostic registry; regenerate with `make docs`", path)
+	}
+}
+
+// TestDocs_EveryCodeIsDocumented is the reader's side of the same guarantee:
+// whatever the generator does, the committed page has to name every code and
+// say what to do about it.
+func TestDocs_EveryCodeIsDocumented(t *testing.T) {
+	page := readDoc(t, "doc/errors.md")
+	for _, e := range diag.All() {
+		if !strings.Contains(page, e.Code.String()) {
+			t.Errorf("doc/errors.md does not mention %s (%s)", e.Code, e.Name)
+		}
+		if !strings.Contains(page, e.Fix) {
+			t.Errorf("doc/errors.md does not tell the reader how to fix %s (%s)", e.Code, e.Name)
+		}
+	}
+}
+
+// TestE2E_EveryCodeIsProvoked is the coverage gate over the diagnostic
+// registry: a published code must be produced by the real binary in a real
+// run, not merely written down. Registering a code therefore obliges you to
+// add the scenario that provokes it, in the same change.
+//
+// Documentation alone would let a code rot in place after the check that
+// raised it was deleted or reworded past the point of reaching it. The
+// scenarios live in test/e2e/atago/error_codes.atago.yaml; any spec in the
+// directory counts, so a code that already has a home elsewhere needs no
+// second one.
+func TestE2E_EveryCodeIsProvoked(t *testing.T) {
+	const dir = "test/e2e/atago"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read %s: %v", dir, err)
+	}
+	provoked := map[diag.Code]bool{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") && !strings.HasSuffix(e.Name(), ".yml") {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		s, lerr := loader.Load(path)
+		if lerr != nil {
+			t.Fatalf("load %s: %v", path, lerr)
+		}
+		// Only what a scenario ASSERTS counts. Scanning the file as text would
+		// let a scenario title or a comment mentioning a code satisfy the gate,
+		// which is the opposite of what it is for.
+		for _, text := range assertedText(s) {
+			for _, c := range diag.Codes(text) {
+				provoked[c] = true
+			}
+		}
+	}
+	for _, e := range diag.All() {
+		if provoked[e.Code] {
+			if _, exempt := unprovokableFromASpec[e.Code]; exempt {
+				t.Errorf("%s (%s) is listed as unprovokable from a spec, but a scenario in %s provokes it; remove the exemption", e.Code, e.Name, dir)
+			}
+			continue
+		}
+		if _, exempt := unprovokableFromASpec[e.Code]; exempt {
+			continue
+		}
+		t.Errorf("%s (%s) is a published code that no scenario in %s provokes; add one to error_codes.atago.yaml", e.Code, e.Name, dir)
+	}
+}
+
+// unprovokableFromASpec lists the codes no spec can reach, each with the reason.
+// Everything else must be provoked by a scenario, and the gate above also fails
+// when a code listed here turns out to be reachable after all — so the list
+// shrinks as the ways to provoke them appear, and never quietly grows stale.
+//
+// This is the one place the coverage gate can be escaped, which is why it is a
+// table of prose rather than a flag: adding a code here is a claim a reviewer
+// can disagree with.
+var unprovokableFromASpec = map[diag.Code]string{
+	diag.RunInterrupted:        "needs a signal delivered to atago itself mid-run, which a scenario cannot arrange for its own runner",
+	diag.MockServerFailed:      "needs the mock server's port to be taken, and a spec cannot pin the port it binds",
+	diag.PTYFailed:             "needs the kernel to refuse a pseudo-terminal; every shape a spec can ask for is rejected by the loader first",
+	diag.InputNotSupported:     "the key and signal vocabularies are validated while loading, so a spec never reaches the runtime check",
+	diag.UnsupportedOnPlatform: "only raised on Windows, where the scenarios that would provoke it are the ones being refused",
+	diag.BrowserActionFailed:   "needs a real browser, which the hermetic self-hosted suite deliberately does not start",
+	diag.PayloadFailed:         "needs a value that will not marshal, which YAML cannot express",
+	diag.ResponseUnreadable:    "needs a peer that answers with a malformed body, which the mock server will not produce",
+	diag.InternalError:         "is unreachable by construction: every state it guards is refused while loading",
+}
+
+// assertedText collects the strings a spec's stream assertions compare
+// against — the only place a diagnostic code can be claimed rather than merely
+// mentioned.
+func assertedText(s *spec.Spec) []string {
+	var out []string
+	collect := func(sa *spec.StreamAssert) {
+		if sa == nil {
+			return
+		}
+		out = append(out, []string(sa.Contains)...)
+		for _, p := range []*string{sa.Matches, sa.Equals} {
+			if p != nil {
+				out = append(out, *p)
+			}
+		}
+	}
+	for i := range s.Scenarios {
+		steps := append(append([]spec.Step{}, s.Scenarios[i].Steps...), s.Scenarios[i].Teardown...)
+		for j := range steps {
+			if a := steps[j].Assert; a != nil {
+				collect(a.Stdout)
+				collect(a.Stderr)
+			}
+		}
+	}
+	return out
 }
 
 var siteLinkRe = regexp.MustCompile(`\]\(([^)]+)\)`)
@@ -693,6 +975,96 @@ func TestExamples_HermeticRunGreen(t *testing.T) {
 				t.Errorf("status = %s, want passed (or skipped by an OS gate): %+v", res.Status, res.Scenarios)
 			}
 		})
+	}
+}
+
+// examplesDeadOnWindows records every hermetic example whose scenarios ALL skip
+// on Windows, with the reason. The README calls examples/ the syntax reference
+// and says it is tested on Linux, macOS, and Windows; TestExamples_HermeticRunGreen
+// accepts a skipped spec as green, so an example that executes nothing there
+// looks exactly like one that passes. Fifteen of them did.
+//
+// The map is EXACT, not a floor: an example listed here that starts running a
+// scenario on Windows fails the test, so the list shrinks as examples are made
+// portable instead of quietly outliving its reasons. Everything in it is
+// POSIX-shell scaffolding — the alternative is a second cmd.exe copy of every
+// scenario in the file readers are pointed at to learn the syntax, which would
+// cost more clarity than the coverage is worth.
+var examplesDeadOnWindows = map[string]string{
+	"examples/changes.atago.yaml":              "the steps that produce a delta are POSIX shell (rm, chmod, mkfifo)",
+	"examples/deterministic.atago.yaml":        "cat, and a JSON document read back through it",
+	"examples/extend_host_env.atago.yaml":      "POSIX PATH syntax: the : separator, sh, and command -v",
+	"examples/hermetic_env.atago.yaml":         "env and printf, which have no cmd.exe builtin",
+	"examples/mock_server.atago.yaml":          "curl, which the runner images do not guarantee on Windows",
+	"examples/project_manifest.atago.yaml":     "cat, plus a ${specdir} interpolated into a shell command",
+	"examples/pty.atago.yaml":                  "the inner programs are POSIX: [ -t 0 ], cat -v, and a SIGINT trap",
+	"examples/pty_screen.atago.yaml":           "the inner program draws with printf escapes and a POSIX read loop",
+	"examples/pty_stdout_split.atago.yaml":     "the inner program writes its UI to /dev/stderr from a POSIX shell",
+	"examples/retry.atago.yaml":                "the marker-file poll is POSIX shell test/touch",
+	"examples/scrub.atago.yaml":                "the volatile output is synthesized with $$ and $(date +%s)",
+	"examples/services.atago.yaml":             "the stand-in service is a POSIX shell loop",
+	"examples/signal.atago.yaml":               "signal steps are POSIX-only; Windows has no signals to deliver",
+	"examples/suite_env_from_setup.atago.yaml": "the setup exports through a POSIX shell",
+}
+
+// TestExamples_RunSomethingOnThisOS fails when a hermetic example skips every
+// scenario on the host OS without being recorded as dead there. On POSIX
+// nothing may be dead at all: an example that runs nothing on the platform it
+// was written for is a broken example, not a portability limit.
+func TestExamples_RunSomethingOnThisOS(t *testing.T) {
+	t.Parallel()
+	for path, hermetic := range exampleSpecs {
+		if !hermetic {
+			continue
+		}
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			s, err := loader.Load(path)
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			res := engine.New().Run(context.Background(), s, path)
+			ran := 0
+			for _, sc := range res.Scenarios {
+				if sc.Status != engine.StatusSkipped {
+					ran++
+				}
+			}
+			reason, recorded := examplesDeadOnWindows[path]
+			if runtime.GOOS != "windows" {
+				if ran == 0 {
+					t.Errorf("every scenario skipped on %s; an example must run somewhere", runtime.GOOS)
+				}
+				return
+			}
+			switch {
+			case ran == 0 && !recorded:
+				t.Errorf("every scenario skips on Windows and the example is not recorded in examplesDeadOnWindows; "+
+					"make one scenario portable, or add it there with the reason (%d scenarios)", len(res.Scenarios))
+			case ran > 0 && recorded:
+				t.Errorf("%d of %d scenarios now run on Windows, so the examplesDeadOnWindows entry is stale "+
+					"(recorded reason: %s); remove it", ran, len(res.Scenarios), reason)
+			}
+		})
+	}
+}
+
+// TestExamples_DeadListNamesRealExamples keeps the record from outliving the
+// file it describes: an entry for an example that was renamed or made
+// non-hermetic would sit there forever claiming coverage nobody checks.
+func TestExamples_DeadListNamesRealExamples(t *testing.T) {
+	t.Parallel()
+	for path, reason := range examplesDeadOnWindows {
+		hermetic, known := exampleSpecs[path]
+		switch {
+		case !known:
+			t.Errorf("examplesDeadOnWindows names %q, which is not a categorized example", path)
+		case !hermetic:
+			t.Errorf("examplesDeadOnWindows names %q, which is validate-only and never run", path)
+		}
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("examplesDeadOnWindows[%q] has no reason", path)
+		}
 	}
 }
 

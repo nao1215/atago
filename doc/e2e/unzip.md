@@ -20,6 +20,7 @@
   - [a traversing entry is stripped and lands inside the destination](#scenario-a-traversing-entry-is-stripped-and-lands-inside-the-destination)
   - [a deeper traversal is stripped down to its basename](#scenario-a-deeper-traversal-is-stripped-down-to-its-basename)
   - [unzip -t reports the hostile archive as intact](#scenario-unzip--t-reports-the-hostile-archive-as-intact)
+
 ## zip and unzip (archive round trips and extracted trees)
 [Info-ZIP](https://infozip.sourceforge.net/) `zip` and `unzip` are the
 archivers a shell script reaches for. An archiver makes two promises worth
@@ -46,6 +47,7 @@ _only when `zip -v` succeeds · skipped on Windows_
 - Fixture file `src/a.txt` is created.
 - Fixture file `src/sub/b.txt` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -62,12 +64,14 @@ zip -q -r ar.zip src
 #### Then
 - exit code is `0`
 - the step changed exactly created `ar.zip`, modified nothing, deleted nothing
+
 ### Scenario: an extracted tree has exactly the paths the archive holds
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `src/sub/b.txt` is created.
 - Fixture file `src/sub/deep/c.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -95,11 +99,13 @@ unzip -q ar.zip -d out
   - dir `out` has 3 entries, (recursive)
   - dir `out` matches glob `src/sub/deep/*.txt`, (recursive)
   - dir `out` contains `src`, has 1 entry
+
 ### Scenario: the extracted tree matches its snapshot manifest
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `src/sub/b.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -118,12 +124,14 @@ unzip -q ar.zip -d out
 - after `unzip -q ar.zip -d out`:
   - exit code is `0`
   - dir `out` tree matches snapshot `extracted_tree`
+
 ### Scenario: a round trip restores every byte, including the awkward ones
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/empty.bin` is created.
 - Fixture file `src/mixed.txt` is created.
 - Fixture file `src/nul.bin` is created.
+
 #### Inputs
 _Fixture `src/mixed.txt`:_
 ```text
@@ -144,11 +152,13 @@ unzip -q ar.zip -d out
   - file `out/src/mixed.txt` is byte-identical to `src/mixed.txt`
   - file `out/src/nul.bin` is byte-identical to `src/nul.bin`
   - file `out/src/empty.bin` is byte-identical to `src/empty.bin`
+
 ### Scenario: unzip -j drops the directories and keeps the files
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `src/sub/b.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -168,12 +178,14 @@ unzip -j -q ar.zip -d flat
   - exit code is `0`
   - dir `flat` contains `a.txt`, contains `b.txt`, does not contain `src`, does not contain `sub`, has 2 entries, (recursive)
   - file `flat/b.txt` is byte-identical to `src/sub/b.txt`
+
 ### Scenario: listing an archive names every entry without writing anything
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `src/sub/b.txt` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -193,11 +205,13 @@ unzip -l ar.zip
   - exit code is `0`
   - stdout contains `src/a.txt`, `src/sub/b.txt`, `4 files`
   - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ### Scenario: an integrity test passes on a good archive and fails on a truncated one
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `broken.zip` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -220,10 +234,12 @@ unzip -t broken.zip
 - after `unzip -t broken.zip`:
   - exit code is `9`
   - stdout contains `End-of-central-directory signature not found`
+
 ### Scenario: a missing archive is exit 9 and creates nothing
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 unzip -q absent.zip -d out
@@ -233,10 +249,12 @@ unzip -q absent.zip -d out
 - stderr contains `cannot find or open absent.zip`
 - the step changed exactly created nothing, modified nothing, deleted nothing
 - dir `out` does not exist
+
 ### Scenario: an unknown option is exit 10 and a name that matches nothing is exit 11
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -257,10 +275,12 @@ unzip -q ar.zip "no/such/*" -d out
   - exit code is `11`
   - stderr contains `filename not matched`
   - dir `out` exists, has 0 entries
+
 ### Scenario: zip with nothing to archive is exit 12 and writes no archive
 _only when `zip -v` succeeds · skipped on Windows_
 #### Given
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 zip -q empty.zip
@@ -268,11 +288,13 @@ zip -q empty.zip
 #### Then
 - exit code is `12`
 - the step changed exactly created nothing, modified nothing, deleted nothing
+
 ### Scenario: overwriting is refused by default, forced by -o, and skipped by -n
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/a.txt` is created.
 - Fixture file `out/src/a.txt` is created.
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -299,6 +321,7 @@ unzip -qo ar.zip -d out
 - after `unzip -qo ar.zip -d out`:
   - exit code is `0`
   - file `out/src/a.txt` is byte-identical to `src/a.txt`
+
 ### Scenario: an updated archive replaces one entry and leaves the rest alone
 _only when `zip -v` succeeds · skipped on Windows_
 #### Given
@@ -306,6 +329,7 @@ _only when `zip -v` succeeds · skipped on Windows_
 - Fixture file `src/b.txt` is created.
 - Fixture file `src/a.txt` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `src/a.txt`:_
 ```text
@@ -335,11 +359,13 @@ unzip -q ar.zip -d out
   - exit code is `0`
   - file `out/src/a.txt` equals exact bytes
   - file `out/src/b.txt` equals exact bytes
+
 ### Scenario: deleting an entry removes it from the extracted tree
 _only when `zip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `src/keep.txt` is created.
 - Fixture file `src/drop.txt` is created.
+
 #### Inputs
 _Fixture `src/keep.txt`:_
 ```text
@@ -361,6 +387,7 @@ unzip -q ar.zip -d out
 - after `unzip -q ar.zip -d out`:
   - exit code is `0`
   - dir `out` contains `src/keep.txt`, does not contain `src/drop.txt`, has 1 entry, (recursive)
+
 ## unzip (path traversal in a hostile archive)
 An archive is untrusted input: the names inside it come from whoever built
 it. The attack known as zip slip stores an entry called `../escaped.txt` (or
@@ -384,6 +411,7 @@ _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `hostile.zip` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 unzip -l hostile.zip
@@ -400,12 +428,14 @@ unzip hostile.zip -d dest
   - the step changed exactly created `dest/escaped.txt`, `dest/abs.txt`, `dest/good.txt`, modified nothing, deleted nothing
   - dir `dest` contains `escaped.txt`, contains `abs.txt`, contains `good.txt`, has 3 entries, (recursive)
   - file `dest/escaped.txt` equals exact bytes
+
 ### Scenario: a deeper traversal is stripped down to its basename
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `deep.zip` is created.
 - Fixture file `dest/placeholder.txt` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### Inputs
 _Fixture `dest/placeholder.txt`:_
 ```text
@@ -421,11 +451,13 @@ unzip -o deep.zip -d dest
 - the step changed exactly created `dest/tmp/pwned.txt`, modified nothing, deleted nothing
 - dir `dest` contains `tmp/pwned.txt`, contains `placeholder.txt`, has 2 entries, (recursive)
 - file `dest/tmp/pwned.txt` equals exact bytes
+
 ### Scenario: unzip -t reports the hostile archive as intact
 _only when `unzip -v` succeeds · skipped on Windows_
 #### Given
 - Fixture file `hostile.zip` is created.
 - The command runs with an isolated home under `${workdir}/.atago-home` (HOME/XDG or APPDATA redirected).
+
 #### When
 ```shell
 unzip -t hostile.zip

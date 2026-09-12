@@ -104,6 +104,23 @@ type Env struct {
 	// name for the `mock:` assertion target (#24). Nil in contexts with no
 	// mock servers (retry `until` asserts, direct API use).
 	MockRecords func(name string) ([]mock.Record, bool)
+	// SnapshotWrites, when set, is the run-scoped record of which snapshot
+	// paths this `--update-snapshots` run has written and with what content, so
+	// two scenarios cannot silently claim one path with different output. Nil
+	// outside a run, where there is nothing to scope the writes to.
+	SnapshotWrites *SnapshotWrites
+	// Writer identifies whose write a snapshot claim is — a scenario, or a suite
+	// lifecycle block. A path claimed twice by the SAME writer is a repeat
+	// iteration or a retry attempt producing different output, which is a
+	// different finding from two scenarios sharing one golden.
+	Writer string
+	// KeepSnapshots exempts these checks from --update-snapshots: they compare
+	// against their golden as a verify run would. It is set for an expect_fail
+	// scenario (#395), whose golden holds the output the tool SHOULD produce
+	// once the bug is fixed — the recorded expectation the scenario fails
+	// against on purpose. Rewriting it with the current, wrong output destroys
+	// what the scenario documents and then reports the bug as fixed.
+	KeepSnapshots bool
 }
 
 func pass(desc string) *CheckResult { return &CheckResult{OK: true, Desc: desc} }

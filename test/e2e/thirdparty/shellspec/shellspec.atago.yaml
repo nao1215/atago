@@ -1,0 +1,398 @@
+version: "1"
+
+suite:
+  name: shellspec (the verdict and the exit contract)
+  description: |
+    [ShellSpec](https://shellspec.info/) is a BDD test framework for POSIX
+    shells, and its own test suite is written in ShellSpec. What that suite
+    checks from the inside is pinned here from the outside: what the runner
+    reports, and what it returns to whatever started it.
+
+    ShellSpec answers with three levels rather than the usual two — 1 for a
+    command line it cannot use, 101 for specs that failed, 102 for a fatal error
+    while loading them — and both spec-level codes can be overridden, which is
+    the whole reason to separate them. Each level is asserted here, together
+    with the TAP the run prints, the rerun command a failure hands back, and the
+    two defaults worth knowing about: an example that asserts nothing is a
+    failure, and finding no examples at all is not.
+
+    Every specfile is written by the scenario that runs it. Nothing upstream is
+    copied.
+
+defaults:
+  scenario:
+    only:
+      command: shellspec --version
+    # ShellSpec runs POSIX shells and the scenarios drive it through them, so
+    # the suite is scoped to POSIX rather than left to fail halfway on Windows.
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+
+scenarios:
+  - name: the version and the help text are answered on stdout
+    steps:
+      - run:
+          command: shellspec --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^[0-9]+\\.[0-9]+\\.[0-9]+"
+          stderr:
+            empty: true
+      - run:
+          command: shellspec --help
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "Usage: shellspec"
+              - "-f, --format FORMATTER"
+              - "--failure-exit-code CODE"
+
+  - name: a passing suite is TAP on stdout, exit 0, and no droppings
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/arithmetic_spec.sh
+          content: |
+            Describe 'arithmetic'
+              It 'adds numbers'
+                When call expr 2 + 2
+                The output should equal 4
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          exit_code: 0
+          # The TAP formatter prints the plan and the result and nothing else:
+          # no banner, no timing, nothing that changes between runs.
+          stdout:
+            equals: |
+              1..1
+              ok 1 - arithmetic adds numbers
+          # A run leaves the project as it found it. Reports and the quick-mode
+          # ledger are written only when they are asked for.
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: a failing example is exit 101 and hands back the command that reruns it
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/arithmetic_spec.sh
+          content: |
+            Describe 'arithmetic'
+              It 'adds numbers'
+                When call expr 2 + 2
+                The output should equal 5
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # The failure carries the evaluation, the expectation, and both values,
+          # so the diff is in the report rather than in a rerun.
+          exit_code: 101
+          stdout:
+            equals: |
+              1..1
+              not ok 1 - arithmetic adds numbers # FAILED
+              # (in specfile spec/arithmetic_spec.sh, line 4)
+              # When call expr 2 + 2
+              # The output should equal 5
+              # 
+              #   expected: 5
+              #        got: 4
+              # 
+      - run:
+          command: shellspec
+      - assert:
+          # The default formatter ends with the exact command line that reruns
+          # just this example, addressed by file and line.
+          exit_code: 101
+          stdout:
+            contains:
+              - "1 example, 1 failure"
+              - "shellspec spec/arithmetic_spec.sh:2 # 1) arithmetic adds numbers FAILED"
+
+  - name: the failure exit code is the caller's to choose
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/failing_spec.sh
+          content: |
+            Describe 'failing'
+              It 'does not hold'
+                When call true
+                The status should equal 9
+              End
+            End
+      - run:
+          command: shellspec --failure-exit-code 42 --format tap
+      - assert:
+          # 101 is a default, not a law: a CI system that reserves its own codes
+          # can say which one means "specs failed".
+          exit_code: 42
+          stdout:
+            contains: "not ok 1 - failing does not hold # FAILED"
+
+  - name: a command line it cannot use is exit 1, before any spec is read
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/arithmetic_spec.sh
+          content: |
+            Describe 'arithmetic'
+              It 'adds numbers'
+                When call expr 2 + 2
+                The output should equal 4
+              End
+            End
+      - run:
+          command: shellspec --bogus
+      - assert:
+          # Distinct from 101: nothing about the specs is known yet, and stdout
+          # stays empty so a TAP consumer reads nothing rather than garbage.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Unrecognized option: --bogus
+      - run:
+          command: shellspec spec/missing_spec.sh
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Not found a path: spec/missing_spec.sh.
+
+  - name: a specfile that does not parse is a fatal error at its own exit code
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/broken_spec.sh
+          content: |
+            Describe 'broken'
+              It 'never closes'
+      - run:
+          command: shellspec
+      - assert:
+          # 102 is the third level: the specs could not be run at all, which is
+          # not the same news as specs that ran and failed. The diagnosis goes to
+          # stderr while the formatter keeps stdout, so a report being piped
+          # somewhere does not swallow the reason the run collapsed.
+          exit_code: 102
+          stderr:
+            contains:
+              - "Syntax error: Unexpected end of file (expecting 'End') in spec/broken_spec.sh line 2"
+              - "Fatal error occurred, terminated with exit status 102."
+          stdout:
+            contains: "Example aborted (exit status: 102)"
+      - run:
+          command: shellspec --error-exit-code 77
+      - assert:
+          # The fatal code is overridable in its own right, separately from the
+          # failure code, which is the point of having two of them.
+          exit_code: 77
+          stderr:
+            contains: "Fatal error occurred, terminated with exit status 77."
+          stdout:
+            contains: "Example aborted (exit status: 77)"
+
+  - name: the syntax check reports the same mistake without running anything
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/good_spec.sh
+          content: |
+            Describe 'good'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --syntax-check
+      - assert:
+          # A clean check lists what it checked and returns 0.
+          exit_code: 0
+          stdout:
+            equals: |
+              spec/good_spec.sh
+      - fixture:
+          file: spec/broken_spec.sh
+          content: |
+            Describe 'broken'
+              It 'never closes'
+      - run:
+          command: shellspec --syntax-check
+      - assert:
+          # The same file that aborts a run with 102 is reported here as 1: this
+          # is a check of the command line's input, not a run that went wrong.
+          exit_code: 1
+          stdout:
+            # Every specfile is still listed, including the one that failed to
+            # parse; the diagnosis for it goes to stderr.
+            contains:
+              - "spec/broken_spec.sh"
+              - "spec/good_spec.sh"
+          stderr:
+            matches: "Syntax error: Unexpected end of file \\(expecting 'End'\\) in spec/broken_spec.sh line 2"
+
+  - name: finding no examples is success unless it is declared a failure
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/notes.txt
+          content: "no specfile matches the default pattern\n"
+      - run:
+          command: shellspec
+      - assert:
+          # An empty run is green by default, which is how a misconfigured path
+          # passes CI while testing nothing.
+          exit_code: 0
+          stdout:
+            contains: "0 examples, 0 failures"
+      - run:
+          command: shellspec --fail-no-examples
+      - assert:
+          # The opt-out from that: the same empty run, reported and failed.
+          exit_code: 101
+          stdout:
+            contains: "0 examples, 0 failures, no examples found"
+
+  - name: an example that asserts nothing fails, unless warnings are demoted
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/silent_spec.sh
+          content: |
+            Describe 'no expectation'
+              It 'checks nothing'
+                When call true
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # The default is the strict one, and it is the right default: an
+          # example with no expectation is a test that cannot fail.
+          exit_code: 101
+          stdout:
+            contains:
+              - "not ok 1 - no expectation checks nothing # WARNED"
+              - "# Not found any expectation"
+      - run:
+          command: shellspec --no-warning-as-failure --format tap
+      - assert:
+          # Same warning, same text, different verdict — the flag changes only
+          # what the run returns.
+          exit_code: 0
+          stdout:
+            contains:
+              - "ok 1 - no expectation checks nothing # WARNED"
+              - "# Not found any expectation"
+
+  - name: skipped, pending, and excluded examples keep the run green
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/states_spec.sh
+          content: |
+            Describe 'states'
+              It 'is skipped'
+                Skip 'not applicable here'
+                When call false
+                The status should be success
+              End
+
+              It 'is pending'
+                Pending 'not implemented yet'
+                When call false
+                The status should be success
+              End
+
+              xIt 'is excluded'
+                When call false
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          # TAP says it three ways: SKIP for a deliberate skip and for an
+          # excluded example, TODO for a pending one — a not ok that is allowed
+          # to be not ok, which is why the run is still green.
+          exit_code: 0
+          stdout:
+            contains:
+              - "ok 1 - states is skipped # SKIP not applicable here"
+              - "not ok 2 - states is pending # TODO not implemented yet"
+              - "ok 3 - states is excluded # SKIP Temporarily skipped"
+
+  - name: the same specfile gets the same verdict in sh and in bash
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/portable_spec.sh
+          content: |
+            Describe 'portable shell'
+              It 'expands parameters the same way everywhere'
+                greet() { echo "hello, $1"; }
+                When call greet world
+                The output should equal "hello, world"
+              End
+            End
+      - run:
+          command: shellspec --shell sh --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - portable shell expands parameters the same way everywhere
+      - run:
+          command: shellspec --shell bash --format tap
+      - assert:
+          # ShellSpec picks the shell rather than reading a shebang, so the same
+          # specfile is the test of both shells. The banner names which one ran.
+          exit_code: 0
+          stdout:
+            equals: |
+              1..1
+              ok 1 - portable shell expands parameters the same way everywhere
+      - run:
+          command: shellspec --shell bash
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^Running: .*bash \\[bash "

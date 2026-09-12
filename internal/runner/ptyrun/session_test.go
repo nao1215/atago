@@ -6,12 +6,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -534,6 +536,31 @@ func TestDriveSession_ExecFailureIsHard(t *testing.T) {
 	}
 }
 
+// TestRunSessionExec_CancelIsNotATimeout pins the diagnostic identity of an
+// interrupted helper. A Ctrl-C that lands while an exec: runs is ATG4103 — the
+// run was interrupted — not ATG4101, whose published fix tells the author to
+// raise `timeout:`, a bound that had nothing to do with what happened. The
+// context is canceled before the call, so the command never starts and the
+// case is deterministic on every OS.
+func TestRunSessionExec_CancelIsNotATimeout(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := runSessionExec(ctx, &spec.PTYExec{Command: "unused-because-the-context-is-already-canceled"}, t.TempDir(), nil)
+	if err == nil {
+		t.Fatal("a canceled exec must be an error")
+	}
+	if !strings.Contains(err.Error(), "canceled") {
+		t.Errorf("error %q should say the exec was canceled", err)
+	}
+	if !strings.Contains(err.Error(), diag.RunInterrupted.String()) {
+		t.Errorf("error %q should carry %s, the interrupt diagnostic", err, diag.RunInterrupted)
+	}
+	if strings.Contains(err.Error(), diag.StepTimeout.String()) {
+		t.Errorf("error %q must not claim the step outlasted a timeout", err)
+	}
+}
+
 // TestCappedBuffer_ReportsWhatItDropped keeps a chatty helper from growing the
 // process without bound while still reporting the full write to the command, so
 // the command never sees a short write on its own output.
@@ -609,4 +636,105 @@ func TestDriveSession_MouseRequiresTracking(t *testing.T) {
 			t.Errorf("terminal received %q, want %q", got, want)
 		}
 	})
+}
+
+// TestSessionDriver_EchoIsNotAMatch covers the rule that keeps an expect
+// honest: a match that lies entirely inside the terminal's echo of a preceding
+// send is the scenario reading back its own keystrokes, not the program
+// answering, so it does not count. The program's own copy of the same text
+// does, which is what keeps a `cat`-shaped session working — the line
+// discipline echoes the line and the program prints it again.
+func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		sentAt     int    // transcript length when the send happened
+		sent       string // bytes the send transmitted
+		transcript string // what the terminal produced, in full
+		scanFrom   int    // where this expect starts scanning
+		pattern    string // the expect
+		wantMatch  bool   // whether a real (non-echo) match exists
+	}{
+		"only the echo is present": {
+			sentAt: 7, sent: "ABC\n", transcript: "ready\r\nABC\r\n",
+			scanFrom: 7, pattern: "ABC", wantMatch: false,
+		},
+		"the program repeated the line": {
+			sentAt: 0, sent: "ABC\n", transcript: "ABC\r\nABC\r\n",
+			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+		"the program answered something else": {
+			sentAt: 0, sent: "name\n", transcript: "name\r\nhello-name\r\n",
+			scanFrom: 0, pattern: "hello-", wantMatch: true,
+		},
+		"echo has not arrived yet": {
+			sentAt: 0, sent: "ABC\n", transcript: "",
+			scanFrom: 0, pattern: "ABC", wantMatch: false,
+		},
+		"echo is off, so the text is the program's": {
+			// Nothing in the transcript equals the echo, so no span resolves
+			// and the match stands.
+			sentAt: 0, sent: "secret\n", transcript: "Password: ****\r\n",
+			scanFrom: 0, pattern: `\*\*\*\*`, wantMatch: true,
+		},
+		"a longer match spanning past the echo counts": {
+			sentAt: 0, sent: "AB\n", transcript: "AB\r\nCD\r\n",
+			scanFrom: 0, pattern: `AB\r\nCD`, wantMatch: true,
+		},
+		"an identical earlier line is not the echo": {
+			// The echo can only be at the write's offset, so the earlier
+			// occurrence is the program's and matches.
+			sentAt: 5, sent: "ABC\n", transcript: "ABC\r\nABC\r\n",
+			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+		"a redraw containing what was sent is not the echo": {
+			// The shape that broke a real TUI suite: a program in raw mode
+			// (nothing echoed) draws the character it was just sent, further
+			// along than the write. Treating that as the echo left an expect
+			// waiting for text already on screen.
+			sentAt: 6, sent: ":", transcript: "ready\n\x1b[2J\x1b[H:prompt",
+			scanFrom: 0, pattern: ":", wantMatch: true,
+		},
+		"the echo sits exactly at the write": {
+			sentAt: 6, sent: ":", transcript: "ready\n:",
+			scanFrom: 6, pattern: ":", wantMatch: false,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := &sessionDriver{
+				echoes: []echoSpan{{at: tt.sentAt, echo: EchoOf([]byte(tt.sent))}},
+			}
+			transcript := []byte(tt.transcript)
+			d.locateEchoes(transcript)
+			re := regexp.MustCompile(tt.pattern)
+			got := d.findReal(re, transcript[tt.scanFrom:], tt.scanFrom) != nil
+			if got != tt.wantMatch {
+				t.Errorf("match = %v, want %v (transcript %q, echo span %+v)", got, tt.wantMatch, tt.transcript, d.echoes[0])
+			}
+		})
+	}
+}
+
+// TestEchoOf pins the one translation the line discipline performs on the way
+// out: ONLCR renders each LF as CRLF, so the bytes a send transmitted are not
+// byte-for-byte what comes back.
+func TestEchoOf(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct{ sent, want string }{
+		"no newline":       {sent: "abc", want: "abc"},
+		"one newline":      {sent: "abc\n", want: "abc\r\n"},
+		"several newlines": {sent: "a\nb\n", want: "a\r\nb\r\n"},
+		"already crlf":     {sent: "a\r\n", want: "a\r\r\n"},
+		"empty":            {sent: "", want: ""},
+		"control byte":     {sent: "\x01", want: "\x01"},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := string(EchoOf([]byte(tt.sent))); got != tt.want {
+				t.Errorf("EchoOf(%q) = %q, want %q", tt.sent, got, tt.want)
+			}
+		})
+	}
 }

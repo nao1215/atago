@@ -1,0 +1,241 @@
+version: "1"
+
+suite:
+  name: transcrypt (plaintext in the tree, ciphertext in the repository)
+  description: |
+    [transcrypt](https://github.com/elasticdog/transcrypt) encrypts chosen files
+    inside a git repository: you keep editing plaintext, and what git stores is
+    ciphertext. It keeps its own test suite in Bats; what those tests check is
+    pinned here from outside, against repositories the scenarios create.
+
+    The claim is a difference between two views of the same file, so that is
+    what is asserted: the working tree on one side, `git show HEAD:<file>` on
+    the other. Around it are the properties that make the scheme usable — the
+    same content re-saved produces no diff at all, a change produces a diff in
+    plaintext, and two files with the same content do not encrypt to the same
+    bytes — and the ones that make it safe, above all a wrong password being
+    detected rather than quietly producing garbage.
+
+    Every password here is invented for the scenario that uses it.
+
+defaults:
+  scenario:
+    only:
+      command: command -v transcrypt
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: it refuses to work outside a repository, and says so before anything else
+    steps:
+      - run:
+          command: transcrypt --display
+      - assert:
+          # There is nothing to configure and nothing to read: the message names
+          # the missing step rather than the missing file.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains: 'transcrypt: you are not currently in a git repository; did you forget to run "git init"?'
+      - run:
+          command: transcrypt --version
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^transcrypt [0-9]+\\.[0-9]+"
+
+  - name: initializing writes the filter configuration and nothing else
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author'
+      - assert:
+          exit_code: 0
+      - run:
+          command: transcrypt --cipher aes-256-cbc --password test-password-one --yes
+      - assert:
+          # The whole of the setup is a .gitattributes with a commented example
+          # pattern; the cipher and the password live in the repository's own
+          # config, which is not shared.
+          exit_code: 0
+          stdout:
+            equals: |
+              The repository has been successfully configured by transcrypt.
+          changes:
+            ignore: [".git/**"]
+            created: [.gitattributes]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: .gitattributes
+            equals: |
+              #pattern  filter=crypt diff=crypt merge=crypt
+      - run:
+          command: git config --get transcrypt.cipher
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              aes-256-cbc
+      - run:
+          command: transcrypt --display
+      - assert:
+          # --display is what you paste into a chat with a colleague: it ends
+          # with the exact command that configures their clone.
+          exit_code: 0
+          stdout:
+            contains:
+              - "CIPHER:   aes-256-cbc"
+              - "PASSWORD: test-password-one"
+              - "  transcrypt -c aes-256-cbc -p 'test-password-one'"
+
+  - name: the working tree keeps the plaintext and the commit holds the ciphertext
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p test-password-two -y
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: .gitattributes
+          content: |
+            secret.txt filter=crypt diff=crypt merge=crypt
+      - fixture:
+          file: secret.txt
+          content: |
+            api_key = not-a-real-key
+      - fixture:
+          file: public.txt
+          content: |
+            nothing secret here
+      - run:
+          shell: true
+          command: git add .gitattributes secret.txt public.txt && git commit -q -m 'add both files'
+      - assert:
+          exit_code: 0
+      - assert:
+          # The file on disk is the file you edit.
+          file:
+            path: secret.txt
+            equals: |
+              api_key = not-a-real-key
+      - run:
+          command: git show HEAD:secret.txt
+      - assert:
+          # And the file git stored is not: OpenSSL's salted envelope, base64
+          # encoded, with no trace of the plaintext in it.
+          exit_code: 0
+          stdout:
+            matches: "^U2FsdGVkX1"
+            not_contains: "not-a-real-key"
+      - run:
+          command: git show HEAD:public.txt
+      - assert:
+          # A file the pattern does not name is stored exactly as written: the
+          # scheme is opt-in, per path.
+          exit_code: 0
+          stdout:
+            equals: |
+              nothing secret here
+      - run:
+          command: transcrypt --list
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              secret.txt
+      - run:
+          command: transcrypt --show-raw secret.txt
+      - assert:
+          # Which is how you see what the repository is really carrying, without
+          # cloning it somewhere else.
+          exit_code: 0
+          stdout:
+            matches: "^U2FsdGVkX1"
+
+  - name: re-saving the same content produces no change at all
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p test-password-three -y && printf 'secret.txt filter=crypt diff=crypt merge=crypt\n' > .gitattributes && printf 'value = one\n' > secret.txt && git add .gitattributes secret.txt && git commit -q -m first
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: printf 'value = one\n' > secret.txt && git status --porcelain
+      - assert:
+          # The property the whole scheme depends on: encryption is deterministic
+          # per file and content, so rewriting the same bytes leaves the index
+          # agreeing with the tree. Without it, every checkout would look dirty.
+          exit_code: 0
+          stdout:
+            empty: true
+      - run:
+          shell: true
+          command: printf 'value = two\n' > secret.txt && git status --porcelain
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: " M secret.txt\n"
+      - run:
+          command: git diff
+      - assert:
+          # And the diff a person reads is the plaintext one, because the
+          # attribute installs a textconv for it — the ciphertext is only what is
+          # stored, never what is shown.
+          exit_code: 0
+          stdout:
+            contains:
+              - "-value = one"
+              - "+value = two"
+      - run:
+          command: git diff --stat
+      - assert:
+          # The summary line still calls it binary, since that is what the blob
+          # is. The two views disagree on purpose.
+          exit_code: 0
+          stdout:
+            contains: "secret.txt | Bin"
+
+  - name: two files with the same content do not encrypt to the same bytes
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p test-password-four -y
+      - assert:
+          exit_code: 0
+      - fixture:
+          file: .gitattributes
+          content: |
+            *.secret filter=crypt diff=crypt merge=crypt
+      - fixture:
+          file: first.secret
+          content: |
+            the same content
+      - fixture:
+          file: second.secret
+          content: |
+            the same content
+      - run:
+          shell: true
+          command: git add .gitattributes first.secret second.secret && git commit -q -m 'two identical files'
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: git show HEAD:first.secret > first.raw && git show HEAD:second.secret > second.raw && cmp -s first.raw second.raw
+      - assert:
+          # cmp exits 1 when the files differ, which is the answer wanted here:
+          # identical plaintext in two paths must not produce identical
+          # ciphertext, or the repository would leak which files match.
+          exit_code: 1
+      - assert:
+          file:
+            path: first.raw
+            not_contains: "the same content"

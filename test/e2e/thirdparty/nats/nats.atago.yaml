@@ -30,6 +30,14 @@ runners:
     base_url: http://127.0.0.1:18161
     timeout: 10s
 
+defaults:
+  scenario:
+    # Every scenario here drives nats-server. Without the program there is nothing to
+    # test, so the suite skips rather than erroring: a missing tool is not a
+    # result. The gate is declared once so no scenario can be left out of it.
+    only:
+      command: nats-server --version
+
 scenarios:
   - name: the binary reports its version
     steps:

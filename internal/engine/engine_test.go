@@ -191,6 +191,57 @@ scenarios:
 	}
 }
 
+// TestEngine_CwdPrecedence pins the documented step > runner > defaults.run
+// order for cwd (#498): a runner names a directory more specifically than a
+// suite-wide default does, so the runner's cwd must beat defaults.run.cwd
+// instead of being erased by it.
+func TestEngine_CwdPrecedence(t *testing.T) {
+	t.Parallel()
+	res := runSpec(t, `
+version: "1"
+suite:
+  name: s
+defaults:
+  run: {shell: true, cwd: from-defaults}
+runners:
+  located:
+    type: cmd
+    cwd: from-runner
+  bare:
+    type: cmd
+scenarios:
+  - name: runner cwd beats defaults.run.cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - fixture: {file: from-step/who.txt, content: step}
+      - run: {runner: located, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: runner}}
+  - name: step cwd beats both
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - fixture: {file: from-step/who.txt, content: step}
+      - run: {runner: located, cwd: from-step, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: step}}
+  - name: defaults apply when no runner names a cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - run: {command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: defaults}}
+  - name: defaults apply when the named runner declares no cwd
+    steps:
+      - fixture: {file: from-defaults/who.txt, content: defaults}
+      - fixture: {file: from-runner/who.txt, content: runner}
+      - run: {runner: bare, command: `+catCmd()+` who.txt}
+      - assert: {exit_code: 0, stdout: {contains: defaults}}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios)
+	}
+}
+
 // TestEngine_EnvInterpolation proves ${env:NAME} resolves from the host
 // environment (t.Setenv forbids t.Parallel): a set variable flows into a
 // command, and an unset one on a shell-less run errors naming the variable
@@ -797,7 +848,7 @@ func TestEngine_FailFastParallel(t *testing.T) {
 			failed++
 		case StatusSkipped:
 			skipped++
-		default:
+		case StatusPassed, StatusError, StatusXFail, StatusXPass, StatusFlaky:
 			other++
 		}
 	}
@@ -1676,5 +1727,41 @@ func TestResolveConn(t *testing.T) {
 	openErr := func(spec.Runner, time.Duration) (*bughuntCloser, error) { return nil, errors.New("boom") }
 	if _, err := resolveConn("db", "query step", "db", rc, map[string]*bughuntCloser{}, true, openErr); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("open error = %v", err)
+	}
+}
+
+// TestEngine_SeedsExactlyTheDocumentedBuiltins ties the names the engine seeds
+// to the list the loader refuses to let a spec shadow. The two were written out
+// separately and drifted: the loader knew three of the five, so a
+// `store: {name: specdir}` was accepted and silently redefined ${specdir} for
+// the rest of the scenario. A new built-in that skips store.Builtins now fails
+// here rather than becoming shadowable.
+func TestEngine_SeedsExactlyTheDocumentedBuiltins(t *testing.T) {
+	t.Parallel()
+	// Every built-in resolves inside a scenario; an unknown ${...} is a hard
+	// error, so a name the engine does not seed fails the run rather than
+	// expanding to nothing.
+	var b strings.Builder
+	b.WriteString("version: \"1\"\nsuite:\n  name: x\n  setup:\n    - run: {shell: true, command: \"echo setup\"}\nscenarios:\n  - name: a\n    steps:\n")
+	for _, name := range store.Builtins {
+		if name == store.BuiltinFixtures {
+			// ${fixtures} is seeded only when a directory manifest points at a
+			// committed tree, which this spec has none of.
+			continue
+		}
+		fmt.Fprintf(&b, "      - run: {shell: true, command: \"echo %s=${%s}\"}\n", name, name)
+	}
+	b.WriteString("      - assert: {exit_code: 0}\n")
+
+	res := runSpec(t, b.String())
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed — a documented built-in did not resolve:\n%+v", res.Status, res.Scenarios[0].Steps)
+	}
+	// And the guard holds in the other direction: the loader must reject a spec
+	// that binds any of them, so nothing the engine seeds can be shadowed.
+	for _, name := range store.Builtins {
+		if !store.IsBuiltin(name) {
+			t.Errorf("store.Builtins lists %q but IsBuiltin says otherwise", name)
+		}
 	}
 }

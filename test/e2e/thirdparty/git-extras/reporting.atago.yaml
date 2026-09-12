@@ -1,0 +1,197 @@
+version: "1"
+
+suite:
+  name: git-extras (reporting on a repository)
+  description: |
+    [git-extras](https://github.com/tj/git-extras) is a collection of git
+    subcommands, each a small shell script with its own Bats file upstream. The
+    reporting half is pinned here: what `summary`, `count`, `effort` and
+    `authors` say about a repository built by the scenario that asks.
+
+    Every repository is created in the workdir, commit by commit, so the numbers
+    are known before the command runs: two commits over two files, one author.
+    Times and dates are the only thing not asserted exactly, because they are
+    the only thing that changes between runs.
+
+defaults:
+  scenario:
+    only:
+      command: command -v git-summary
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+      # Several of these scripts reach for the terminal database; without TERM
+      # they still work but print a notice, which is not what is under test.
+      TERM: xterm
+
+scenarios:
+  - name: summary counts the commits, the files, and the authors
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m 'first commit' && echo two >> a.txt && echo b > b.txt && git add . && git commit -q -m 'second commit'
+      - assert:
+          exit_code: 0
+      - run:
+          command: git summary
+      - assert:
+          # Everything here is known from the four commands above: two commits,
+          # two files, nothing uncommitted.
+          exit_code: 0
+          stdout:
+            contains:
+              - " branch:     : master"
+              - " commits     : 2"
+              - " files       : 2"
+              - " uncommitted : 0"
+      - assert:
+          # And what is missing: the authors section has its heading and nothing
+          # under it. The author table comes from `git shortlog`, which reads
+          # standard input when it is not attached to a terminal, so through a
+          # pipe it contributes nothing. The scenario below runs the same command
+          # on a terminal, where the table appears.
+          stdout:
+            matches: " authors     : \\n$"
+      - run:
+          shell: true
+          command: echo three > c.txt
+      - assert:
+          exit_code: 0
+      - run:
+          command: git summary
+      - assert:
+          # An untracked file is uncommitted work, and the summary says so
+          # without it having been added to anything.
+          exit_code: 0
+          stdout:
+            contains: " uncommitted : 1"
+      - pty:
+          command: git summary
+          cols: 100
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            # The author table is assembled with a rare Unicode separator and
+            # laid out by `column`, which refuses it under the C locale, so this
+            # step asks for the UTF-8 one.
+            LC_ALL: C.UTF-8
+          session:
+            - expect: "authors"
+      - assert:
+          # The same command, with a terminal attached: the author table is
+          # there, holding the whole history. Whether a report is complete
+          # depends on what it is being read by.
+          screen:
+            matches: "2\\s+A Author\\s+100\\.0%"
+
+  - name: count reports the commits per author
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m one && git commit -q --allow-empty -m two && git commit -q --allow-empty -m three
+      - assert:
+          exit_code: 0
+      - run:
+          command: git count
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              total 3
+      - run:
+          shell: true
+          command: git -c user.email=other@example.com -c user.name='B Other' commit -q --allow-empty -m four
+      - assert:
+          exit_code: 0
+      - run:
+          command: git count --all
+      - assert:
+          # --all is documented to break the total down by author. Through a
+          # pipe it does not: the breakdown comes from `git shortlog`, which
+          # reads standard input when it is not on a terminal, so what is left is
+          # a blank line and the same total as before.
+          exit_code: 0
+          stdout:
+            equals: |
+
+              total 4
+      - pty:
+          command: git count --all
+          cols: 100
+          rows: 24
+          timeout: 30s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            - expect: "total 4"
+      - assert:
+          # On a terminal the breakdown is there, in descending order.
+          screen:
+            contains:
+              - "A Author (3)"
+              - "B Other (1)"
+              - "total 4"
+
+  - name: effort lists each file with the commits that touched it
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && echo one > a.txt && git add a.txt && git commit -q -m first && echo two >> a.txt && echo b > b.txt && git add . && git commit -q -m second
+      - assert:
+          exit_code: 0
+      - run:
+          command: git effort
+      - assert:
+          # a.txt was touched by both commits and b.txt by one: the point of the
+          # command is that number, per path.
+          exit_code: 0
+          stdout:
+            contains:
+              - "path       commits    active days"
+            matches: "a\\.txt\\.+ 2\\s+1"
+      - assert:
+          stdout:
+            matches: "b\\.txt\\.+ 1\\s+1"
+
+  - name: authors writes the file it is named after, and can just print instead
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && git commit -q --allow-empty -m first && git -c user.email=other@example.com -c user.name='B Other' commit -q --allow-empty -m second
+      - assert:
+          exit_code: 0
+      - run:
+          command: git authors --list
+      - assert:
+          # --list is the read-only form: both authors, on stdout, and nothing
+          # written anywhere.
+          exit_code: 0
+          stdout:
+            equals: |
+              A Author <author@example.com>
+              B Other <other@example.com>
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - run:
+          command: git authors
+      - assert:
+          # Without it, the same list becomes a file in the repository — the
+          # AUTHORS file a project is expected to carry.
+          exit_code: 0
+          changes:
+            created: [AUTHORS]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: AUTHORS
+            equals: |
+              A Author <author@example.com>
+              B Other <other@example.com>

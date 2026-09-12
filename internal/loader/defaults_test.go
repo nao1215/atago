@@ -111,6 +111,47 @@ scenarios:
 	}
 }
 
+// TestApplyDefaults_RunnerCwdBeatsDefaults is a regression for #498: a step
+// naming a cmd runner that declares its own cwd must be left cwd-less by the
+// merge, so the engine's runner layering still supplies it. Filling
+// defaults.run.cwd here would erase the runner value and invert the documented
+// step > runner > defaults.run precedence.
+func TestApplyDefaults_RunnerCwdBeatsDefaults(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: sample
+runners:
+  located:
+    type: cmd
+    cwd: from-runner
+  bare:
+    type: cmd
+defaults:
+  run:
+    cwd: from-defaults
+scenarios:
+  - name: cwd precedence
+    steps:
+      - run: {runner: located, command: echo hi}
+      - run: {runner: located, cwd: from-step, command: echo hi}
+      - run: {runner: bare, command: echo hi}
+      - run: {command: echo hi}
+`
+	s, err := LoadBytes("sample.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	steps := s.Scenarios[0].Steps
+	want := []string{"", "from-step", "from-defaults", "from-defaults"}
+	for i, w := range want {
+		if got := steps[i].Run.Cwd; got != w {
+			t.Errorf("step %d cwd = %q, want %q", i, got, w)
+		}
+	}
+}
+
 // TestApplyDefaults_ExplicitShellFalseWins proves an authored `shell: false`
 // beats a defaulted `shell: true` — the documented "an explicitly authored
 // value always wins" rule holds for booleans too (Shell is a *bool so unset
@@ -814,6 +855,46 @@ scenarios:
 			wantMsg: `duplicate mock server name "api"`,
 		},
 		{
+			// The mock serves the FIRST route whose method and path match, so a
+			// second one for the same pair never answers. Method comparison is
+			// case-insensitive at serve time, so GET and get are the same route.
+			name: "duplicate route never answers",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: /ping, status: 200, body: first}
+          - {method: get, path: /ping, status: 500, body: second}
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `duplicate route GET /ping`,
+		},
+		{
+			// Matching compares the request's path, which never carries a query,
+			// so a route declaring one can never answer.
+			name: "route path carrying a query string",
+			src: `
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: s
+    mock_servers:
+      - name: api
+        routes:
+          - {method: GET, path: "/ping?a=1", status: 200, body: pong}
+    steps:
+      - run: {command: echo hi}
+`,
+			wantMsg: `must not contain a query string`,
+		},
+		{
 			name: "route with two payload sources",
 			src: `
 version: "1"
@@ -1230,5 +1311,74 @@ scenarios:
 	}
 	if s.Scenarios[0].Steps[0].Run.ShellEnabled() {
 		t.Errorf("run.shell = true, want unchanged false without defaults")
+	}
+}
+
+// TestApplyDefaults_ScenarioGate covers the file-level selection gate. A
+// probe-first suite states "these scenarios exist only where the tool is
+// installed" once, and a scenario that states its own condition keeps it: the
+// two are not combined, because a scenario's own `only:` line has to keep
+// describing when that scenario runs.
+func TestApplyDefaults_ScenarioGate(t *testing.T) {
+	t.Parallel()
+	src := `
+version: "1"
+suite:
+  name: gate
+defaults:
+  scenario:
+    only:
+      command: mytool --version
+    skip:
+      os: windows
+scenarios:
+  - name: takes both defaults
+    steps:
+      - run: {command: "true"}
+  - name: states its own only
+    only:
+      env: MYTOOL_HOME
+    steps:
+      - run: {command: "true"}
+  - name: states its own skip
+    skip:
+      os: darwin
+    steps:
+      - run: {command: "true"}
+`
+	s, err := LoadBytes("gate.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	tests := []struct {
+		idx      int
+		wantOnly string
+		wantSkip string
+	}{
+		{idx: 0, wantOnly: "mytool --version", wantSkip: "windows"},
+		{idx: 1, wantOnly: "", wantSkip: "windows"},
+		{idx: 2, wantOnly: "mytool --version", wantSkip: "darwin"},
+	}
+	for _, tt := range tests {
+		sc := s.Scenarios[tt.idx]
+		gotOnly := ""
+		if sc.Only != nil {
+			gotOnly = sc.Only.Command
+		}
+		if gotOnly != tt.wantOnly {
+			t.Errorf("scenario %q only.command = %q, want %q", sc.Name, gotOnly, tt.wantOnly)
+		}
+		gotSkip := ""
+		if sc.Skip != nil {
+			gotSkip = sc.Skip.OS
+		}
+		if gotSkip != tt.wantSkip {
+			t.Errorf("scenario %q skip.os = %q, want %q", sc.Name, gotSkip, tt.wantSkip)
+		}
+	}
+	// The scenario that stated its own only: keeps it whole, rather than
+	// inheriting the default's command alongside its own env.
+	if s.Scenarios[1].Only == nil || s.Scenarios[1].Only.Env != "MYTOOL_HOME" {
+		t.Errorf("scenario 1 lost its own only: %+v", s.Scenarios[1].Only)
 	}
 }

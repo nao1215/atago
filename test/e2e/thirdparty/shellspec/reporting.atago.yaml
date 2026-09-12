@@ -1,0 +1,379 @@
+version: "1"
+
+suite:
+  name: shellspec (formatters, report files, and tracing)
+  description: |
+    One suite — a passing example and a failing one — reported in every shape
+    [ShellSpec](https://shellspec.info/) offers: progress dots, nested
+    documentation, JUnit XML, the editor-oriented `failures` lines, and `null`,
+    which prints nothing and still returns the verdict. Alongside the console
+    formatter, `--output` writes report files, `--profile` ranks the slowest
+    examples, and `--xtrace` writes an evaluation trace to a log file.
+
+    The last two scenarios are about what a report is worth: parallel jobs must
+    not change the verdict, and `--random` must not change it either — though it
+    does damage the TAP plan line, which is pinned here as it behaves.
+
+defaults:
+  scenario:
+    only:
+      command: shellspec --version
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+
+scenarios:
+  - name: the default formatter is dots, a count, and the failure in full
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mixed_spec.sh
+          content: |
+            Describe 'mixed'
+              It 'passes'
+                When call expr 2 + 2
+                The output should equal 4
+              End
+
+              It 'fails'
+                When call expr 2 + 2
+                The output should equal 5
+              End
+            End
+      - run:
+          command: shellspec
+      - assert:
+          exit_code: 101
+          stdout:
+            contains:
+              # The banner names the shell the specs ran in, which is a choice
+              # ShellSpec makes rather than something the specfile declares.
+              - "Running: "
+              - ".F"
+              - "1.1) The output should equal 5"
+              - "expected: 5"
+              - "got: 4"
+              - "2 examples, 1 failure"
+
+  - name: the documentation formatter nests the names as written
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/nested_spec.sh
+          content: |
+            Describe 'outer'
+              Describe 'inner'
+                It 'passes'
+                  When call true
+                  The status should be success
+                End
+              End
+            End
+      - run:
+          command: shellspec --format documentation
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: |
+              outer
+                inner
+                  passes
+
+  - name: the failures formatter is one line an editor can jump to
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mixed_spec.sh
+          content: |
+            Describe 'mixed'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+
+              It 'fails'
+                When call true
+                The status should equal 9
+              End
+            End
+      - run:
+          command: shellspec --format failures
+      - assert:
+          # Only the failures, as file:line:status:name — nothing to parse out of
+          # a report, which is what makes it useful in an editor's error list.
+          exit_code: 101
+          stdout:
+            equals: |
+              ./spec/mixed_spec.sh:7:FAILED:mixed fails
+
+  - name: the null formatter reports nothing and still returns the verdict
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mixed_spec.sh
+          content: |
+            Describe 'mixed'
+              It 'fails'
+                When call true
+                The status should equal 9
+              End
+            End
+      - run:
+          command: shellspec --format null
+      - assert:
+          # For a script that only cares whether the suite is green.
+          exit_code: 101
+          stdout:
+            empty: true
+
+  - name: the JUnit formatter carries the counts, the message, and the output
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mixed_spec.sh
+          content: |
+            Describe 'mixed'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+
+              It 'fails'
+                When call echo unexpected
+                The output should equal expected
+              End
+            End
+      - run:
+          command: shellspec --format junit
+      - assert:
+          # Timestamps and the project name vary; the tallies, the per-example
+          # elements, the failure message and the captured stdout do not.
+          exit_code: 101
+          stdout:
+            contains:
+              - '<?xml version="1.0" encoding="UTF-8"?>'
+              - 'tests="2"'
+              - 'failures="1"'
+              - '<testcase time="0" classname="spec/mixed_spec.sh" name="mixed fails">'
+              - '<failure message="The output should equal expected">'
+              - '<![CDATA[expected: "expected"'
+              - 'got: "unexpected"'
+
+  - name: report files are written beside the console report, where asked
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/mixed_spec.sh
+          content: |
+            Describe 'mixed'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --output tap --output junit --format progress
+      - assert:
+          # The console keeps the formatter it was given; the generators write
+          # their own files, named after the format, under report/ by default.
+          exit_code: 0
+          stdout:
+            contains: "1 example, 0 failures"
+          changes:
+            created:
+              - report/results.tap
+              - report/results_junit.xml
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: report/results.tap
+            equals: |
+              1..1
+              ok 1 - mixed passes
+      - assert:
+          file:
+            path: report/results_junit.xml
+            contains: 'name="mixed passes"'
+      - run:
+          command: shellspec --output tap --reportdir elsewhere --format null
+      - assert:
+          # And the directory is the caller's choice.
+          exit_code: 0
+          changes:
+            created: [elsewhere/results.tap]
+            modified: []
+            deleted: []
+
+  - name: profiling ranks the slowest examples
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/two_spec.sh
+          content: |
+            Describe 'two'
+              It 'first'
+                When call true
+                The status should be success
+              End
+
+              It 'second'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --profile --profile-limit 1
+      - assert:
+          # The list is addressed by file and line range, so the slow example can
+          # be opened rather than searched for.
+          exit_code: 0
+          stdout:
+            contains: "# Top 1 slowest examples of the 2 examples"
+            matches: "#\\s+1 [0-9]+\\.[0-9]+ spec/two_spec\\.sh:[0-9]+-[0-9]+"
+
+  - name: tracing writes the evaluated commands to a log file
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/traced_spec.sh
+          content: |
+            Describe 'traced'
+              greet() { echo "hello, $1"; }
+
+              It 'greets'
+                When call greet world
+                The output should equal "hello, world"
+              End
+            End
+      - run:
+          command: shellspec --xtrace --log-file trace.log --format tap
+      - assert:
+          exit_code: 0
+          changes:
+            created: [trace.log]
+            modified: []
+            deleted: []
+          stderr:
+            # Under a shell without BASH_XTRACEFD the trace is all there is:
+            # ShellSpec says so rather than silently reporting expectations it
+            # did not check.
+            contains: "Fall back to trace-only mode. All expectations will be skipped."
+      - assert:
+          file:
+            path: trace.log
+            contains:
+              - "[spec/traced_spec.sh:5] When call greet world"
+              - "+ greet world"
+              - "+ echo hello, world"
+
+  - name: running in parallel does not change the report
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/a_spec.sh
+          content: |
+            Describe 'a'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+            End
+      - fixture:
+          file: spec/b_spec.sh
+          content: |
+            Describe 'b'
+              It 'fails'
+                When call true
+                The status should equal 9
+              End
+            End
+      - run:
+          command: shellspec --format tap
+      - assert:
+          exit_code: 101
+          stdout:
+            contains:
+              - "1..2"
+              - "ok 1 - a passes"
+              - "not ok 2 - b fails # FAILED"
+      - run:
+          command: shellspec --jobs 2 --format tap
+      - assert:
+          # ShellSpec parallelizes on its own, with no external helper, and the
+          # numbered report comes back in the defined order regardless.
+          exit_code: 101
+          stdout:
+            contains:
+              - "1..2"
+              - "ok 1 - a passes"
+              - "not ok 2 - b fails # FAILED"
+
+  - name: randomizing the order keeps the verdict and breaks the TAP plan line
+    steps:
+      - fixture:
+          file: .shellspec
+          content: ""
+      - fixture:
+          file: spec/a_spec.sh
+          content: |
+            Describe 'a'
+              It 'passes'
+                When call true
+                The status should be success
+              End
+            End
+      - fixture:
+          file: spec/b_spec.sh
+          content: |
+            Describe 'b'
+              It 'also passes'
+                When call true
+                The status should be success
+              End
+            End
+      - run:
+          command: shellspec --random specfiles --format tap
+      - assert:
+          # The verdict and the results survive the shuffle, and the seed is
+          # announced on stderr so a failing order can be replayed.
+          exit_code: 0
+          stdout:
+            contains:
+              - "ok 1 - "
+              - "ok 2 - "
+          stderr:
+            matches: "^Randomized with seed [0-9]+"
+      - assert:
+          # Observed as it is, not as TAP defines it: under --random the plan
+          # line is not a count. "1.." is followed by the shuffled list of
+          # specfiles, so a strict TAP consumer sees a malformed plan even though
+          # the run itself is fine. Without randomization the same suite prints
+          # "1..2".
+          stdout:
+            matches: "^1\\.\\.spec/[ab]_spec\\.sh\\n"
+      - run:
+          command: shellspec --random none --format tap
+      - assert:
+          exit_code: 0
+          stdout:
+            matches: "^1\\.\\.2\\n"

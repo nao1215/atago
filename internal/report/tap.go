@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // writeTAP emits a Test Anything Protocol (TAP version 13) stream, the format
@@ -13,9 +14,9 @@ import (
 // `ok`/`not ok` line per scenario across every suite, numbered from 1; failures
 // and errors carry a YAML diagnostic block, and skips use the `# SKIP` directive.
 // Rendered by Render (FormatTAP).
-func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
+func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure, snapsUpdated int) error {
 	var b strings.Builder
-	total := 0
+	total := len(loadFailures)
 	for _, res := range results {
 		total += len(res.Scenarios)
 		// A suite that errored before any scenario ran (#7) still contributes a
@@ -28,6 +29,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 	fmt.Fprintf(&b, "1..%d\n", total)
 
 	n := 0
+	// The unreadable specs lead the stream: they are what the run could not even
+	// begin.
+	for _, lf := range loadFailures {
+		n++
+		fmt.Fprintf(&b, "not ok %d - %s\n", n, tapInline(lf.SpecPath))
+		writeTAPDiagnostic(&b, "spec failed to load", lf.Message)
+	}
 	for _, res := range results {
 		for i := range res.Scenarios {
 			sc := &res.Scenarios[i]
@@ -67,6 +75,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 			default:
 				fmt.Fprintf(&b, "not ok %d - %s\n", n, name)
 			}
+			// A failed teardown never changes the point's verdict — the steps
+			// decide it — but a TAP consumer used to see a bare passing point
+			// with zero trace that cleanup failed. A comment is TAP's slot for
+			// exactly that: legal after any point, ignored by the count.
+			if msg := firstStepFailureMessage(sc.Teardown); msg != "" {
+				fmt.Fprintf(&b, "# teardown failed: %s\n", tapFlatten(msg))
+			}
 		}
 		if suiteErroredWithoutScenarios(res) {
 			for _, p := range suiteFailurePoints(res) {
@@ -75,6 +90,18 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult) error {
 				writeTAPDiagnostic(&b, p.message, p.body)
 			}
 		}
+		// The suite-level twin: suite.teardown outcomes never change the suite
+		// status, so they surface as a comment rather than a point.
+		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
+			fmt.Fprintf(&b, "# suite teardown failed: %s\n", tapFlatten(msg))
+		}
+	}
+	// A snapshot rewrite is not a test point — nothing was verified — so it is a
+	// comment, the slot TAP has for a fact a consumer should see without it
+	// counting toward the plan.
+	if n := snapsUpdated; n > 0 {
+		fmt.Fprintf(&b, "# %s updated by --update-snapshots; the committed expected results were rewritten\n",
+			plural.Count(n, "snapshot", "snapshots"))
 	}
 	_, err := io.WriteString(w, b.String())
 	return err

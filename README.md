@@ -1,5 +1,5 @@
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ![Coverage](https://raw.githubusercontent.com/nao1215/octocovs-central-repo/main/badges/nao1215/atago/coverage.svg)
@@ -79,19 +79,6 @@ On macOS, Homebrew works too:
 brew install --cask nao1215/tap/atago
 ```
 
-On Windows, winget installs it from the community repository:
-
-```shell
-winget install nao1215.atago
-```
-
-[Scoop](https://scoop.sh/) installs it from this repository's own bucket:
-
-```shell
-scoop bucket add nao1215 https://github.com/nao1215/atago
-scoop install nao1215/atago
-```
-
 On Arch Linux, install the [`atago-bin`](https://aur.archlinux.org/packages/atago-bin) package from the AUR:
 
 ```shell
@@ -115,7 +102,7 @@ If your installed `mise` release does not see `nao1215/atago` yet, update `mise`
 
 The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Requires Go 1.26 or later when building from source.
 
-Runs on Linux, macOS, and Windows (CI tests all three).
+Runs on Linux, macOS, and Windows. CI tests all three: the unit suite on every OS, and the self-hosted spec suite on Linux, macOS, and Windows — the last both under the native `cmd.exe` and under a POSIX shell. Almost everything behaves identically; [Platform support](https://nao1215.github.io/atago/reference/#platform-support) is the short list of what does not, and why.
 
 ## Getting started
 
@@ -348,6 +335,8 @@ atago manifest ./specs
 atago list ./specs
 ```
 
+A spec error carries a code — `spec.yaml: ATG2201: suite.name is required` — whose first digit is the exit code, so `ATG2xxx` always exits 2. Codes are searchable and stable across rewordings of the message, and the [error reference](https://nao1215.github.io/atago/errors/) says what each one means and what to change. Codes are being assigned one family at a time, and the reference says which families carry them today. Assertion failures carry none by design: exit 1 is a spec doing its job, not atago failing to do its own.
+
 Scenario names say what happens; an optional `description:` on the suite and on
 a scenario says why it matters. Both are prose for the reader of the generated
 Markdown — rendered under the matching heading, never expanded, and with no
@@ -427,6 +416,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
   <tbody>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://debimate.jp/"><img src="https://avatars.githubusercontent.com/u/22737008?v=4?s=75" width="75px;" alt="CHIKAMATSU Naohiro"/><br /><sub><b>CHIKAMATSU Naohiro</b></sub></a><br /><a href="https://github.com/nao1215/atago/commits?author=nao1215" title="Code">💻</a> <a href="https://github.com/nao1215/atago/commits?author=nao1215" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://rafaeldominiquini.ddns.net/"><img src="https://avatars.githubusercontent.com/u/1180808?v=4?s=75" width="75px;" alt="Rafael Baboni Dominiquini"/><br /><sub><b>Rafael Baboni Dominiquini</b></sub></a><br /><a href="#platform-Dominiquini" title="Packaging/porting to new platform">📦</a></td>
     </tr>
   </tbody>
 </table>

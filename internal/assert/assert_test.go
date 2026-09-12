@@ -258,6 +258,46 @@ func TestCheck_Stream_EqualsTrailingNewline(t *testing.T) {
 	}
 }
 
+// TestCheck_StreamEmptyIgnoresWhitespace pins what `empty:` actually means: a
+// stream carrying nothing but whitespace counts as empty, and `empty: false`
+// therefore fails on it. A CLI that prints a stray newline or a run of spaces
+// on an otherwise-silent stream is quiet as far as a user is concerned, so
+// judging it by byte length would make `stderr: {empty: true}` fail for output
+// nobody can see. The trade is that `empty: false` cannot be used to prove a
+// stream carried bytes — only that it carried something legible.
+func TestCheck_StreamEmptyIgnoresWhitespace(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		out        string
+		wantEmpty  bool
+		wantFilled bool
+	}{
+		"no bytes at all":   {out: "", wantEmpty: true, wantFilled: false},
+		"one newline":       {out: "\n", wantEmpty: true, wantFilled: false},
+		"several newlines":  {out: "\n\n\n", wantEmpty: true, wantFilled: false},
+		"one space":         {out: " ", wantEmpty: true, wantFilled: false},
+		"spaces and tabs":   {out: " \t \t ", wantEmpty: true, wantFilled: false},
+		"crlf":              {out: "\r\n", wantEmpty: true, wantFilled: false},
+		"carriage return":   {out: "\r", wantEmpty: true, wantFilled: false},
+		"unicode space":     {out: " ", wantEmpty: true, wantFilled: false},
+		"text":              {out: "x", wantEmpty: false, wantFilled: true},
+		"text and newlines": {out: "\n x \n", wantEmpty: false, wantFilled: true},
+		"zero byte":         {out: "\x00", wantEmpty: false, wantFilled: true},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			res := &runner.Result{Stdout: []byte(tt.out)}
+			if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(true)}}, res, Env{}); got.OK != tt.wantEmpty {
+				t.Errorf("empty: true on %q = %v, want %v (%s)", tt.out, got.OK, tt.wantEmpty, got.Hint)
+			}
+			if got := Check(&spec.Assert{Stdout: &spec.StreamAssert{Empty: boolp(false)}}, res, Env{}); got.OK != tt.wantFilled {
+				t.Errorf("empty: false on %q = %v, want %v (%s)", tt.out, got.OK, tt.wantFilled, got.Hint)
+			}
+		})
+	}
+}
+
 // TestCheck_ContainsList_FailureNamesElement verifies an array contains /
 // not_contains failure identifies which element failed, and that a single-element
 // list keeps the original (no "element N of M") failure phrasing.
@@ -2099,6 +2139,37 @@ func TestExcerpt_Truncation(t *testing.T) {
 	}
 }
 
+// TestExcerpt_RevealsWhitespaceOnlyPayloads pins the rendering of an observed
+// payload that is invisible on a terminal. A truly empty payload says
+// "(empty)"; a whitespace-only one rendered as a blank block — MORE
+// empty-looking than (empty) — exactly where the distinction decides the
+// verdict: `empty: false` fails on "  \n\n" because whitespace counts as
+// empty, and the failure block gave the reader no way to see the bytes that
+// made it so. Quoting reveals them; a visible payload keeps its unquoted,
+// copy-pasteable form.
+func TestExcerpt_RevealsWhitespaceOnlyPayloads(t *testing.T) {
+	t.Parallel()
+	if got := excerpt("  \n\n"); got != `"  \n\n"` {
+		t.Errorf("excerpt(whitespace-only) = %q, want the payload quoted", got)
+	}
+	if got := excerpt(""); got != EmptyExcerpt {
+		t.Errorf("excerpt(empty) = %q, want %q", got, EmptyExcerpt)
+	}
+	if got := excerpt("visible\n"); got != "visible\n" {
+		t.Errorf("excerpt(visible) = %q, want it unchanged", got)
+	}
+
+	// The failure that motivated this: empty:false on whitespace-only output
+	// must show the invisible bytes as evidence.
+	cr := checkStream("stdout", &spec.StreamAssert{Empty: boolp(false)}, []byte("  \n\n"), true, Env{})
+	if cr.OK {
+		t.Fatal("empty:false must fail on whitespace-only output")
+	}
+	if !strings.Contains(cr.Actual, `\n`) {
+		t.Errorf("Actual = %q, want the whitespace revealed", cr.Actual)
+	}
+}
+
 func TestCheckStream_LineOutOfRange(t *testing.T) {
 	t.Parallel()
 	sa := &spec.StreamAssert{Line: intp(9), Contains: spec.StringList{"x"}}
@@ -2320,6 +2391,72 @@ func TestCheckDirRecursive_FailureBranches(t *testing.T) {
 // ---------------------------------------------------------------------------
 // snapshot.go: missing, update, mismatch, path escape
 // ---------------------------------------------------------------------------
+
+// TestCheckSnapshot_ConflictingUpdateFails is a regression: two scenarios
+// pointing at one snapshot path made --update-snapshots lie. Each wrote in
+// turn, the update run reported every scenario green, and the very next verify
+// run was red — a hard break of the documented write→verify invariant, and a
+// race between the two writers under --parallel. Two scenarios asserting the
+// SAME output against one golden (the `-h` and `--help` pattern) is legitimate
+// and must keep working, so only a conflicting rewrite is refused.
+func TestCheckSnapshot_ConflictingUpdateFails(t *testing.T) {
+	t.Parallel()
+	specDir := t.TempDir()
+	writes := NewSnapshotWrites()
+	// Each scenario claims under its own identity, which is what tells this
+	// cross-scenario clash apart from one scenario's own retry attempt.
+	alpha := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes, Writer: "s.atago.yaml / alpha"}
+	beta := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes, Writer: "s.atago.yaml / beta"}
+
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), alpha); !cr.OK {
+		t.Fatalf("the first write should pass: %+v", cr)
+	}
+	// The same content from another scenario is the shared-golden pattern.
+	if cr := checkSnapshot("d", "stdout", "shared.snap", []byte("from-alpha\n"), beta); !cr.OK {
+		t.Errorf("an identical rewrite should pass: %+v", cr)
+	}
+	// Different content is the lie: whichever ran last would win, and the next
+	// verify run would fail on the other scenario.
+	conflict := checkSnapshot("d", "stdout", "shared.snap", []byte("from-beta\n"), beta)
+	if conflict.OK {
+		t.Fatal("a conflicting rewrite was accepted; the next verify run would be red")
+	}
+	if !strings.Contains(conflict.Hint, "already written in this run") {
+		t.Errorf("hint = %q, want it to name the conflicting rewrite", conflict.Hint)
+	}
+	// One scenario clashing with its OWN earlier claim is a different finding:
+	// output that changes between attempts, not a path two scenarios share.
+	retry := checkSnapshot("d", "stdout", "attempt.snap", []byte("first\n"), alpha)
+	if !retry.OK {
+		t.Fatalf("the first attempt should pass: %+v", retry)
+	}
+	again := checkSnapshot("d", "stdout", "attempt.snap", []byte("second\n"), alpha)
+	if again.OK {
+		t.Fatal("a conflicting rewrite from the same scenario was accepted")
+	}
+	if !strings.Contains(again.Hint, "changed between attempts") {
+		t.Errorf("hint = %q, want the clash attributed to this scenario's own earlier attempt", again.Hint)
+	}
+	// An unnamed writer (direct API use) keeps the general wording rather than
+	// claiming two anonymous writes came from one scenario.
+	anon := Env{SpecDir: specDir, Workdir: specDir, UpdateSnapshots: true, SnapshotWrites: writes}
+	if cr := checkSnapshot("d", "stdout", "anon.snap", []byte("one\n"), anon); !cr.OK {
+		t.Fatalf("the first anonymous write should pass: %+v", cr)
+	}
+	anonClash := checkSnapshot("d", "stdout", "anon.snap", []byte("two\n"), anon)
+	if !strings.Contains(anonClash.Hint, "two scenarios cannot share") {
+		t.Errorf("hint = %q, want the general wording for an unnamed writer", anonClash.Hint)
+	}
+	// The first writer's content stays on disk: the run reports the conflict
+	// rather than leaving whichever scenario happened to be last.
+	got, err := os.ReadFile(filepath.Join(specDir, "shared.snap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "from-alpha\n" {
+		t.Errorf("snapshot = %q, want the first writer's content", got)
+	}
+}
 
 func TestCheckSnapshot_Lifecycle(t *testing.T) {
 	t.Parallel()

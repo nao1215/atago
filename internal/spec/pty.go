@@ -1,7 +1,20 @@
 package spec
 
+import "time"
+
+// DefaultPTYSessionTimeout bounds a pty session when the spec sets none: an
+// interactive program that never produces the expected prompt (or never exits)
+// must fail loudly instead of hanging the run. It lives here, beside
+// DefaultPTYExecTimeout, so the runtime that enforces it and the loader that
+// validates a session-local duration against it read one definition.
+const DefaultPTYSessionTimeout = 30 * time.Second
+
 // ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
 func (p *PTY) ClearEnvEnabled() bool { return p.ClearEnv != nil && *p.ClearEnv }
+
+// ShellEnabled reports whether the pty command runs through the shell, matching
+// run.shell semantics.
+func (p *PTY) ShellEnabled() bool { return p.Shell != nil && *p.Shell }
 
 // SandboxHomeEnabled reports whether the pty step opts into an isolated home (#71).
 func (p *PTY) SandboxHomeEnabled() bool { return p.SandboxHome != nil && *p.SandboxHome }
@@ -105,6 +118,7 @@ type PTYExpectScreen struct {
 	// the attribute matchers too (#382): the live frame is the same frame the
 	// post-step assert reads, so it deserves the same questions.
 	ScreenAssert `yaml:",inline"`
+
 	// Timeout bounds THIS wait only; when empty, the enclosing pty timeout
 	// supplies the budget.
 	Timeout string `yaml:"timeout,omitempty"`

@@ -8,6 +8,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -78,6 +79,8 @@ func FindProject(dir string) (*Project, error) {
 		}
 		parent := filepath.Dir(abs)
 		if parent == abs {
+			//nolint:nilnil // No manifest anywhere above dir. That is the normal case for a
+			// project without one, so it cannot be reported as a failure.
 			return nil, nil
 		}
 		abs = parent
@@ -95,16 +98,19 @@ func LoadProject(path string) (*Project, error) {
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // path is the manifest atago itself located
 	if err != nil {
-		return nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
+		return nil, &Error{Path: path, Kind: KindValidation, Code: diag.SpecUnreadable, Msg: err.Error()}
 	}
 	var p Project
 	if derr := yaml.UnmarshalWithOptions(data, &p, yaml.Strict()); derr != nil {
-		return nil, &Error{Path: path, Kind: KindParse, Msg: yaml.FormatError(derr, false, true)}
+		msg := yaml.FormatError(derr, false, true)
+		return nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(data, msg), Msg: msg}
 	}
 	p.Path = path
 
 	var msgs []string
-	add := func(format string, args ...any) { msgs = append(msgs, fmt.Sprintf(format, args...)) }
+	add := func(code diag.Code, format string, args ...any) {
+		msgs = append(msgs, code.Annotate(fmt.Sprintf(format, args...)))
+	}
 	if p.Defaults != nil {
 		validateDefaults(add, p.Defaults)
 	}
@@ -120,9 +126,9 @@ func LoadProject(path string) (*Project, error) {
 		st, serr := os.Stat(resolved)
 		switch {
 		case serr != nil:
-			add("fixtures_dir %q does not exist (resolved to %s)", p.FixturesDir, resolved)
+			add(diag.PathNotUsable, "fixtures_dir %q does not exist (resolved to %s)", p.FixturesDir, resolved)
 		case !st.IsDir():
-			add("fixtures_dir %q is not a directory (resolved to %s)", p.FixturesDir, resolved)
+			add(diag.PathNotUsable, "fixtures_dir %q is not a directory (resolved to %s)", p.FixturesDir, resolved)
 		default:
 			p.ResolvedFixturesDir = resolved
 		}
@@ -142,6 +148,16 @@ func applyProject(s *spec.Spec, p *Project) {
 	}
 	s.ProjectPath = p.Path
 	s.FixturesDir = p.ResolvedFixturesDir
+	// Record the subject build on the spec: it is a command that runs on the
+	// host before any scenario, and leaving it inside the loader is why nothing
+	// described or flagged it.
+	if p.Subject != nil && p.Subject.Build != nil {
+		s.Subject = &spec.Subject{
+			Name:    p.Subject.Name,
+			Command: p.Subject.Build.Command,
+			Shell:   p.Subject.Build.Shell != nil && *p.Subject.Build.Shell,
+		}
+	}
 	if len(p.Env) > 0 {
 		s.Suite.Env = mergeStringMap(p.Env, s.Suite.Env)
 	}
@@ -213,46 +229,51 @@ type Profile struct {
 }
 
 // validateSubject checks the subject/profiles block (#393).
-func validateSubject(add func(string, ...any), sub *Subject, profiles map[string]Profile) {
+func validateSubject(add addFunc, sub *Subject, profiles map[string]Profile) {
 	for name, prof := range profiles {
 		if name == "" {
-			add("profiles has an empty name")
+			add(diag.EmptyValue, "profiles has an empty name")
 		}
 		if prof.Build == nil && len(prof.Env) == 0 {
-			add("profiles.%s sets neither build nor env, so selecting it would change nothing", name)
+			add(diag.ChooseAtLeastOne, "profiles.%s sets neither build nor env, so selecting it would change nothing", name)
 		}
 		if prof.Build != nil {
 			validateBuild(add, "profiles."+name+".build", prof.Build)
 		}
 		if prof.Build != nil && sub == nil {
-			add("profiles.%s declares a build, but there is no subject: to build", name)
+			add(diag.KeyNeedsAnother, "profiles.%s declares a build, but there is no subject: to build", name)
 		}
 	}
 	if sub == nil {
 		return
 	}
 	if sub.Name == "" {
-		add("subject.name is required: it is what specs call the binary")
+		add(diag.RequiredKey, "subject.name is required: it is what specs call the binary")
 	}
 	if sub.Artifact == "" {
-		add("subject.artifact is required: it is where the build writes, and what ${artifact} expands to")
+		add(diag.RequiredKey, "subject.artifact is required: it is where the build writes, and what ${artifact} expands to")
 	} else if filepath.IsAbs(sub.Artifact) {
-		add("subject.artifact %q must be relative: it is written into a run-scoped scratch directory, not into the repository", sub.Artifact)
+		add(diag.AbsolutePath, "subject.artifact %q must be relative: it is written into a run-scoped scratch directory, not into the repository", sub.Artifact)
 	}
 	if sub.Build == nil {
-		add("subject.build is required: atago has to know how to produce the binary")
+		add(diag.RequiredKey, "subject.build is required: atago has to know how to produce the binary")
 		return
 	}
 	validateBuild(add, "subject.build", sub.Build)
 }
 
-func validateBuild(add func(string, ...any), where string, b *Build) {
+func validateBuild(add addFunc, where string, b *Build) {
 	if b.Command == "" {
-		add("%s.command is required", where)
+		add(diag.RequiredKey, "%s.command is required", where)
 	}
 	if b.Timeout != "" {
-		if d, err := time.ParseDuration(b.Timeout); err != nil || d <= 0 {
-			add("%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
+		// Two different mistakes, and the reader fixes them differently: text
+		// that is not a duration at all, and a duration that parsed but leaves
+		// the build no time to run.
+		if d, err := time.ParseDuration(b.Timeout); err != nil {
+			add(diag.BadDuration, "%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
+		} else if d <= 0 {
+			add(diag.NonPositiveValue, "%s.timeout must be a positive Go duration (got %q)", where, b.Timeout)
 		}
 	}
 }

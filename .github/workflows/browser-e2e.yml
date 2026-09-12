@@ -25,7 +25,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "go.mod"
+          go-version: "stable"
 
       # ubuntu-latest ships Google Chrome; assert it is present so a missing
       # browser fails here with a clear message rather than mid-test.

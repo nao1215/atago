@@ -24,6 +24,7 @@
   - [write saves a copy to another path without changing the source file](#scenario-write-saves-a-copy-to-another-path-without-changing-the-source-file)
   - [unicode filenames and Japanese text save without mangling](#scenario-unicode-filenames-and-japanese-text-save-without-mangling)
   - [wide and combining characters round-trip through a save](#scenario-wide-and-combining-characters-round-trip-through-a-save)
+
 ## helix (third-party modal editor)
 [Helix](https://helix-editor.com/) is a modal text editor, driven here as a
 person drives it: the real TUI is launched in a terminal, keys are typed in
@@ -45,12 +46,14 @@ hx --version
 #### Then
 - exit code is `0`
 - stdout contains `helix 25.07.1`
+
 ### Scenario: opening an existing file reaches the editor and quits cleanly
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -69,12 +72,14 @@ alpha
 ```
 #### Then
 - exit code is `0`
+
 ### Scenario: append mode edits an existing file and write quit saves it
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -93,14 +98,17 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `alpha beta`
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout contains `alpha beta`
+
 ### Scenario: insert mode prefixes the first line and write quit saves it
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -119,14 +127,17 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: append mode after j edits only the second line
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -146,8 +157,10 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -160,6 +173,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -178,13 +192,16 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: saving a new file path creates the file on disk
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -199,14 +216,17 @@ auto-save = false
 cat fresh.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat fresh.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: saving a new file path under an existing directory creates the file
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `dir/.keep` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -221,13 +241,16 @@ auto-save = false
 cat dir/fresh.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat dir/fresh.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: enter in insert mode writes multiple lines
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -242,8 +265,10 @@ auto-save = false
 cat lines.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat lines.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -256,6 +281,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -275,8 +301,10 @@ third
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -290,6 +318,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -309,8 +338,10 @@ third
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -324,6 +355,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -342,14 +374,17 @@ alpha
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: x d then undo restores the deleted line before save
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -369,8 +404,10 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 #### Expected output
 _expected stdout:_
 ```text
@@ -383,6 +420,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -401,14 +439,17 @@ alpha beta gamma
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: x then d deletes the selected line and saves the shorter file
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -428,8 +469,10 @@ second
 cat note.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat note.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: buffer-next switches to the second file in a multi-file session
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -437,6 +480,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `one.txt` is created.
 - Fixture file `two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -459,8 +503,10 @@ two-start
 cat two.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `two-start updated`
+- after `cat two.txt`:
+  - exit code is `0`
+  - stdout contains `two-start updated`
+
 ### Scenario: buffer-previous returns to the first file in a multi-file session
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -468,6 +514,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `one.txt` is created.
 - Fixture file `two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -490,8 +537,10 @@ two-start
 cat one.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `one-start updated`
+- after `cat one.txt`:
+  - exit code is `0`
+  - stdout contains `one-start updated`
+
 ### Scenario: buffer-next then buffer-previous can edit both buffers before quit
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
@@ -499,6 +548,7 @@ _only when `hx --version` succeeds · skipped on Windows_
 - Fixture file `one.txt` is created.
 - Fixture file `two.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -528,12 +578,14 @@ cat two.txt
 - after `cat two.txt`:
   - exit code is `0`
   - stdout contains `two-start second`
+
 ### Scenario: write saves a copy to another path without changing the source file
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - Fixture file `note.txt` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -559,11 +611,13 @@ cat copy.txt
 - after `cat copy.txt`:
   - exit code is `0`
   - stdout equals an exact value
+
 ### Scenario: unicode filenames and Japanese text save without mangling
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -578,13 +632,16 @@ auto-save = false
 cat 日本語メモ.txt
 ```
 #### Then
-- exit code is `0`
-- stdout equals an exact value
+- after `cat 日本語メモ.txt`:
+  - exit code is `0`
+  - stdout equals an exact value
+
 ### Scenario: wide and combining characters round-trip through a save
 _only when `hx --version` succeeds · skipped on Windows_
 #### Given
 - Fixture file `cfg/config.toml` is created.
 - The command runs with a cleared environment (passing through: PATH, HELIX_RUNTIME).
+
 #### Inputs
 _Fixture `cfg/config.toml`:_
 ```text
@@ -599,5 +656,6 @@ auto-save = false
 od -An -tx1 -v unicode.txt
 ```
 #### Then
-- exit code is `0`
-- stdout contains `65 cc 81`
+- after `od -An -tx1 -v unicode.txt`:
+  - exit code is `0`
+  - stdout contains `65 cc 81`

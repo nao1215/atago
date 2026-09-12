@@ -1,0 +1,325 @@
+version: "1"
+
+suite:
+  name: shdotenv (dialects and output formats)
+  description: |
+    The two matrices [shdotenv](https://github.com/ko1nksm/shdotenv) exists for:
+    the .env syntax dialect it reads, and the format it writes.
+
+    A dialect is not a preference — it changes what a file means, so the
+    scenarios here feed one file to several dialects and assert that the answers
+    differ in the documented way: a backslash-n that stays two characters under
+    the POSIX rules and becomes a newline under Ruby's, a key with a space after
+    it that POSIX and Docker refuse and Ruby accepts. The format half is asserted
+    exactly, because these outputs are consumed by other programs: a shell, csh,
+    fish, JSON, JSONL, YAML.
+
+defaults:
+  scenario:
+    only:
+      command: command -v shdotenv
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: one file, six formats, each exactly as its consumer expects
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            NAME=world
+            GREETING="hello, ${NAME}"
+      - run:
+          command: shdotenv --format sh
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              export NAME='world'
+              export GREETING='hello, world'
+      - run:
+          command: shdotenv --format csh
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              setenv NAME 'world';
+              setenv GREETING 'hello, world';
+      - run:
+          command: shdotenv --format fish
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              set --export NAME 'world';
+              set --export GREETING 'hello, world';
+      - run:
+          command: shdotenv --format json
+      - assert:
+          # Asserted as JSON rather than as text, so the contract is the data.
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.NAME"
+                equals: world
+              - path: "$.GREETING"
+                equals: "hello, world"
+      - run:
+          command: shdotenv --format jsonl
+      - assert:
+          # One line, for a consumer reading a stream.
+          exit_code: 0
+          stdout:
+            equals: |
+              { "NAME": "world", "GREETING": "hello, world" }
+      - run:
+          command: shdotenv --format yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              NAME: "world"
+              GREETING: "hello, world"
+
+  - name: the output can be filtered and reduced to names, and sorted only partly
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            DELTA=4
+            BRAVO=2
+            ECHO=5
+            ALFA=1
+            CHARLIE=3
+      - run:
+          command: shdotenv
+      - assert:
+          # The order is the file's order until something says otherwise.
+          exit_code: 0
+          stdout:
+            equals: |
+              export DELTA='4'
+              export BRAVO='2'
+              export ECHO='5'
+              export ALFA='1'
+              export CHARLIE='3'
+      - run:
+          command: shdotenv --sort
+      - assert:
+          # Pinned as observed rather than as documented: --sort reorders, but
+          # not into sorted order. Four of the five names come back sorted and
+          # CHARLIE stays where it was, at the end. A consumer that depends on
+          # this output being ordered is depending on something the flag does not
+          # deliver in 0.14.0.
+          exit_code: 0
+          stdout:
+            equals: |
+              export ALFA='1'
+              export BRAVO='2'
+              export DELTA='4'
+              export ECHO='5'
+              export CHARLIE='3'
+      - run:
+          command: shdotenv --grep '^[BC]'
+      - assert:
+          # A regexp over the names, for pulling one group of settings out of a
+          # file that holds several. It keeps the file's order.
+          exit_code: 0
+          stdout:
+            equals: |
+              export BRAVO='2'
+              export CHARLIE='3'
+      - run:
+          command: shdotenv --name-only
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              DELTA
+              BRAVO
+              ECHO
+              ALFA
+              CHARLIE
+      - run:
+          command: shdotenv --name-only --sort
+      - assert:
+          # And the two flags do not compose: with --name-only the sort is not
+          # applied at all, so this is the file's order exactly.
+          exit_code: 0
+          stdout:
+            equals: |
+              DELTA
+              BRAVO
+              ECHO
+              ALFA
+              CHARLIE
+
+  - name: a backslash escape means different things in different dialects
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            MESSAGE="first\nsecond"
+      - run:
+          command: shdotenv --dialect posix --format json
+      - assert:
+          # POSIX shell has no backslash escapes inside double quotes, so the
+          # value is the eight characters that were written.
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.MESSAGE"
+              equals: "first\\nsecond"
+      - run:
+          command: shdotenv --dialect ruby --format json
+      - assert:
+          # Ruby's dotenv expands \n, so the same file is now two lines.
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.MESSAGE"
+              equals: "first\nsecond"
+      - run:
+          command: shdotenv --dialect node --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.MESSAGE"
+              equals: "first\nsecond"
+      - run:
+          command: shdotenv --dialect go --format json
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              path: "$.MESSAGE"
+              equals: "first\nsecond"
+
+  - name: a space after the key is a syntax error in some dialects and not in others
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            KEY = value
+      - run:
+          command: shdotenv --dialect posix
+      - assert:
+          # Under the POSIX rules this is not an assignment at all, and the
+          # message quotes the text it stopped at.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              shdotenv: `KEY ': no space allowed after the key
+      - run:
+          command: shdotenv --dialect docker
+      - assert:
+          exit_code: 1
+          stderr:
+            equals: |
+              shdotenv: `KEY ': no space allowed after the key
+      - run:
+          command: shdotenv --dialect ruby
+      - assert:
+          # Ruby's dotenv trims around the key, so the same file loads. This is
+          # the reason the dialect flag exists: the file is not portable, and
+          # the tool says which reading it is using rather than guessing.
+          exit_code: 0
+          stdout:
+            equals: |
+              export KEY='value'
+
+  - name: a line that is not a definition is quoted back with what is wrong
+    steps:
+      - fixture:
+          file: .env
+          content: |
+            GOOD=value
+            THIS IS NOT A DEFINITION
+      - run:
+          command: shdotenv
+      - assert:
+          # The diagnosis names the line's own text rather than a line number,
+          # which is what makes it findable in a file that is mostly comments.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              shdotenv: `THIS IS NOT A DEFINITION': not a variable definition
+      - fixture:
+          file: .env
+          content: |
+            A-B=value
+      - run:
+          command: shdotenv
+      - assert:
+          # A name that no shell could export is refused as such, separately
+          # from a line that is not an assignment at all.
+          exit_code: 1
+          stderr:
+            equals: |
+              shdotenv: `A-B': the key is not a valid identifier
+
+  - name: the environment can be dumped as a .env file and read back
+    steps:
+      - run:
+          command: shdotenv export ROUND_TRIP OTHER_VALUE
+          env:
+            ROUND_TRIP: "a value with spaces"
+            OTHER_VALUE: "x'y"
+          stdout_to: dumped.env
+      - assert:
+          # The export subcommand writes the current environment in the syntax
+          # shdotenv itself reads, including a value carrying a single quote.
+          exit_code: 0
+          changes:
+            created: [dumped.env]
+            modified: []
+            deleted: []
+      - run:
+          command: shdotenv -e dumped.env --format json
+      - assert:
+          # Which closes the loop: what it wrote, it reads back unchanged.
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.ROUND_TRIP"
+                equals: "a value with spaces"
+              - path: "$.OTHER_VALUE"
+                equals: "x'y"
+      - run:
+          command: shdotenv export -n ROUND_TRIP
+          env:
+            ROUND_TRIP: "a value with spaces"
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              ROUND_TRIP
+
+  - name: a file can come from standard input
+    steps:
+      - run:
+          command: shdotenv -e -
+          stdin: |
+            FROM_STDIN=yes
+            SECOND=2
+      - assert:
+          # For a .env that is generated rather than stored — decrypted, or
+          # produced by another tool — without writing it to disk first.
+          exit_code: 0
+          stdout:
+            equals: |
+              export FROM_STDIN='yes'
+              export SECOND='2'
+          changes:
+            created: []
+            modified: []
+            deleted: []

@@ -25,6 +25,16 @@ func applyDefaults(s *spec.Spec) {
 		sc := &s.Scenarios[i]
 		if d.Scenario != nil {
 			sc.Env = mergeStringMap(d.Scenario.Env, sc.Env)
+			// A gate is taken whole rather than merged: a scenario that states
+			// its own condition means that one, and silently ANDing a
+			// file-level condition onto it would make the scenario's own line
+			// no longer describe when it runs.
+			if sc.Only == nil {
+				sc.Only = d.Scenario.Only
+			}
+			if sc.Skip == nil {
+				sc.Skip = d.Scenario.Skip
+			}
 		}
 		if d.Service != nil {
 			for j := range sc.Services {
@@ -69,6 +79,19 @@ func mergeStringMap(def, own map[string]string) map[string]string {
 	return out
 }
 
+// runnerHasCwd reports whether name references a declared command runner that
+// carries its own cwd — the one runner knob defaults.run also owns, and so the
+// one place where a load-time fill could hide a more specific value (#498).
+// Only cmd runners run local commands; any other type on a run step is an error
+// the engine reports, and none of them relocate a working directory.
+func runnerHasCwd(name string, runners map[string]spec.Runner) bool {
+	if name == "" {
+		return false
+	}
+	rdef, ok := runners[name]
+	return ok && rdef.Cwd != "" && (rdef.Type == "cmd" || rdef.Type == "")
+}
+
 // mergeRunDefaults layers def beneath an authored run step. Command and Retry are
 // intentionally not merged (they are per-step; the validator rejects them on
 // defaults.run so a stray value is never silently ignored).
@@ -88,7 +111,12 @@ func mergeRunDefaults(def, r *spec.Run, runners map[string]spec.Runner) {
 	if r.Shell == nil {
 		r.Shell = def.Shell
 	}
-	if r.Cwd == "" {
+	// A runner names a directory more specifically than a suite-wide default
+	// does, so a step whose cmd runner declares its own cwd must not take
+	// defaults.run.cwd: the engine layers the runner's value beneath the step's
+	// at exec time, and a string-fill here would leave that layering nothing to
+	// do, inverting the documented step > runner > defaults.run order (#498).
+	if r.Cwd == "" && !runnerHasCwd(r.Runner, runners) {
 		r.Cwd = def.Cwd
 	}
 	// Timeout is deliberately NOT merged here: the engine resolves the full

@@ -83,3 +83,71 @@ scenarios:
           exit_code: 2
           stderr:
             contains: is not declared
+
+  # #497: a libpq keyword dsn can name its peer as `hostaddr` instead of
+  # `host`. Reading only `host` left that address unchecked, so a spec could
+  # reach a database the network policy was written to keep it away from —
+  # the connection error proved the dial had already happened.
+  - name: a hostaddr dsn is held to the network policy (exit 6)
+    steps:
+      - fixture:
+          file: hostaddr.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner-hostaddr
+              timeout: 10s
+            permissions:
+              network:
+                allow: ["db.allowed.example"]
+            runners:
+              store:
+                type: db
+                driver: postgres
+                dsn: "hostaddr=127.0.0.1 port=1 user=u dbname=app sslmode=disable"
+            scenarios:
+              - name: reaches an address the policy never named
+                steps:
+                  - query:
+                      runner: store
+                      sql: "SELECT 1"
+      - run:
+          command: ${atago} run hostaddr.atago.yaml
+      - assert:
+          exit_code: 6
+          stdout:
+            contains: 'network policy denies host "127.0.0.1"'
+
+  # #497: libpq lets a value be single-quoted, and the quotes belong to the dsn
+  # syntax rather than to the host. Keeping them denied a host the policy names.
+  - name: a quoted host is compared to the allowlist without its quotes
+    steps:
+      - fixture:
+          file: quoted.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner-quoted
+              timeout: 10s
+            permissions:
+              network:
+                allow: ["127.0.0.1"]
+            runners:
+              store:
+                type: db
+                driver: postgres
+                dsn: "host='127.0.0.1' port=1 user=u dbname=app sslmode=disable"
+            scenarios:
+              - name: the allowlisted host connects (and fails as a connection)
+                steps:
+                  - query:
+                      runner: store
+                      sql: "SELECT 1"
+      - run:
+          command: ${atago} run quoted.atago.yaml
+      - assert:
+          # The connection is refused (nothing listens on port 1), which is a
+          # runner error rather than a policy violation: exit 4, not exit 6.
+          exit_code: 4
+          stdout:
+            not_contains: network policy denies

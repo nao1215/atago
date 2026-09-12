@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/artifact"
 	"github.com/nao1215/atago/internal/assert"
+	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/fixture"
 	"github.com/nao1215/atago/internal/fsdelta"
 	"github.com/nao1215/atago/internal/runner"
@@ -47,6 +49,9 @@ func resultObserved(steps []spec.Step, i int) bool {
 			}
 		case spec.StepRun, spec.StepHTTP, spec.StepQuery, spec.StepGRPC, spec.StepPTY, spec.StepCDP:
 			return false
+		case spec.StepFixture, spec.StepStore, spec.StepService, spec.StepSignal, spec.StepMockServer:
+			// Keep scanning: none of these replaces the current result, so an
+			// assert further down is still looking at the step at i.
 		}
 	}
 	return false
@@ -111,7 +116,8 @@ func timeoutKillCheck(res *runner.Result, steps []spec.Step, i int) *assert.Chec
 func unresolvedRunRefMsg(field, name string, shellExpandable bool) string {
 	if envName, isEnv := strings.CutPrefix(name, "env:"); isEnv {
 		return fmt.Sprintf(
-			"%s references ${env:%s}, but the environment variable %s is not set", field, envName, envName)
+			"%s references ${env:%s}, but the environment variable %s is not set; set it or write $${env:%s} for the literal text",
+			field, envName, envName, envName)
 	}
 	if shellExpandable {
 		return fmt.Sprintf(
@@ -155,27 +161,39 @@ func runRefGuard(st *store.Store, run *spec.Run, runners map[string]spec.Runner)
 	if isSSHRunner(run.Runner, runners) {
 		return ""
 	}
-	if !run.ShellEnabled() {
-		if names := st.Unresolved(run.Command); len(names) > 0 {
-			return unresolvedRunRefMsg("run.command", names[0], true)
+	return commandRefGuard(st, "run", run.Command, run.Cwd, run.ShellEnabled())
+}
+
+// commandRefGuard is the guard itself, over the command and working directory a
+// step starts a process with. It is shared by `run` and `pty` steps: a pty step
+// launches a process the same way, so a reference nothing can expand reaches the
+// OS the same way — and the session entries inside a pty step were guarded from
+// the start while the command that starts the session was not, which is a
+// difference the author of a spec has no reason to expect. prefix names the step
+// kind for the message ("run" / "pty").
+func commandRefGuard(st *store.Store, prefix, command, cwd string, shell bool) string {
+	commandField, cwdField := prefix+".command", prefix+".cwd"
+	if !shell {
+		if names := st.Unresolved(command); len(names) > 0 {
+			return unresolvedRunRefMsg(commandField, names[0], true)
 		}
 	} else {
-		for _, name := range st.Unresolved(run.Command) {
+		for _, name := range st.Unresolved(command) {
 			if strings.HasPrefix(name, "env:") {
-				return unresolvedRunRefMsg("run.command", name, true)
+				return unresolvedRunRefMsg(commandField, name, true)
 			}
 		}
 	}
-	if names := st.Unresolved(run.Cwd); len(names) > 0 {
-		return unresolvedRunRefMsg("run.cwd", names[0], false)
+	if names := st.Unresolved(cwd); len(names) > 0 {
+		return unresolvedRunRefMsg(cwdField, names[0], false)
 	}
-	if !run.ShellEnabled() {
-		if _, leaked := st.ExpandDetectingLeaks(run.Command); len(leaked) > 0 {
-			return leakedRunRefMsg("run.command", leaked[0])
+	if !shell {
+		if _, leaked := st.ExpandDetectingLeaks(command); len(leaked) > 0 {
+			return leakedRunRefMsg(commandField, leaked[0])
 		}
 	}
-	if _, leaked := st.ExpandDetectingLeaks(run.Cwd); len(leaked) > 0 {
-		return leakedRunRefMsg("run.cwd", leaked[0])
+	if _, leaked := st.ExpandDetectingLeaks(cwd); len(leaked) > 0 {
+		return leakedRunRefMsg(cwdField, leaked[0])
 	}
 	return ""
 }
@@ -236,14 +254,9 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 	case spec.StepRun:
 		return x.execRunStep(ctx, steps, i, step, beforeAttempt)
 	case spec.StepAssert:
-		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, assert.Env{
-			Workdir:         x.workdir,
-			SpecDir:         x.specDir,
-			UpdateSnapshots: x.e.UpdateSnapshots,
-			Secrets:         x.masker.MaskBytes,
-			Scrub:           x.rc.scrubber.Apply,
-			MockRecords:     x.mockRecords,
-		})
+		env := x.e.assertEnv(x.rc, x.workdir, x.specDir)
+		env.MockRecords = x.mockRecords
+		crs := assert.CheckAll(expandAssert(x.st, step.Assert), x.current, env)
 		x.e.recordChecks(x.masker, crs, x.artifactScope(), i)
 		sr.Checks = crs
 		if !assert.AllOK(crs) {
@@ -271,7 +284,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 		r, err := x.e.runQuery(ctx, step.Query, x.st, x.rc, x.dbConns)
 		if err != nil {
 			sr.ErrMsg = err.Error()
-			return sr, StatusError, false
+			return sr, StatusError, isPolicyViolation(err)
 		}
 		x.adopt(&sr, r)
 	case spec.StepGRPC:
@@ -287,7 +300,7 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 		r, err := x.e.runCDP(ctx, expandCDP(x.st, step.CDP), x.workdir, x.st, x.rc, x.browserConns)
 		if err != nil {
 			sr.ErrMsg = err.Error()
-			return sr, StatusError, false
+			return sr, StatusError, isPolicyViolation(err)
 		}
 		x.adopt(&sr, r)
 	case spec.StepSignal:
@@ -299,6 +312,13 @@ func (x *scenarioRun) execStep(ctx context.Context, steps []spec.Step, i int, st
 			sr.ErrMsg = err.Error()
 			status = StatusError
 		}
+	case spec.StepService, spec.StepMockServer:
+		// Suite-level only, and the loader says so with ATG-2106 before a run
+		// starts. This is the backstop for a spec built through the API rather
+		// than parsed, where "no recognized action" would misname a kind atago
+		// recognizes perfectly well and merely refuses here.
+		sr.ErrMsg = fmt.Sprintf("%s steps are only allowed in suite.setup", step.Kind())
+		status = StatusError
 	default:
 		sr.ErrMsg = "step has no recognized action"
 		status = StatusError
@@ -312,7 +332,7 @@ func (x *scenarioRun) execRunStep(ctx context.Context, steps []spec.Step, i int,
 	sr := StepResult{Index: i, Kind: step.Kind()}
 	status := StatusPassed
 	if msg := runRefGuard(x.st, step.Run, x.rc.runners); msg != "" {
-		sr.ErrMsg = msg
+		sr.ErrMsg = diag.VariableUnresolved.Annotate(msg)
 		return sr, StatusError, false
 	}
 	run := mergeScenarioEnv(x.scEnv, expandRun(x.st, step.Run), x.st)
@@ -423,6 +443,9 @@ func (x *scenarioRun) runSteps(ctx context.Context, leadingFixtures int) {
 // each other.
 func (x *scenarioRun) runTeardown(ctx context.Context) {
 	if len(x.sc.Teardown) > 0 {
+		//nolint:contextcheck // tctx is deliberately not derived from ctx when ctx is
+		// already done: a derived context would cancel cleanup immediately. The bounded
+		// fresh context below is what lets an interrupt still tear external resources down.
 		tctx := ctx
 		if ctx.Err() != nil {
 			// The run was interrupted: give cleanup its own bounded context so an
@@ -432,6 +455,13 @@ func (x *scenarioRun) runTeardown(ctx context.Context) {
 			tctx, cancel = context.WithTimeout(context.Background(), teardownInterruptTimeout)
 			defer cancel()
 		}
+		// Teardown steps are numbered from zero like the scenario's own, so their
+		// artifacts need a phase of their own to land beside — not on top of — the
+		// evidence for the step the verdict is about. Restored afterwards, because
+		// the service and mock logs written once the scenario is over belong to
+		// the scenario rather than to its teardown.
+		x.phase = artifact.PhaseTeardown
+		defer func() { x.phase = "" }()
 		for i := range x.sc.Teardown {
 			sr, _, secViolation := x.execStep(tctx, x.sc.Teardown, i, &x.sc.Teardown[i], nil) // teardown never carries a changes assert
 			// A teardown failure never changes the scenario verdict — the behavior
@@ -495,8 +525,7 @@ func (e *Engine) runStep(ctx context.Context, run *spec.Run, st *store.Store, wo
 		}
 		return r, nil, nil
 	}
-	env := assert.Env{Workdir: workdir, SpecDir: specDir, UpdateSnapshots: e.UpdateSnapshots, Secrets: rc.masker.MaskBytes, Scrub: rc.scrubber.Apply}
-	return pollUntil(ctx, run.Retry, st, env, exec, beforeAttempt)
+	return pollUntil(ctx, run.Retry, st, e.assertEnv(rc, workdir, specDir), exec, beforeAttempt)
 }
 
 // resolveRunTarget decides whether a run step executes remotely and settles
@@ -508,7 +537,7 @@ func resolveRunTarget(run *spec.Run, st *store.Store, rc runConfig) (remote bool
 	if run.Runner != "" {
 		rdef, ok := rc.runners[run.Runner]
 		if !ok {
-			return false, fmt.Errorf("run step references unknown runner %q", run.Runner)
+			return false, diag.InternalError.Errorf("run step references unknown runner %q", run.Runner)
 		}
 		switch rdef.Type {
 		case "ssh":
@@ -522,7 +551,7 @@ func resolveRunTarget(run *spec.Run, st *store.Store, rc runConfig) (remote bool
 			}
 			runnerTimeout = rdef.Timeout
 		default:
-			return false, fmt.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
+			return false, diag.InternalError.Errorf("runner %q (type %q) cannot run a command step; use a step matching its type", run.Runner, rdef.Type)
 		}
 	}
 	if !remote {

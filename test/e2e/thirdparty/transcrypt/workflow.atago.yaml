@@ -1,0 +1,188 @@
+version: "1"
+
+suite:
+  name: transcrypt (cloning, the wrong password, and uninstalling)
+  description: |
+    The workflow around [transcrypt](https://github.com/elasticdog/transcrypt):
+    what a colleague sees when they clone the repository, what happens when they
+    type the wrong password, and what is left after uninstalling.
+
+    The clone is a real one — a second repository in the same workdir, cloned
+    from the first — so "the files stay encrypted until you are configured" is
+    asserted on an actual working tree rather than described. The uninstall is
+    driven in a pseudo-terminal, because it asks a yes/no question, and both
+    answers are pinned: the one that removes the configuration and the one that
+    leaves everything as it was.
+
+defaults:
+  scenario:
+    only:
+      command: command -v transcrypt
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: a clone carries ciphertext until it is given the password
+    steps:
+      - run:
+          shell: true
+          command: mkdir origin && cd origin && git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p clone-password -y && printf 'secret.txt filter=crypt diff=crypt merge=crypt\n' > .gitattributes && printf 'token = shared-with-the-team\n' > secret.txt && git add .gitattributes secret.txt && git commit -q -m 'add the secret'
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: git clone -q origin copy
+      - assert:
+          exit_code: 0
+      - assert:
+          # What anyone without the password gets: the ciphertext, in the
+          # working tree, as the file's content.
+          file:
+            path: copy/secret.txt
+            contains: "U2FsdGVkX1"
+      - assert:
+          file:
+            path: copy/secret.txt
+            not_contains: "shared-with-the-team"
+      - run:
+          command: transcrypt -c aes-256-cbc -p clone-password -y
+          cwd: copy
+      - assert:
+          # Configuring the clone re-checks out every encrypted path, so the
+          # working tree changes under the command that was only asked to store
+          # a password.
+          exit_code: 0
+          stdout:
+            equals: |
+              The repository has been successfully configured by transcrypt.
+      - assert:
+          file:
+            path: copy/secret.txt
+            equals: |
+              token = shared-with-the-team
+
+  - name: the wrong password is caught rather than silently producing garbage
+    steps:
+      - run:
+          shell: true
+          command: mkdir origin && cd origin && git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p the-right-password -y && printf 'secret.txt filter=crypt diff=crypt merge=crypt\n' > .gitattributes && printf 'token = shared-with-the-team\n' > secret.txt && git add .gitattributes secret.txt && git commit -q -m 'add the secret'
+      - assert:
+          exit_code: 0
+      - run:
+          shell: true
+          command: git clone -q origin copy
+      - assert:
+          exit_code: 0
+      - run:
+          command: transcrypt -c aes-256-cbc -p the-wrong-password -y
+          cwd: copy
+      - assert:
+          # Decryption with the wrong key produces bytes, not an error, so the
+          # check is indirect: after configuring, the files git believes are
+          # unchanged suddenly differ from what is on disk. transcrypt notices
+          # that and says which of the two to doubt.
+          exit_code: 1
+          stderr:
+            contains: "transcrypt: Unexpected new dirty files in the repository when configured by transcrypt, please check your password."
+      - assert:
+          file:
+            path: copy/secret.txt
+            not_contains: "shared-with-the-team"
+
+  - name: uninstalling asks first, and leaves the plaintext behind when told to go ahead
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p uninstall-password -y && printf 'secret.txt filter=crypt diff=crypt merge=crypt\n' > .gitattributes && printf 'token = kept-after-uninstall\n' > secret.txt && git add .gitattributes secret.txt && git commit -q -m 'add the secret'
+      - assert:
+          exit_code: 0
+      - pty:
+          command: transcrypt --uninstall
+          cols: 100
+          rows: 24
+          timeout: 60s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            - expect: "Proceed with uninstall?"
+            - send: "y"
+            - send: {key: enter}
+            - expect: "has been completely removed"
+      - assert:
+          # It states what it is about to do before doing it, including the part
+          # that is not obvious: the repository is garbage collected so the
+          # plaintext cached in it goes away too.
+          screen:
+            contains:
+              - "You are about to remove all transcrypt configuration from your repository."
+              - "All previously encrypted files will remain decrypted in this working copy"
+              - "The transcrypt configuration has been completely removed from the repository."
+      - run:
+          command: git config --get transcrypt.password
+      - assert:
+          # The stored password is gone, which is what `git config --get`
+          # reports as exit 1 with nothing on stdout.
+          exit_code: 1
+          stdout:
+            empty: true
+      - assert:
+          # The filter attribute is gone with it.
+          file:
+            path: .gitattributes
+            not_contains: "filter=crypt"
+      - assert:
+          # And the promise the prompt made: the file is still readable.
+          file:
+            path: secret.txt
+            equals: |
+              token = kept-after-uninstall
+      - run:
+          command: git show HEAD:secret.txt
+      - assert:
+          # What was already committed stays encrypted — uninstalling is not a
+          # history rewrite, and the prompt does not claim it is.
+          exit_code: 0
+          stdout:
+            matches: "^U2FsdGVkX1"
+
+  - name: answering no to the uninstall changes nothing
+    steps:
+      - run:
+          shell: true
+          command: git init -q && git config user.email author@example.com && git config user.name 'A Author' && transcrypt -c aes-256-cbc -p keep-me -y && printf 'secret.txt filter=crypt diff=crypt merge=crypt\n' > .gitattributes && printf 'token = still-encrypted\n' > secret.txt && git add .gitattributes secret.txt && git commit -q -m 'add the secret'
+      - assert:
+          exit_code: 0
+      - pty:
+          command: transcrypt --uninstall
+          cols: 100
+          rows: 24
+          timeout: 60s
+          sandbox_home: true
+          env:
+            LC_ALL: C
+          session:
+            - expect: "Proceed with uninstall?"
+            - send: "n"
+            - send: {key: enter}
+            - expect: "uninstallation has been aborted"
+      - assert:
+          # The default is no, and choosing it is reported rather than passed
+          # over in silence.
+          screen:
+            contains: "transcrypt: uninstallation has been aborted"
+      - run:
+          command: git config --get transcrypt.password
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              keep-me
+      - assert:
+          file:
+            path: .gitattributes
+            contains: "filter=crypt"

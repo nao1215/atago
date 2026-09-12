@@ -2,6 +2,7 @@ package spec
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
@@ -51,6 +52,61 @@ func TestStep_SetKeysAndKind(t *testing.T) {
 	}
 	if got := two.Kind(); got != StepNone {
 		t.Errorf("two-action Kind = %q, want none", got)
+	}
+}
+
+// TestStepActions_CoverEveryStepField pins stepActions to the Step struct the
+// way assertTargets is pinned to Assert: every action field on Step must have
+// exactly one table entry, and every table entry a field. Adding a step kind
+// without an entry fails here, which is the anchor the walker coverage tests
+// pull on — AllStepKinds cannot silently under-report the kinds that exist.
+func TestStepActions_CoverEveryStepField(t *testing.T) {
+	t.Parallel()
+	fields := map[string]bool{}
+	rt := reflect.TypeOf(Step{})
+	for i := range rt.NumField() {
+		tag, _, _ := strings.Cut(rt.Field(i).Tag.Get("yaml"), ",")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		fields[tag] = true
+	}
+	listed := map[StepKind]bool{}
+	for _, kind := range AllStepKinds() {
+		if listed[kind] {
+			t.Errorf("kind %q is listed twice", kind)
+		}
+		listed[kind] = true
+		if !fields[string(kind)] {
+			t.Errorf("kind %q has no field on Step carrying that yaml key", kind)
+		}
+	}
+	for key := range fields {
+		if !listed[StepKind(key)] {
+			t.Errorf("Step field %q is an action with no entry in stepActions; SetKeys will never report it", key)
+		}
+	}
+}
+
+// TestStepActions_ReportEachKindAlone pins the pairing between a kind and its
+// field: a Step whose only allocated field is the kind's reports exactly that
+// kind, so a table entry cannot be wired to the wrong field.
+func TestStepActions_ReportEachKindAlone(t *testing.T) {
+	t.Parallel()
+	for _, kind := range AllStepKinds() {
+		st := &Step{}
+		rv := reflect.ValueOf(st).Elem()
+		rt := rv.Type()
+		for i := range rt.NumField() {
+			tag, _, _ := strings.Cut(rt.Field(i).Tag.Get("yaml"), ",")
+			if tag != string(kind) {
+				continue
+			}
+			rv.Field(i).Set(reflect.New(rv.Field(i).Type().Elem()))
+		}
+		if got := st.SetKeys(); len(got) != 1 || got[0] != kind {
+			t.Errorf("SetKeys for a %q step = %v, want exactly [%s]", kind, got, kind)
+		}
 	}
 }
 
@@ -127,6 +183,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	t.Parallel()
 
 	t.Run("single mapping", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equals: 1\n"), &s); err != nil {
 			t.Fatalf("unmarshal single: %v", err)
@@ -137,6 +194,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("list of mappings", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		src := "json:\n  - {path: $.a, equals: 1}\n  - {path: $.b, equals: 2}\n"
 		if err := yaml.Unmarshal([]byte(src), &s); err != nil {
@@ -148,6 +206,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("empty list rejected", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json: []\n"), &s); err == nil {
 			t.Fatal("empty json list should be rejected")
@@ -155,6 +214,7 @@ func TestJSONChecks_UnmarshalYAML(t *testing.T) {
 	})
 
 	t.Run("unknown key inside a check is rejected", func(t *testing.T) {
+		t.Parallel()
 		var s StreamAssert
 		if err := yaml.Unmarshal([]byte("json:\n  path: $.a\n  equalss: 1\n"), &s); err == nil {
 			t.Fatal("a typo'd key inside a json check should be rejected (strict)")

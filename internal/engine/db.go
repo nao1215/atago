@@ -6,6 +6,7 @@ import (
 
 	"github.com/nao1215/atago/internal/runner"
 	dbrunner "github.com/nao1215/atago/internal/runner/db"
+	"github.com/nao1215/atago/internal/security"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
 )
@@ -18,7 +19,7 @@ func (e *Engine) runQuery(ctx context.Context, q *spec.Query, st *store.Store, r
 	if err != nil {
 		return nil, err
 	}
-	return conn.Query(ctx, st.Expand(q.SQL))
+	return conn.Query(ctx, spec.WalkQueryStrings(q, st.Expand).SQL)
 }
 
 // dbConn returns the scenario's connection for a named db runner, opening it on
@@ -31,6 +32,18 @@ func dbConn(name string, st *store.Store, rc runConfig, conns map[string]*dbrunn
 			return nil, err
 		}
 		cfg.Timeout = timeout
+		// Enforce the network allowlist before opening (issue #17): db egress is
+		// confined to permissions.network.allow just like HTTP, grpc, and ssh.
+		// Before the pool, because database/sql connects lazily — a check after
+		// it would run once the denied host had already been dialed.
+		// Every peer the dsn names is checked, not just the first: a libpq dsn
+		// can name a failover list, or a host beside the hostaddr the driver
+		// actually dials, and an unchecked one is a hole (#497).
+		for _, host := range cfg.Hosts {
+			if err := security.CheckHost(rc.allow, host); err != nil {
+				return nil, err
+			}
+		}
 		return dbrunner.Open(cfg)
 	})
 }

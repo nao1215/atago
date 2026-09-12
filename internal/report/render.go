@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/nao1215/atago/internal/engine"
+	"github.com/nao1215/atago/internal/plural"
 )
 
 // flakyMessage renders the one-line reason a scenario is flaky, in a form that
@@ -78,11 +80,11 @@ func expectFailSuffix(c engine.Counts) string {
 type Option func(*renderOptions)
 
 type renderOptions struct {
-	// loadFailures is the number of spec files that failed to load (parse/schema
-	// errors) before any scenario could run. Such files contribute to no suite in
-	// results, so the console summary reports them separately and reads FAILED
-	// rather than a misleading PASSED that contradicts the non-zero exit code (#120).
-	loadFailures int
+	// loadFailures are the spec files that failed to load (parse/schema errors)
+	// before any scenario could run. Such files contribute to no suite in
+	// results, so every format reports them separately and reads FAILED rather
+	// than a misleading PASSED that contradicts the non-zero exit code (#120).
+	loadFailures []LoadFailure
 	// elapsed, when set, is the run's real wall-clock time. The console summary
 	// prefers it over the sum of per-suite durations, which overcounts when
 	// --parallel runs suites concurrently (4 one-second suites in parallel finish
@@ -98,12 +100,66 @@ type renderOptions struct {
 	// an XPASS fails the run by default, so the summary must read FAILED unless
 	// the caller accepted it.
 	allowXPass bool
+	// snapshotsUpdated is how many golden files the run rewrote under
+	// --update-snapshots, as counted by the engine's write recorder.
+	snapshotsUpdated int
 }
 
-// WithLoadFailures records how many spec files failed to load for this run, so
-// the summary can reflect them instead of silently omitting them (#120).
-func WithLoadFailures(n int) Option {
-	return func(o *renderOptions) { o.loadFailures = n }
+// LoadFailure is one spec file the run was given and could not read: the path
+// as written, and the loader's diagnostic.
+//
+// The path and message travel with the report rather than only the count,
+// because a machine format has to name the file to be worth reading. A count
+// tells a dashboard that something is wrong; the path tells it what.
+type LoadFailure struct {
+	SpecPath string
+	Message  string
+}
+
+// WithLoadFailures records the spec files that failed to load for this run, so
+// every format reflects them instead of silently omitting them (#120).
+func WithLoadFailures(fails ...LoadFailure) Option {
+	return func(o *renderOptions) { o.loadFailures = fails }
+}
+
+// WithSnapshotsUpdated records how many golden files this run rewrote under
+// --update-snapshots. Rewriting the committed goldens is the one passing
+// outcome a reviewer has to be told about: a job carrying --update-snapshots by
+// accident rewrites every expected result to whatever the code currently does
+// and still reports green.
+//
+// The count comes from the engine's write recorder rather than from the
+// reported results, because the results cannot answer the question. A walk over
+// them missed a scenario's teardown and both suite lifecycle blocks, never saw
+// the repeat/retry iterations that are not the surviving result — so a run that
+// went red after rewriting a golden reported no rewrite at all — and counted one
+// per matrix row where one file was written.
+func WithSnapshotsUpdated(n int) Option {
+	return func(o *renderOptions) { o.snapshotsUpdated = n }
+}
+
+// snapshotSuffix names the snapshot rewrites in a summary line, in the shape
+// the flaky and load-failure tails already use.
+func snapshotSuffix(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %s updated", plural.Count(n, "snapshot", "snapshots"))
+}
+
+// loadFailureSuffix renders the ", N specs failed to load" tail the console and
+// gha summaries share. A spec that never parsed ran no scenario, so it cannot be
+// folded into the passed/failed tally without lying about how much was tested —
+// it gets its own count, in one wording shared by both summaries.
+func loadFailureSuffix(n int) string {
+	if n == 0 {
+		return ""
+	}
+	specPlural := "specs"
+	if n == 1 {
+		specPlural = "spec"
+	}
+	return fmt.Sprintf(", %d %s failed to load", n, specPlural)
 }
 
 // WithElapsed supplies the run's real wall-clock duration so the console summary
@@ -160,23 +216,28 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, o.loadFailures, o.allowFlaky, o.allowXPass)
+		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass, o.snapshotsUpdated)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:
-		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results))}
+		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: o.snapshotsUpdated}
 		for _, res := range results {
 			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
+		}
+		for _, lf := range o.loadFailures {
+			// Forward slashes, like every other spec_path in the document: two
+			// fields naming files must not disagree about the separator on Windows.
+			doc.LoadFailures = append(doc.LoadFailures, jsonLoadFailure{SpecPath: filepath.ToSlash(lf.SpecPath), Error: lf.Message})
 		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(doc)
 	case FormatJUnit:
-		return writeJUnit(w, buildJUnit(results, o.allowXPass))
+		return writeJUnit(w, buildJUnit(results, o.allowXPass, o.loadFailures))
 	case FormatGHA:
-		return writeGHA(w, results, o.allowXPass)
+		return writeGHA(w, results, o.allowXPass, o.loadFailures, o.snapshotsUpdated)
 	case FormatTAP:
-		return writeTAP(w, results)
+		return writeTAP(w, results, o.loadFailures, o.snapshotsUpdated)
 	default:
 		return fmt.Errorf("unknown report format %q", f)
 	}

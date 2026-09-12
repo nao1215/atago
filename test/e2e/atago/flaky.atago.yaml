@@ -160,6 +160,32 @@ scenarios:
               - "always fails: 0/3 passed"
               - "1 failed"
 
+  # A scenario a gate skipped on every iteration ran nothing, so it has no rate.
+  # The line counted only passes, so it read "0/3 passed" — in green, beside a
+  # summary saying nothing failed — for a scenario that was never executed.
+  - name: a gated-out scenario reports no repeat rate
+    steps:
+      - fixture:
+          file: gated.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: needs a variable nobody set
+                only: {env: ATAGO_E2E_NEVER_SET}
+                steps:
+                  - run: {shell: true, command: exit 1}
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} run --repeat 3 gated.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 skipped"
+            not_contains: "0/3 passed"
+
   - name: repeat and retry-failed are mutually exclusive
     steps:
       - fixture:

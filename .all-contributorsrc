@@ -1,0 +1,35 @@
+{
+  "projectName": "atago",
+  "projectOwner": "nao1215",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md"
+  ],
+  "imageSize": 75,
+  "commit": false,
+  "commitConvention": "angular",
+  "contributorsPerLine": 7,
+  "linkToUsage": false,
+  "contributors": [
+    {
+      "login": "nao1215",
+      "name": "CHIKAMATSU Naohiro",
+      "avatar_url": "https://avatars.githubusercontent.com/u/22737008?v=4",
+      "profile": "https://debimate.jp/",
+      "contributions": [
+        "code",
+        "doc"
+      ]
+    },
+    {
+      "login": "Dominiquini",
+      "name": "Rafael Baboni Dominiquini",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1180808?v=4",
+      "profile": "https://rafaeldominiquini.ddns.net/",
+      "contributions": [
+        "platform"
+      ]
+    }
+  ]
+}

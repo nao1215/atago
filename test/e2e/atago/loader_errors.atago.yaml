@@ -272,3 +272,305 @@ scenarios:
               - "no *.atago.yaml"
               - "specs"
               - "atago init"
+
+  # A cwd is documented as workdir-relative, and a `../` one used to run the
+  # command wherever it landed — at the filesystem root for enough of them —
+  # while every assertion still looked at the untouched sandbox. It is refused
+  # before the command runs, like every other workdir-relative path.
+  - name: a cwd that traverses out of the workdir is refused before running
+    steps:
+      - fixture:
+          file: escape.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: runs somewhere else
+                steps:
+                  - run:
+                      shell: true
+                      command: pwd
+                      cwd: "../../../.."
+      - run:
+          command: ${atago} run escape.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "run.cwd"
+              - "escapes the scenario workdir"
+      # A sub-directory of the workdir is what cwd is for, and still loads.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: runs in a sub-directory
+                steps:
+                  - run: {shell: true, command: "mkdir -p sub"}
+                  - run: {shell: true, command: "pwd", cwd: sub}
+                  - assert:
+                      exit_code: 0
+                      stdout:
+                        contains: sub
+      - run:
+          command: ${atago} run ok.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  - name: a gate with no condition is rejected
+    steps:
+      # `only: {}` reads as "this scenario is restricted" and restricts nothing.
+      # It is the shape left behind on the way to a gate that was never
+      # finished, or after the condition was deleted.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                only: {}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "only must name a condition (os, env, or command)"}
+
+  - name: skip and only naming the same condition are rejected
+    steps:
+      # Gated both ways by one condition, the scenario is skipped whether the
+      # condition holds or not: it can never run on any machine, and reports as
+      # an ordinary skip with exit 0 forever.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                skip: {os: linux}
+                only: {os: linux}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "skip.os and only.os both name"
+              - "can never run anywhere"
+
+  - name: gates naming different fields still load
+    steps:
+      # The refusal is per field and literal: a POSIX-only scenario that also
+      # needs a tool installed is an ordinary spec.
+      - fixture:
+          file: ok.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                skip: {os: windows}
+                only: {command: "no-such-tool-zzz"}
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run ok.atago.yaml"}
+      - assert:
+          exit_code: 0
+          stdout: {contains: "1 skipped"}
+
+  - name: an empty deterministic compare list is rejected
+    steps:
+      # An empty list is not "compare nothing": the default (stdout, exit_code)
+      # applied, so the run compared observables the author had just asked it
+      # not to.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps: [{run: {command: echo, deterministic: {compare: []}}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "deterministic.compare must not be empty"}
+
+  - name: an empty-matching pattern under a count bound is rejected
+    steps:
+      # Zero-width matches are counted, so "q*" reports one match per position:
+      # max_count: 0 — the documented way to say "never" — could never pass, and
+      # the count reported the length of the stream rather than the pattern.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {matches: "q*", max_count: 0}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "matches the empty string"}
+
+  - name: an empty-matching store capture is rejected
+    steps:
+      # The capture takes the first match, which is the empty string at position
+      # 0, so the store held "" for output that plainly carried the value — a
+      # wrong value flowing into later steps with no diagnostic at all.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - store: {name: v, from: {stdout: {matches: "[0-9]*"}}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "captures \"\" from any output"}
+
+  - name: an empty-matching scrub rule is rejected
+    steps:
+      # Such a rule matches between every byte, so it replaced the whole
+      # snapshot with placeholders — green, committed, and unreadable.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scrub:
+              - {pattern: "[0-9]*", placeholder: "<ID>"}
+            scenarios:
+              - name: a
+                steps: [{run: {command: echo}}]
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr: {contains: "matches between every byte"}
+
+  - name: matchers of one assert that contradict each other are rejected
+    steps:
+      # Such an assert used to run and then blame the program under test: "the
+      # substring was unexpectedly present" is a statement about the CLI, for an
+      # assertion no output could have satisfied.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {stdout: {contains: [abc], not_contains: [abc]}}
+              - name: b
+                steps:
+                  - assert: {dir: {path: d, contains: [x], count: 0}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - 'contains and not_contains both list "abc"'
+              - "count: 0 cannot hold together with contains"
+
+  - name: a file assertion with no matcher names the size bounds too
+    steps:
+      # The message used to list the content matchers only, while a size bound
+      # alone is a complete file assertion, so the author was sent looking for a
+      # matcher they may not have needed.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: out.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "must set one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot/size/min_size/max_size"
+
+  - name: a file assertion with two content matchers still names only those
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert: {file: {path: out.txt, exists: true, snapshot: s.txt}}
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "must set exactly one of exists/contains/not_contains/executable/equals/equals_file/json/snapshot"
+
+  - name: a list written where one value belongs names the key and the shape
+    steps:
+      # The decoder's own message names a Go type and the outermost struct
+      # field ("Spec.Scenarios of type string"), which is true and useless: the
+      # mistake is one key deep in the file, and the key next to it — contains —
+      # is the one that does take a list.
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo}
+                  - assert:
+                      stdout:
+                        matches:
+                          - "^h"
+                          - "i$"
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - '"matches" takes a single value, not a list'
+              - "one assert per pattern"
+
+  - name: a mapping written where text belongs names the key too
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: x}
+            scenarios:
+              - name: a
+                steps:
+                  - run:
+                      command:
+                        bin: echo
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: '"command" takes a single value, not a mapping'

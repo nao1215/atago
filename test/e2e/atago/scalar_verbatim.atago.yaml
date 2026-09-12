@@ -1,0 +1,79 @@
+# A plain YAML scalar that lands in a text field means the characters the
+# author wrote. YAML types an unquoted 1.20 as a float and an unquoted TRUE as a
+# boolean, and decoding one of those into a text field used to keep the parsed
+# value and drop the text: `contains: 1.20` asserted the substring 1.2, which
+# matches output that never carried 1.20 at all.
+#
+# The unquoted spellings live inside child specs written as fixtures, and the
+# scenarios here run atago over them: the outer spec is validated against the
+# published schema, which types a text field as a string, while the behavior
+# under test is precisely what an unquoted scalar means to the loader.
+version: "1"
+
+suite:
+  name: verbatim scalars
+
+scenarios:
+  - name: unquoted literals keep their digits in matchers, env, and fixtures
+    steps:
+      - fixture:
+          file: child.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: child}
+            scenarios:
+              - name: a trailing zero survives into an exact match
+                steps:
+                  - run: {command: echo 1.20}
+                  - assert: {stdout: {equals: "1.20"}}
+              - name: leading zeros reach the program under test
+                steps:
+                  - run: {shell: true, command: 'echo "[$V]"', env: {V: 007}}
+                  - assert: {stdout: {equals: "[007]"}}
+              - name: a fixture keeps the digits it was written with
+                steps:
+                  - fixture: {file: version.txt, content: 1.10}
+                  - assert: {file: {path: version.txt, equals: "1.10"}}
+              - name: a boolean-looking command still names the program
+                steps:
+                  - run: {command: true}
+                  - assert: {exit_code: 0}
+      - run:
+          command: "${atago} run --parallel 1 child.atago.yaml"
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "4 passed"
+
+  - name: output that lacks the literal fails instead of matching a shortened one
+    steps:
+      - fixture:
+          file: child.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: child}
+            scenarios:
+              - name: a
+                steps:
+                  - run: {command: echo 1.2}
+                  - assert: {stdout: {contains: 1.20}}
+      - run:
+          command: "${atago} run child.atago.yaml"
+      - assert:
+          exit_code: 1
+          stdout:
+            contains: "1.20"
+
+  - name: a json matcher keeps YAML's typing, so true is not the text true
+    steps:
+      - run:
+          shell: true
+          command: |
+            echo '{"ok": true, "name": "true"}'
+      - assert:
+          stdout:
+            json:
+              - path: $.ok
+                equals: true
+              - path: $.name
+                equals: "true"

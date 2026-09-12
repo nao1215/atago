@@ -11,8 +11,17 @@ name: ThirdParty
 # pinned deliberately: `go install` legs pin a module version (integrity still
 # comes from the Go checksum database), and raw binary-download legs pin a
 # version + SHA256 because a CDN download has no implicit integrity check.
+#
+# It also runs on every push to main, so a regression in the pty/TUI engine is
+# found minutes after it lands rather than at the next nightly. It deliberately
+# does NOT gate pull requests: one run in five fails for reasons that have
+# nothing to do with the change under review — a CDN hiccup installing one of
+# 46 programs, or a real terminal UI missing its budget on a loaded runner — and
+# a gate that cries wolf at that rate teaches people to merge past it.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
   schedule:
     # 06:30 UTC daily, after the dogfood matrix.
     - cron: "30 6 * * *"
@@ -180,13 +189,198 @@ jobs:
           - name: kustomize
             dir: ./test/e2e/thirdparty/kustomize
             install: go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
+          # kubectx and kubens switch kubectl contexts and namespaces. The specs
+          # drive throwaway kubeconfigs in the scenario workdir and never reach a
+          # cluster, and fzf is installed so the interactive picker scenario runs
+          # instead of skipping.
+          - name: kubectx
+            dir: ./test/e2e/thirdparty/kubectx
+            install: |
+              go install github.com/ahmetb/kubectx/cmd/kubectx@v0.11.0
+              go install github.com/ahmetb/kubectx/cmd/kubens@v0.11.0
+              go install github.com/junegunn/fzf@v0.74.0
           # actionlint statically lints GitHub Actions workflows offline; the
           # specs disable shellcheck so results do not depend on its presence.
           - name: actionlint
             dir: ./test/e2e/thirdparty/actionlint
             install: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          # bats-core runs Bash test files and reports TAP. It is a shell
+          # program, so it comes from the release tarball pinned by version and
+          # SHA256; install.sh lays bin/, libexec/ and lib/ under the prefix, and
+          # the prefix is GOPATH because this job already puts GOPATH/bin on PATH.
+          - name: bats
+            dir: ./test/e2e/thirdparty/bats
+            install: |
+              ver="1.11.1"
+              sha256="5c57ed9616b78f7fd8c553b9bae3c7c9870119edd727ec17dbd1185c599f79d9"
+              curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${ver}.tar.gz" -o bats-core.tar.gz
+              echo "${sha256}  bats-core.tar.gz" | sha256sum -c -
+              tar -xzf bats-core.tar.gz
+              "./bats-core-${ver}/install.sh" "$(go env GOPATH)"
+          # ShellSpec is a BDD test framework for POSIX shells. Like bats it is
+          # a shell program, pinned by version and SHA256; its launcher resolves
+          # its own symlink, so the tree is unpacked once and linked onto the
+          # PATH this job already exports.
+          - name: shellspec
+            dir: ./test/e2e/thirdparty/shellspec
+            install: |
+              ver="0.28.1"
+              sha256="400d835466429a5fe6c77a62775a9173729d61dd43e05dfa893e8cf6cb511783"
+              curl -fsSL "https://github.com/shellspec/shellspec/archive/refs/tags/${ver}.tar.gz" -o shellspec.tar.gz
+              echo "${sha256}  shellspec.tar.gz" | sha256sum -c -
+              tar -xzf shellspec.tar.gz -C "$HOME"
+              ln -sf "$HOME/shellspec-${ver}/shellspec" "$(go env GOPATH)/bin/shellspec"
+          # rbenv selects the Ruby version a command runs under. No Ruby is
+          # installed for it: the specs build versions as directories under a
+          # root they own, which is all rbenv's resolution rules need. Cloned at
+          # a tag and linked onto the PATH this job already exports.
+          - name: rbenv
+            dir: ./test/e2e/thirdparty/rbenv
+            install: |
+              # v1.3.2, pinned by commit: a tag can be moved, and this matrix
+              # exists to exercise a fixed third-party contract.
+              sha="10e96bfc473c7459a447fbbda12164745a72fd37"
+              git init -q "$HOME/.rbenv"
+              git -C "$HOME/.rbenv" fetch -q --depth 1 https://github.com/rbenv/rbenv.git "$sha"
+              git -C "$HOME/.rbenv" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.rbenv/bin/rbenv" "$(go env GOPATH)/bin/rbenv"
+          # git-secrets scans for patterns that must never be committed, and
+          # installs git hooks that enforce them. Pinned by commit rather than by
+          # its 1.3.0 tag, and used as a git subcommand, so the launcher is
+          # linked onto the PATH this job already exports.
+          - name: git-secrets
+            dir: ./test/e2e/thirdparty/git-secrets
+            install: |
+              sha="ad82d68ee924906a0401dfd48de5057731a9bc84"
+              git init -q "$HOME/.git-secrets"
+              git -C "$HOME/.git-secrets" fetch -q --depth 1 https://github.com/awslabs/git-secrets.git "$sha"
+              git -C "$HOME/.git-secrets" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.git-secrets/git-secrets" "$(go env GOPATH)/bin/git-secrets"
+          # getoptions generates POSIX-shell option parsers. Pinned by commit
+          # (v3.3.2) and built from source with its own Makefile, which is a
+          # shell script concatenation; both generated commands go onto the PATH
+          # this job already exports.
+          - name: getoptions
+            dir: ./test/e2e/thirdparty/getoptions
+            install: |
+              sha="139d121807db67f632b412b2a00ece851df73203"
+              git init -q "$HOME/.getoptions"
+              git -C "$HOME/.getoptions" fetch -q --depth 1 https://github.com/ko1nksm/getoptions.git "$sha"
+              git -C "$HOME/.getoptions" checkout -q FETCH_HEAD
+              make -C "$HOME/.getoptions" build
+              ln -sf "$HOME/.getoptions/bin/gengetoptions" "$(go env GOPATH)/bin/gengetoptions"
+              ln -sf "$HOME/.getoptions/bin/getoptions" "$(go env GOPATH)/bin/getoptions"
+          # shdotenv loads .env files without letting them run anything. Pinned
+          # by the commit v0.14.0 points at and built from source (its Makefile
+          # concatenates the shell script with its embedded awk).
+          - name: shdotenv
+            dir: ./test/e2e/thirdparty/shdotenv
+            install: |
+              sha="777e8edb65482b036e0275a895d4cb6be8511c7d"
+              git init -q "$HOME/.shdotenv"
+              git -C "$HOME/.shdotenv" fetch -q --depth 1 https://github.com/ko1nksm/shdotenv.git "$sha"
+              git -C "$HOME/.shdotenv" checkout -q FETCH_HEAD
+              make -C "$HOME/.shdotenv" build
+              ln -sf "$HOME/.shdotenv/shdotenv" "$(go env GOPATH)/bin/shdotenv"
+          # git-open turns the repository you are in into a web address. Pinned
+          # by commit; it is a single script, used as a git subcommand, so the
+          # launcher is linked onto the PATH this job already exports.
+          - name: git-open
+            dir: ./test/e2e/thirdparty/git-open
+            install: |
+              sha="63c0e77aaf18b72c839b1113c1e2f9514413643b"
+              git init -q "$HOME/.git-open"
+              git -C "$HOME/.git-open" fetch -q --depth 1 https://github.com/paulirish/git-open.git "$sha"
+              git -C "$HOME/.git-open" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.git-open/git-open" "$(go env GOPATH)/bin/git-open"
+          # git-extras is a collection of git subcommands. Pinned by commit and
+          # installed with its own Makefile, whose PREFIX is GOPATH because this
+          # job already puts GOPATH/bin on PATH; the scripts source a helper the
+          # install step lays down, so running them from the checkout is not
+          # enough.
+          - name: git-extras
+            dir: ./test/e2e/thirdparty/git-extras
+            install: |
+              sha="dbf68bac59af47cd1adfa0b2317391c8315f8fad"
+              git init -q "$HOME/.git-extras"
+              git -C "$HOME/.git-extras" fetch -q --depth 1 https://github.com/tj/git-extras.git "$sha"
+              git -C "$HOME/.git-extras" checkout -q FETCH_HEAD
+              make -C "$HOME/.git-extras" install PREFIX="$(go env GOPATH)"
+          # transcrypt encrypts chosen files inside a git repository, using the
+          # openssl already present on the runner. Pinned by commit; it is a
+          # single script, linked onto the PATH this job already exports.
+          - name: transcrypt
+            dir: ./test/e2e/thirdparty/transcrypt
+            install: |
+              sha="1b59c8e505c0f0eb396dce4d36274a12a446e2d6"
+              git init -q "$HOME/.transcrypt"
+              git -C "$HOME/.transcrypt" fetch -q --depth 1 https://github.com/elasticdog/transcrypt.git "$sha"
+              git -C "$HOME/.transcrypt" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.transcrypt/transcrypt" "$(go env GOPATH)/bin/transcrypt"
+          # nb keeps notes as git repositories. Pinned by commit; it is a single
+          # bash script, linked onto the PATH this job already exports. Every
+          # notebook the specs create lives under a sandboxed home.
+          - name: nb
+            dir: ./test/e2e/thirdparty/nb
+            install: |
+              sha="a1e007dc191b7d821b14773978e720b67b6034d2"
+              git init -q "$HOME/.nb-src"
+              git -C "$HOME/.nb-src" fetch -q --depth 1 https://github.com/xwmx/nb.git "$sha"
+              git -C "$HOME/.nb-src" checkout -q FETCH_HEAD
+              ln -sf "$HOME/.nb-src/nb" "$(go env GOPATH)/bin/nb"
+          # mommy wraps a command and comments on how it went. Pinned by commit
+          # and built with its own Makefile, which assembles the script into
+          # build/bin.
+          - name: mommy
+            dir: ./test/e2e/thirdparty/mommy
+            install: |
+              sha="2426f9174970d563315d11eeb559e006856448ef"
+              git init -q "$HOME/.mommy"
+              git -C "$HOME/.mommy" fetch -q --depth 1 https://github.com/FWDekker/mommy.git "$sha"
+              git -C "$HOME/.mommy" checkout -q FETCH_HEAD
+              make -C "$HOME/.mommy" build
+              # mommy finds its own man page the way man does — by looking
+              # beside the bin directory it was run from — so the built tree goes
+              # on PATH rather than being symlinked into GOPATH.
+              echo "$HOME/.mommy/build/bin" >> "$GITHUB_PATH"
+          # asdf 0.14.1 (the last shell implementation, whose test suite is
+          # Bats), pinned by commit. Its launcher derives its own directory, so
+          # it is put on PATH rather than symlinked; the specs write their own
+          # plugin and never reach the network.
+          - name: asdf
+            dir: ./test/e2e/thirdparty/asdf
+            install: |
+              sha="f00f759f3d8d405468d0071310a91b8f5a9c3798"
+              git init -q "$HOME/.asdf-vm"
+              git -C "$HOME/.asdf-vm" fetch -q --depth 1 https://github.com/asdf-vm/asdf.git "$sha"
+              git -C "$HOME/.asdf-vm" checkout -q FETCH_HEAD
+              echo "$HOME/.asdf-vm/bin" >> "$GITHUB_PATH"
+          # pyenv, pinned by commit. The suite covers only what pyenv does that
+          # rbenv does not (several versions in one file, aliases, whence), and
+          # builds its versions as directories, so no Python is installed for it.
+          - name: pyenv
+            dir: ./test/e2e/thirdparty/pyenv
+            install: |
+              sha="a71a378dacd210f5673550ff923715bf4d04324f"
+              git init -q "$HOME/.pyenv-src"
+              git -C "$HOME/.pyenv-src" fetch -q --depth 1 https://github.com/pyenv/pyenv.git "$sha"
+              git -C "$HOME/.pyenv-src" checkout -q FETCH_HEAD
+              echo "$HOME/.pyenv-src/bin" >> "$GITHUB_PATH"
+          # curl from the pinned Ubuntu snapshot. This is the one suite whose
+          # subject is what a client sends rather than what it prints, so it
+          # runs against atago's own mock server and reaches no network.
+          - name: curl
+            dir: ./test/e2e/thirdparty/curl
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh curl
           # sops encrypts structured files with age as the key backend; both are
           # go-installed (age and age-keygen provide the throwaway keys).
+          # GnuPG from the pinned Ubuntu snapshot: the suite generates its own
+          # throwaway keys inside each scenario workdir and never reaches a key
+          # server. pinentry-curses is what the interactive scenario drives, and
+          # without it that scenario skips instead of running.
+          - name: gpg
+            dir: ./test/e2e/thirdparty/gpg
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh gnupg pinentry-curses
           - name: sops
             dir: ./test/e2e/thirdparty/sops
             install: |
@@ -322,7 +516,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "go.mod"
+          go-version: "stable"
 
       - name: Build atago
         run: go build -o ./dist/atago .
@@ -342,4 +536,15 @@ jobs:
         # nothing but load: the TUI suites timed out waiting for a screen that
         # arrives promptly on a quiet machine. A regression still fails both
         # attempts; only a flake is absorbed, and the report names it.
-        run: ./dist/atago run --retry-failed 1 --allow-flaky "${{ matrix.program.dir }}"
+        run: |
+          set -o pipefail
+          ./dist/atago run --retry-failed 1 --allow-flaky "${{ matrix.program.dir }}" | tee run.log
+          # This leg installed the program, so a suite that ran nothing means
+          # the gate's `only:` probe is wrong. That failure is silent — the job
+          # stays green while testing nothing — and it lands on a scheduled
+          # workflow nobody watches, so it has to be caught here rather than
+          # noticed.
+          if grep -qE '^[A-Z]+ +[0-9]+ scenarios?: 0 passed' run.log; then
+            echo "::error::every scenario was skipped after installing ${{ matrix.program.name }}; the suite's only: probe does not match the installed binary"
+            exit 1
+          fi

@@ -1,6 +1,7 @@
 package record
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -8,6 +9,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
+	"github.com/nao1215/atago/internal/runner/ptyrun"
+	"github.com/nao1215/atago/internal/spec"
 )
 
 // drainTeardownGrace bounds the teardown wait in capturePipes. It is generous —
@@ -390,5 +395,77 @@ func TestCapturePTY_TimesOutOnNonExitingChild(t *testing.T) {
 	// The killed child never exits cleanly, so the recorded code is non-zero.
 	if rec.ExitCode == 0 {
 		t.Errorf("exit code = 0, want a non-zero code for a killed child")
+	}
+}
+
+// TestExitCode_EveryRunnerAgrees is the cross-runner fence for what an exit code
+// MEANS in atago: one table of small programs driven through every runner atago
+// has — the cmd runner behind `run:`, the pty runner behind `pty:`, and the
+// interactive recorder behind `record --pty` — asserting all three report the
+// same code for the same program. A runner that invents its own conversion (a
+// signaled child reported as Go's -1 rather than the POSIX 128+signal) fails
+// here instead of shipping a second dialect of "exit code", which is how the pty
+// runner and the recorder came to disagree with `run:` in the first place.
+//
+// The timeout row is the other half of the contract: -1 stays the sentinel for
+// "atago killed it and there is no exit status to report", so the signal a
+// timeout kill delivers must NOT be mapped to 137.
+func TestExitCode_EveryRunnerAgrees(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX signals only; ConPTY has no 128+signal convention to agree on")
+	}
+
+	cases := []struct {
+		name    string
+		command string
+		timeout time.Duration
+		want    int
+	}{
+		{name: "clean exit", command: "exit 0", want: 0},
+		{name: "ordinary failure", command: "exit 7", want: 7},
+		{name: "self SIGTERM", command: "kill -TERM $$", want: 143},
+		{name: "self SIGINT", command: "kill -INT $$", want: 130},
+		{name: "killed by timeout", command: "sleep 60", timeout: 500 * time.Millisecond, want: -1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			timeout := c.timeout
+			if timeout == 0 {
+				timeout = 30 * time.Second
+			}
+
+			run := &spec.Run{Shell: spec.Bool(true), Command: c.command}
+			if c.timeout > 0 {
+				run.Timeout = c.timeout.String()
+			}
+			cmdRes, err := runnercmd.New().Run(context.Background(), run, t.TempDir())
+			if err != nil {
+				t.Fatalf("run runner: %v", err)
+			}
+			if cmdRes.ExitCode != c.want {
+				t.Errorf("run: exit code = %d, want %d", cmdRes.ExitCode, c.want)
+			}
+
+			p := &spec.PTY{Shell: spec.Bool(true), Command: c.command, Timeout: timeout.String()}
+			ptyRes, ef, err := ptyrun.Run(context.Background(), p, t.TempDir(), nil)
+			if err != nil {
+				t.Fatalf("pty runner: %v", err)
+			}
+			if ef != nil {
+				t.Fatalf("pty runner: unexpected expect failure: %+v", ef)
+			}
+			if ptyRes.ExitCode != c.want {
+				t.Errorf("pty: exit code = %d, want %d (the same program through run: reports %d)", ptyRes.ExitCode, c.want, cmdRes.ExitCode)
+			}
+
+			inR, outW := capturePipes(t)
+			rec, err := CapturePTY(c.command, true, inR, outW, timeout)
+			if err != nil && !errors.Is(err, ErrCaptureTimeout) {
+				t.Fatalf("recorder: %v", err)
+			}
+			if rec.ExitCode != c.want {
+				t.Errorf("record --pty: exit code = %d, want %d — a recorded session generates a spec a run: step must be able to satisfy", rec.ExitCode, c.want)
+			}
+		})
 	}
 }

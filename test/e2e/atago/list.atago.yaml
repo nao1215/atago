@@ -62,3 +62,45 @@ scenarios:
             json:
               path: $.scenarios[0].scenario
               equals: only scenario
+
+  # Regression: a scenario documenting a known bug was indistinguishable from a
+  # healthy one in the inventory, though explain, doc, and the manifest all
+  # report it — so a listing read as promising more than the suite does.
+  - name: list marks an expect_fail scenario
+    steps:
+      - fixture:
+          file: xfail.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: xfail
+            scenarios:
+              - name: known bug
+                expect_fail:
+                  reason: "upstream renders the wrong width"
+                  issue: "https://example.com/issues/42"
+                steps:
+                  - run: {shell: true, command: "exit 1"}
+                  - assert: {exit_code: 0}
+              - name: healthy
+                steps:
+                  - run: {shell: true, command: "true"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} list xfail.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "XFAIL"
+              - "known bug"
+      - run:
+          command: ${atago} list --json xfail.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.scenarios[0].expect_fail.reason"
+                equals: "upstream renders the wrong width"
+              - path: "$.scenarios[0].expect_fail.issue"
+                equals: "https://example.com/issues/42"

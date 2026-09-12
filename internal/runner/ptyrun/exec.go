@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nao1215/atago/internal/diag"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
 )
@@ -50,6 +51,15 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	defer cancel()
 
 	cmd := exec.CommandContext(runCtx, name, args...) //nolint:gosec // the spec author's declared command is the point
+	if e.ShellEnabled() {
+		// Same reason the cmd runner does it: on Windows the argv above would be
+		// re-escaped with MSVCRT quoting rules cmd.exe does not follow, so an
+		// embedded double quote would reach the command as a literal \". A
+		// mid-session helper is usually the step that writes JSON or a config
+		// file for the program under test to react to, which is exactly the
+		// command that carries quotes. No-op on POSIX.
+		runnercmd.ConfigureShell(cmd, e.Command)
+	}
 	cmd.Dir = dir
 	cmd.Env = env
 	// Killing the command on timeout is not enough to get Run back: a helper run
@@ -75,16 +85,24 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	detail := out.String()
 	switch {
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
-		return fmt.Errorf("exec %q did not finish within %s%s", e.Command, timeout, execOutputSuffix(detail))
+		return diag.StepTimeout.Errorf("exec %q did not finish within %s%s", e.Command, timeout, execOutputSuffix(detail))
 	case errors.Is(ctx.Err(), context.Canceled):
-		return fmt.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
+		// The session's OWN budget running out is the deadline case above; a
+		// cancel arriving through the parent context is an interrupt (Ctrl-C, a
+		// suite cancel), and must say so: the timeout code's published fix tells
+		// the author to raise `timeout:`, a bound that had nothing to do with it.
+		return diag.RunInterrupted.Errorf("exec %q was canceled after %s: %w", e.Command, time.Since(start).Round(time.Millisecond), ctx.Err())
 	}
 	var exitErr *exec.ExitError
 	if errors.As(runErr, &exitErr) {
-		return fmt.Errorf("exec %q exited %d, so the change the session waits for was not made%s",
-			e.Command, exitErr.ExitCode(), execOutputSuffix(detail))
+		// The same mapping every atago runner reports through, so a helper killed
+		// by a signal is named 143 here rather than Go's -1. The timeout and
+		// cancel paths returned above, so a signal at this point is the command's
+		// own termination.
+		return diag.SessionExecFailed.Errorf("exec %q exited %d, so the change the session waits for was not made%s",
+			e.Command, runnercmd.ExitCode(runErr), execOutputSuffix(detail))
 	}
-	return fmt.Errorf("exec %q could not run: %w%s", e.Command, runErr, execOutputSuffix(detail))
+	return diag.CommandNotStarted.Errorf("exec %q could not run: %w%s", e.Command, runErr, execOutputSuffix(detail))
 }
 
 func execOutputSuffix(detail string) string {

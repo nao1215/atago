@@ -12,7 +12,7 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 | `atago record` | run a command once and write a spec from what it observed (`--pty` for interactive sessions) |
 | `atago init` | scaffold a spec (`--template` for browser, cli, db, grpc, http, mock, services, ssh; `cli` is the default) |
 | `atago snapshot update` | record or refresh golden files |
-| `atago explain` | describe what a spec does without running it |
+| `atago explain` | describe what a spec does without running it, or what an `ATG` code means (`atago explain ATG2201`) |
 | `atago doc` | generate Markdown from specs, with fixtures and golden files inlined |
 | `atago manifest` | emit a stable JSON summary of specs for tooling |
 | `atago list` | show scenarios, tags, and artifacts |
@@ -111,6 +111,35 @@ version: "1"
 
 The report and manifest outputs have schemas too: [report.schema.json](https://github.com/nao1215/atago/blob/main/schema/report.schema.json) and [manifest.schema.json](https://github.com/nao1215/atago/blob/main/schema/manifest.schema.json).
 
+## Platform support
+
+atago runs on Linux, macOS, and Windows, and CI tests all three: the unit suite on every OS, the self-hosted E2E suite on Linux and macOS, and on Windows both under the native `cmd.exe` and under a POSIX shell. Almost everything behaves identically. This section is the short list of what does not, and why.
+
+`skip:` and `only:` gate on the host as Go names it, so besides `linux`, `darwin` and `windows` they accept `freebsd`, `openbsd` and `netbsd`. Each is a host of its own rather than one BSD family: what FreeBSD `ps` prints is not what OpenBSD `ps` prints, so a gate names the one it means. `bsd` is not a value, and neither is `dragonfly`, where atago does not build. atago ships no binary for the three it accepts; `go install` builds one, and a gate for a host you never run on simply never fires.
+
+| Behavior | Linux / macOS | Windows |
+|----------|---------------|---------|
+| `shell: true` | `/bin/sh -c`, resolved absolutely so the program under test cannot supply it | `%SystemRoot%\System32\cmd.exe /S /C`, resolved the same way. `ATAGO_SHELL` overrides on both |
+| `signal:` steps | delivers `TERM`, `INT`, `HUP`, `USR1`, `USR2`, `KILL` to the service's process group | not supported — Windows has no POSIX signals. Gate with `skip: {os: windows}` |
+| cancel / timeout teardown | kills the whole process group | kills the whole process tree (`taskkill /T`) |
+| `pty:` steps and `atago record --pty` | a real pty | a ConPTY, which needs Windows 10 version 1809 or later. `record --pty` cannot auto-detect a password prompt there, because a ConPTY exposes no echo state — convert a secret send to `${env:...}` by hand |
+| `file: {executable: ...}` | the mode bits | the file extension against `PATHEXT`, which is what Windows uses to decide what it runs by name. There is no execute bit to read |
+| `fixture: {mode: ...}` | sets the permission bits | no effect — Windows has no POSIX permissions |
+| `fixture: {symlink: ...}` | always available | needs Developer Mode or an elevated process |
+| `changes:` | compares content, symlink target, kind, and permission bits | compares content, symlink target, and kind. Permissions are left out: Go synthesizes a mode from the read-only attribute, so including it would make one spec report a different delta per OS |
+| `sandbox_home: true` | redirects `HOME` and the XDG base directories | redirects `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `HOMEDRIVE`, `HOMEPATH` |
+| `clear_env: true` | starts from an empty environment plus `pass_env` | the same, plus `SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, and `PATHEXT`, without which a process cannot start at all |
+
+### Choosing the shell
+
+`shell: true` runs the platform's own interpreter, so a command written for `/bin/sh` does not run under `cmd.exe`. Two ways out. Keep the command portable — `echo` and `exit` are builtins of both, and `run.env:`, `run.stdin:`, `run.stdout_to:` cover the variable prefixes and redirects a spec usually reaches for a shell to get. Or point atago at the shell you want:
+
+```shell
+ATAGO_SHELL='C:\Program Files\Git\bin\bash.exe' atago run ./e2e
+```
+
+`ATAGO_SHELL` takes an absolute path on either platform. atago picks the calling convention from the name: `/S /C` for `cmd.exe`, `-c` for anything else, which covers the bash that ships with Git for Windows and MSYS2 as well as PowerShell. One caveat when pairing a POSIX shell with Windows paths: `${workdir}`, `${specdir}`, and `${atago}` expand to backslash paths, and a POSIX shell reads a backslash as an escape — so interpolate them into argv-form commands (`shell: false`) rather than into shell commands.
+
 ## Shell completion
 
 `atago completion <bash|zsh|fish|powershell>` prints a completion script for your shell.
@@ -128,3 +157,5 @@ The report and manifest outputs have schemas too: [report.schema.json](https://g
 | `6`  | security policy violation |
 
 `Ctrl-C`/`SIGTERM` stops the run cleanly: in-flight processes, services, and sessions are torn down, partial results are reported, and the run exits `4`.
+
+Errors also carry a diagnostic code such as `ATG2201`, whose first digit is the exit code above — so `ATG2xxx` always exits 2. The codes are searchable and stable across rewordings of the message; [Error codes](/errors/) lists what each one means, what to change, and which families carry codes today. Assertion failures carry none: exit 1 is a result, not an error. `atago explain ATG2201` prints the same entry without a browser, and the JSON report carries the code as a `code` field on each failure so a dashboard can group by cause.

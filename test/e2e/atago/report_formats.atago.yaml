@@ -129,6 +129,90 @@ scenarios:
               - path: "$.suites[0].scenarios[0].status"
                 equals: "passed"
 
+  # A spec that never parsed runs no scenario, so it belongs to no suite result.
+  # Only the console summary used to hear about it, and every machine format
+  # rendered a green document for a run that exited 2.
+  - name: a spec that failed to load is named by every report format
+    steps:
+      - fixture:
+          file: good.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: good
+            scenarios:
+              - name: passes
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: broken}
+            scenarios: [ this is not a scenario
+      - run:
+          command: ${atago} run --report json .
+      - assert:
+          exit_code: 2
+          stdout:
+            json:
+              - path: "$.load_failures[0].spec_path"
+                equals: "bad.atago.yaml"
+              - path: "$.suites[0].status"
+                equals: "passed"
+      - run:
+          command: ${atago} run --report junit .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - 'errors="1"'
+              - "bad.atago.yaml"
+      - run:
+          command: ${atago} run --report tap .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "1..2"
+              - "not ok 1 - bad.atago.yaml"
+      - run:
+          command: ${atago} run --report gha .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "::error file=bad.atago.yaml,title=bad.atago.yaml"
+              - "1 spec failed to load"
+
+  # Every spec failing to load used to write no document at all, leaving a machine
+  # consumer with empty output where it expected a result.
+  - name: a run whose specs all failed to load still reports them
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: broken}
+            scenarios: [ this is not a scenario
+      - run:
+          command: ${atago} run --report json .
+      - assert:
+          exit_code: 2
+          stdout:
+            json:
+              - path: "$.load_failures[0].spec_path"
+                equals: "bad.atago.yaml"
+      - run:
+          command: ${atago} run --report tap .
+      - assert:
+          exit_code: 2
+          stdout:
+            contains:
+              - "1..1"
+              - "not ok 1 - bad.atago.yaml"
+
   - name: an errored step is counted as an error, not a failure, across formats
     steps:
       - fixture:
@@ -150,3 +234,101 @@ scenarios:
               - 'errors="1"'
               - 'failures="0"'
               - "<error"
+
+  # Regression: only the console and json knew about a failed teardown. junit
+  # reported a clean pass with zero trace of it, tap emitted a bare passing
+  # point, and gha a green notice — so a CI consumer reading any of those
+  # formats never learned that cleanup failed. Each format now carries the
+  # fact in its non-verdict-changing slot; the exit code stays 0 everywhere.
+  - name: a failed teardown surfaces in junit, tap, and gha without changing the verdict
+    steps:
+      - fixture:
+          file: td.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: td
+            scenarios:
+              - name: passes but cleanup fails
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+                teardown:
+                  - run: {shell: true, command: "exit 7"}
+                  - assert: {exit_code: 0}
+      - run:
+          command: ${atago} run --ci --report junit td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'failures="0"'
+              - "<system-err>teardown failed"
+              - "exit code 7"
+      - run:
+          command: ${atago} run --ci --report tap td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "ok 1 - td / passes but cleanup fails"
+              - "# teardown failed: assert exit_code is 0"
+      - run:
+          command: ${atago} run --ci --report gha td.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "::warning title=td / passes but cleanup fails::teardown failed"
+            not_contains: "::error"
+
+  # Regression: --update-snapshots rewrites the committed expected results of a
+  # whole suite and left no trace anywhere, so a CI job carrying the flag by
+  # accident rewrote every golden to whatever the code currently does and
+  # reported green with nothing in the log to notice.
+  - name: a snapshot rewrite is reported by the console and every machine format
+    steps:
+      - fixture:
+          file: snap.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: snap
+            scenarios:
+              - name: greets
+                steps:
+                  - run: {shell: true, command: "echo greetings"}
+                  - assert: {stdout: {snapshot: greet.snap}}
+      - run:
+          command: ${atago} run --ci --update-snapshots snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 snapshot updated"
+      - run:
+          command: ${atago} run --ci --update-snapshots --report json snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            json:
+              - path: "$.snapshots_updated"
+                equals: 1
+      - run:
+          command: ${atago} run --ci --update-snapshots --report gha snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "::warning title=atago::1 snapshot updated"
+      - run:
+          command: ${atago} run --ci --update-snapshots --report tap snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "# 1 snapshot updated"
+      # An ordinary verify run says nothing: the note exists to flag a rewrite.
+      - run:
+          command: ${atago} run --ci snap.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            not_contains: "snapshot updated"

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/nao1215/atago/internal/assert"
@@ -145,10 +146,12 @@ func TestExpandStore_File(t *testing.T) {
 	if got := out.From.File.Path; got != "/wd/f.json" {
 		t.Errorf("store file path = %q, want /wd/f.json", got)
 	}
-	// A store without a file source is returned unchanged.
+	// A store without a file source has nothing to expand and comes back
+	// semantically unchanged (the shared walker may copy; identity is an
+	// implementation detail, the contract is the value).
 	noFile := &spec.Store{Name: "y", From: &spec.StoreFrom{Header: "X"}}
-	if expandStore(st, noFile) != noFile {
-		t.Error("store without file should be returned as-is")
+	if got := expandStore(st, noFile); !reflect.DeepEqual(got, noFile) {
+		t.Errorf("store without file changed: %+v", got)
 	}
 }
 

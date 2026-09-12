@@ -8,6 +8,7 @@
   - [a full object lifecycle through the mc client](#scenario-a-full-object-lifecycle-through-the-mc-client)
   - [bucket versioning can be enabled and reported](#scenario-bucket-versioning-can-be-enabled-and-reported)
   - [an anonymous download policy publishes a bucket read-only](#scenario-an-anonymous-download-policy-publishes-a-bucket-read-only)
+
 ## minio (self-hosted object storage)
 [MinIO](https://min.io/) is S3-compatible object storage, driven here by its
 own `mc` client against a real server.
@@ -22,33 +23,43 @@ because a client library parses that error document, and "denied" has to
 arrive in a form the client can understand.
 
 Source: `test/e2e/thirdparty/minio/minio.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 ### Scenario: the server reports itself alive over the health API
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18120`.
+
 #### When
 ```shell
-# HTTP GET /minio/health/live
-# HTTP GET /minio/health/ready
+# HTTP GET /minio/health/live via s3
+# HTTP GET /minio/health/ready via s3
 ```
 #### Then
 - after `HTTP GET /minio/health/live`:
   - HTTP status is `200`
 - after `HTTP GET /minio/health/ready`:
   - HTTP status is `200`
+
 ### Scenario: anonymous S3 access is denied with a proper S3 XML error
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18121`.
+- The step is retried up to 20 times every 250ms until HTTP status is `403`.
+
 #### When
 ```shell
-# HTTP GET /
+# HTTP GET / via s3_authz
 ```
 #### Then
 - HTTP status is `403`
 - body contains `<Code>AccessDenied</Code>`
+
 ### Scenario: a full object lifecycle through the mc client
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18122`.
 - Fixture file `upload.txt` is created.
+
 #### Inputs
 _Fixture `upload.txt`:_
 ```text
@@ -89,9 +100,12 @@ mc ls lifecycle/atago-bucket
 - after `mc ls lifecycle/atago-bucket`:
   - exit code is `0`
   - stdout is empty
+
 ### Scenario: bucket versioning can be enabled and reported
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18123`.
+
 #### When
 ```shell
 mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key
@@ -106,10 +120,13 @@ mc version info --json versioned/versioned
 - after `mc version info --json versioned/versioned`:
   - exit code is `0`
   - stdout at `$.versioning.status` equals `Enabled`
+
 ### Scenario: an anonymous download policy publishes a bucket read-only
+_only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18124`.
 - Fixture file `page.txt` is created.
+
 #### Inputs
 _Fixture `page.txt`:_
 ```text
@@ -120,17 +137,17 @@ published via bucket policy
 mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
 mc mb publichost/public-bucket
 mc cp page.txt publichost/public-bucket/
-# HTTP GET /public-bucket/page.txt
+# HTTP GET /public-bucket/page.txt via s3_public
 mc anonymous set download publichost/public-bucket
-# HTTP GET /public-bucket/page.txt
-# HTTP PUT /public-bucket/forbidden.txt
+# HTTP GET /public-bucket/page.txt via s3_public
+# HTTP PUT /public-bucket/forbidden.txt via s3_public
 ```
 #### Then
 - after `HTTP GET /public-bucket/page.txt`:
   - HTTP status is `403`
 - after `mc anonymous set download publichost/public-bucket`:
   - exit code is `0`
-  - stdout contains `is set to `download``
+  - stdout contains `` is set to `download` ``
 - after `HTTP GET /public-bucket/page.txt`:
   - HTTP status is `200`
   - body contains `published via bucket policy`

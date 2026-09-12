@@ -1,0 +1,338 @@
+version: "1"
+
+suite:
+  name: getoptions (what the generated parser does)
+  description: |
+    One definition, generated once per scenario, and then exercised the way a
+    user exercises a command line: short and long forms, clustering, negation,
+    counters, optional arguments, `--`, abbreviations, and every way of getting
+    it wrong.
+
+    This is the half that matters — a generator's contract is the behavior of
+    what it emits — so every assertion here is about a program
+    [getoptions](https://github.com/ko1nksm/getoptions) wrote, not about the
+    text it wrote.
+
+defaults:
+  scenario:
+    only:
+      command: command -v gengetoptions
+    skip:
+      os: windows
+  run:
+    sandbox_home: true
+    env:
+      LC_ALL: C
+
+scenarios:
+  - name: every declared form parses, and the rest arguments survive
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST plus:true help:usage abbr:true -- "Usage: demo [options]... [args]..." ''
+              msg -- 'Options:'
+              flag    FLAG    -f +f --{no-}flag -- "on and off"
+              flag    VERBOSE -v --verbose counter:true init:=0 -- "repeatable"
+              param   NAME    -n --name -- "one argument"
+              option  LEVEL   -l --level on:"default" -- "optional argument"
+              disp    :usage  -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            . ./parser.sh
+            parse "$@"
+            eval "set -- $REST"
+            echo "FLAG=[$FLAG] VERBOSE=[$VERBOSE] NAME=[$NAME] LEVEL=[$LEVEL] rest=[$*]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --flag --verbose --verbose --name world --level=3 alpha beta
+      - assert:
+          # The long forms, a counter counted twice, a param, an option with an
+          # attached value, and two arguments that are none of the above.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[1] VERBOSE=[2] NAME=[world] LEVEL=[3] rest=[alpha beta]
+      - run:
+          command: ./demo.sh -fvvn world -l3 alpha
+      - assert:
+          # The same command line in short form, clustered into two words. A
+          # parser written by hand is where this stops working.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[1] VERBOSE=[2] NAME=[world] LEVEL=[3] rest=[alpha]
+      - run:
+          command: ./demo.sh -l
+      - assert:
+          # An option's argument is optional: without one it takes the value the
+          # definition declared with on:.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[] VERBOSE=[0] NAME=[] LEVEL=[default] rest=[]
+
+  - name: a flag can be turned back off, and -- ends the options
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST plus:true help:usage -- "Usage: demo [options]... [args]..." ''
+              flag    FLAG    -f +f --{no-}flag
+              disp    :usage  -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            . ./parser.sh
+            parse "$@"
+            eval "set -- $REST"
+            echo "FLAG=[$FLAG] rest=[$*]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --flag --no-flag
+      - assert:
+          # --{no-}flag declares both spellings at once, and the later one wins,
+          # which is what makes a flag overridable by a wrapper script.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[] rest=[]
+      - run:
+          command: ./demo.sh -f +f
+      - assert:
+          # plus:true adds the other tradition for the same thing.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[] rest=[]
+      - run:
+          command: ./demo.sh -- -f --no-such-option
+      - assert:
+          # After --, nothing is an option any more, including things that look
+          # exactly like the ones this parser knows.
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[] rest=[-f --no-such-option]
+
+  - name: an abbreviation is accepted while it is unambiguous
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST help:usage abbr:true -- "Usage: demo [options]..." ''
+              flag    FLAG -f --{no-}flag
+              param   NAME -n --name
+              disp    :usage -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            . ./parser.sh
+            parse "$@"
+            echo "FLAG=[$FLAG] NAME=[$NAME]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --nam world
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              FLAG=[] NAME=[world]
+      - run:
+          command: ./demo.sh --n world
+      - assert:
+          # And the moment it is ambiguous it is refused, with the candidates
+          # listed rather than one of them guessed at.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Ambiguous option: --n (could be --no-flag, --name)
+
+  - name: the mistakes a user makes each have their own message
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST help:usage -- "Usage: demo [options]..." ''
+              param   NAME -n --name pattern:"alice | bob"
+              disp    :usage -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            . ./parser.sh
+            parse "$@"
+            echo "NAME=[$NAME]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --nope
+      - assert:
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Unrecognized option: --nope
+      - run:
+          command: ./demo.sh --name
+      - assert:
+          # A param needs its argument, and running out of command line is not
+          # the same mistake as naming an option that does not exist.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Requires an argument: --name
+      - run:
+          command: ./demo.sh --name carol
+      - assert:
+          # And a value the definition constrains is checked against the pattern
+          # the definition wrote, in the parser rather than in the program.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Does not match the pattern (alice | bob): --name
+      - run:
+          command: ./demo.sh --name bob
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              NAME=[bob]
+
+  - name: a custom validator decides, and says so when it refuses
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST help:usage -- "Usage: demo [options]..." ''
+              param   PORT -p --port validate:"is_port" -- "1024-65535"
+              disp    :usage -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            is_port() {
+              case $OPTARG in
+                (*[!0-9]*) return 1 ;;
+              esac
+              [ "$OPTARG" -ge 1024 ] && [ "$OPTARG" -le 65535 ]
+            }
+            . ./parser.sh
+            parse "$@"
+            echo "PORT=[$PORT]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --port 8080
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: |
+              PORT=[8080]
+      - run:
+          command: ./demo.sh --port 80
+      - assert:
+          # The validator is an ordinary shell function reading OPTARG; when it
+          # returns non-zero the parser reports which option it refused and what
+          # the function returned.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            equals: |
+              Validation error (is_port:1): --port
+      - run:
+          command: ./demo.sh --port http
+      - assert:
+          exit_code: 1
+          stderr:
+            equals: |
+              Validation error (is_port:1): --port
+
+  - name: a validator that is not defined is a validation error, not a crash
+    steps:
+      - fixture:
+          file: definition.sh
+          content: |
+            parser_definition() {
+              setup   REST help:usage -- "Usage: demo [options]..." ''
+              param   PORT -p --port validate:"number"
+              disp    :usage -h --help
+            }
+      - fixture:
+          file: demo.sh
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            set -eu
+            . ./parser.sh
+            parse "$@"
+            echo "PORT=[$PORT]"
+      - run:
+          shell: true
+          command: gengetoptions parser -f definition.sh parser_definition parse demo > parser.sh
+      - assert:
+          exit_code: 0
+      - run:
+          command: ./demo.sh --port 8080
+      - assert:
+          # Worth pinning because the printed example uses validate:number and
+          # defines no such function: the shell's "not found" surfaces, the code
+          # 127 is carried into the message, and a value that is perfectly valid
+          # is rejected. The definition names a contract the script must keep.
+          exit_code: 1
+          stdout:
+            empty: true
+          stderr:
+            contains:
+              - "not found"
+              - "Validation error (number:127): --port"
