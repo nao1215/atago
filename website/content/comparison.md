@@ -11,11 +11,11 @@ to rank projects.
 
 Compared releases, checked against each project's official documentation and
 release pages (linked under [Sources](#sources)) on 2026-08-14, and TUI Test on
-2026-08-15:
+2026-09-12:
 
 | Tool | Release compared | Released |
 |------|------------------|----------|
-| [atago](https://github.com/nao1215/atago) | v0.20.1 | 2026-08-15 |
+| [atago](https://github.com/nao1215/atago) | v0.22.0 | 2026-09-12 |
 | [Bats-core](https://github.com/bats-core/bats-core) | v1.14.0 | 2026-07-21 |
 | [ShellSpec](https://github.com/shellspec/shellspec) | 0.28.1 | 2021-01-11 |
 | [commander](https://github.com/commander-cli/commander) | v2.5.0 | 2023-03-28 |
@@ -55,7 +55,7 @@ test, they are the better choice:
 
 Bats, ShellSpec, and commander overlap with atago directly: all four run a
 command and assert on what happened. The tables compare that shared job.
-Columns are atago v0.20.1, Bats-core v1.14.0, ShellSpec 0.28.1, and
+Columns are atago v0.22.0, Bats-core v1.14.0, ShellSpec 0.28.1, and
 commander v2.5.0.
 
 ### Writing and running tests
@@ -120,9 +120,9 @@ commander v2.5.0.
 
 ## The terminal layer: TUI applications
 
-[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.20.1 and TUI Test 0.0.4; [0.1.0-beta.1](https://github.com/microsoft/tui-test/releases/tag/0.1.0-beta.1) is a Rust rewrite with a different shape, so read its README too.
+[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.22.0 and TUI Test 0.0.4, which is still the latest stable release; the [0.1.0 betas](https://github.com/microsoft/tui-test/releases) — beta.3 as of 2026-09-12 — are a Rust rewrite with a different shape, so read their README too.
 
-| | atago v0.20.1 | TUI Test 0.0.4 |
+| | atago v0.22.0 | TUI Test 0.0.4 |
 |---|---|---|
 | Tests are written in | YAML | TypeScript / JavaScript |
 | Ships as | single binary | npm package (Node 16.6+, or Bun on macOS/Linux) |
