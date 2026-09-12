@@ -58,8 +58,15 @@ func TestDemoTapes_CommandsStillExist(t *testing.T) {
 			args := rewriteForTest(t, cmd)
 			var stdout, stderr bytes.Buffer
 			code := cli.Main(args, &stdout, &stderr)
-			if code == cli.ExitConfig {
-				t.Errorf("`atago %s` is no longer a command atago accepts (exit %d)\nstderr: %s",
+			// ExitConfig is a rotted command line — an unknown subcommand or an
+			// unrecognized flag. ExitParse is a spec the demo names that no
+			// longer loads. Execution outcomes are deliberately tolerated:
+			// ExitFailures is what two of these lines exist to show, and
+			// ExitExec is how a demo spec calling echo or printf reports itself
+			// on a Windows runner, which is about that runner rather than about
+			// the tape.
+			if code == cli.ExitConfig || code == cli.ExitParse {
+				t.Errorf("`atago %s` no longer runs as the tape types it (exit %d)\nstderr: %s",
 					strings.Join(cmd.args, " "), code, stderr.String())
 			}
 		})
