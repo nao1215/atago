@@ -83,7 +83,10 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1"
+          # "stable", for the reason spelled out in the matrix above: setup-go
+          # resolves "1" from its own manifest, which lags a new Go release, so
+          # this leg silently kept running an older toolchain.
+          go-version: "stable"
 
       # -race needs cgo, so this is the one job that must not set
       # CGO_ENABLED=0. -timeout 10m rather than the 5m above: every test runs

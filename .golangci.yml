@@ -21,7 +21,7 @@ linters:
     # to be complete: the run-scoped fields it wires reached three of the four
     # assertion sites twice before, and each time the fix was to route everything
     # through this one function. Now the function itself cannot forget a field.
-    - exhaustruct
+    - exhaustruct_v5
     # forbidigo carries the rules that are specific to atago rather than to Go.
     # All four report nothing today; they exist so the next change cannot quietly
     # take one of these away. See settings.forbidigo for what each one protects.
@@ -88,8 +88,13 @@ linters:
       # for the same reason, so the switches and the coverage tests are checked
       # against one universe.
       ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
-    exhaustruct:
-      include:
+    exhaustruct_v5:
+      # v5 renamed include/exclude to enforce-patterns/ignore-patterns, and it
+      # checks every struct unless explicit-mode says otherwise — where v4's
+      # include list narrowed on its own. Both keys together keep the scope
+      # unchanged: this one struct and nothing else.
+      explicit-mode: true
+      enforce-patterns:
         - 'github.com/nao1215/atago/internal/assert\.Env'
     forbidigo:
       analyze-types: true
@@ -151,7 +156,7 @@ linters:
       # way to write them; the constructor the rule protects is production code.
       - linters:
           - gosec
-          - exhaustruct
+          - exhaustruct_v5
         path: _test\.go
       # A test helper subprocess is the program under test: printing to its own
       # stdout is what the capture assertions read.
@@ -165,6 +170,16 @@ linters:
           - gocognit
           - nestif
         path: _test\.go
+      # SA4023 fires on the GOOS=windows leg alone, at the call that delivers a
+      # POSIX signal to a service. The Windows runner refuses every signal step,
+      # so on that one OS staticcheck can prove the returned error is never nil
+      # and reports the check as always true. It is not always true on the five
+      # systems that do deliver signals, and this call site is shared code: the
+      # error check belongs there.
+      - linters:
+          - staticcheck
+        path: internal/engine/signal\.go
+        text: SA4023
     paths:
       - third_party$
       - builtin$

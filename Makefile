@@ -50,7 +50,7 @@ lint: ## Run golangci-lint for every target OS (a linter only sees the files tha
 	done
 
 tools: ## Install developer tools used by this repository
-	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 release-smoke: ## Build release artifacts locally and smoke-test them (requires goreleaser; syft adds the SBOM check)
 	@if command -v syft >/dev/null; then \
