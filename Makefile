@@ -44,7 +44,7 @@ fmt: ## Format Go source code
 	$(GO_FORMAT) $(GO_PKGROOT)
 
 lint: ## Run golangci-lint for every target OS (a linter only sees the files that build for its GOOS)
-	for goos in linux darwin windows; do \
+	for goos in linux darwin windows freebsd openbsd netbsd; do \
 		echo "==> golangci-lint (GOOS=$$goos)"; \
 		env GOOS=$$goos golangci-lint run --config .golangci.yml || exit 1; \
 	done

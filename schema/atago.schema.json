@@ -632,9 +632,12 @@
           "enum": [
             "linux",
             "darwin",
-            "windows"
+            "windows",
+            "freebsd",
+            "openbsd",
+            "netbsd"
           ],
-          "description": "Matches the host operating system (linux, darwin, windows)."
+          "description": "Matches the host operating system as runtime.GOOS names it. Each BSD is named on its own: freebsd, openbsd and netbsd are separate hosts, not one family."
         },
         "env": {
           "type": [

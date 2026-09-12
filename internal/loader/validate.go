@@ -13,7 +13,25 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-var validOS = map[string]bool{"linux": true, "darwin": true, "windows": true}
+// validOS is the set a skip/only gate may name. platform.Matches compares the
+// value against runtime.GOOS, so what belongs here is every system atago
+// builds for. The BSDs are named one by one rather than as a family: they are
+// separate values of GOOS, and a scenario gated on one of them is making a
+// claim about that system's commands, not about BSD in general. DragonFly is
+// left out because atago does not build there at all: modernc.org/libc, which
+// the database runner reaches through modernc.org/sqlite, has no files for it,
+// so a gate naming it could never fire.
+var validOS = map[string]bool{
+	"linux":   true,
+	"darwin":  true,
+	"windows": true,
+	"freebsd": true,
+	"openbsd": true,
+	"netbsd":  true,
+}
+
+// validOSList names the values in the order the diagnostic lists them.
+var validOSList = []string{"linux", "darwin", "windows", "freebsd", "openbsd", "netbsd"}
 
 // firstControlChar returns a readable label for the first control character in
 // name (a newline, tab, or other C0/DEL byte), or "" when there is none. A name
@@ -437,7 +455,7 @@ func validateCondition(add addFunc, where, key string, c *spec.Condition) {
 		add(diag.EmptyValue, "%s.%s must name a condition (os, env, or command); an empty gate restricts nothing", where, key)
 	}
 	if c.OS != "" && !validOS[c.OS] {
-		add(diag.NotAllowedValue, "%s.%s.os %q is invalid (want linux, darwin, or windows)", where, key, c.OS)
+		add(diag.NotAllowedValue, "%s.%s.os %q is invalid (want one of: %s)", where, key, c.OS, strings.Join(validOSList, ", "))
 	}
 }
 
