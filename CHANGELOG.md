@@ -7,6 +7,17 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- The three VHS tapes are checked by a test that runs the atago commands they type. A GIF cannot be diffed — VHS output varies with timing, fonts and the encoder — so what a stale demo produces is a recording of atago printing usage errors, with nothing failing until someone watches it. Every `Type "atago …"` line now goes through the real dispatch and flag parsing, and a renamed subcommand or a dropped flag fails the build instead. The assertion is not "exits 0": two of those lines exist to show a failing run, so what is refused is a configuration error. The spec files the tapes name are checked for existence from the directory the tape is standing in, and each tape's `Output` path is checked against what the README actually embeds.
+- golangci-lint runs for FreeBSD, OpenBSD and NetBSD in CI, not only in the Makefile. v0.22.0 added the three as scenario gates and said the linter covered them, which was true locally and untrue on the runner: the workflow matrix still listed linux, darwin and windows. A build tag written as `darwin || freebsd` leaves the other two BSDs reading code nobody has analyzed, which is the bug this catches.
+
+### Changed
+
+- Dependencies updated: golang.org/x/crypto 0.57.0, golang.org/x/image 0.46.0, golang.org/x/sys 0.48.0, golang.org/x/term 0.46.0, modernc.org/sqlite 1.58.0, go-sql-driver/mysql 1.10.1, mattn/go-runewidth 0.0.30, ohler55/ojg 1.28.6, chromedp/cdproto, charmbracelet/ultraviolet and charmbracelet/x/vt. The go directive reads 1.26.0 rather than 1.26 because the x/ family now declares that form and the toolchain refuses the shorter one against it; the floor is the same release it always was.
+- golangci-lint moves to v2.13.2, which deprecates `exhaustruct` in favour of `exhaustruct_v5`. The replacement checks every struct unless told otherwise, where the old one narrowed through its include list, so the config now pairs `explicit-mode` with `enforce-patterns` to keep the scope it had: `assert.Env` and nothing else. v2.13.2 also reports the Windows leg's signal call as an always-true error check — correct on the one OS whose runner refuses every signal step, and wrong for the five that deliver them, so it is excluded there by name.
+- The race-detector job asks for `stable` rather than `"1"`, which is the reason already written into the matrix beside it: setup-go resolves `"1"` from a manifest that lags a new Go release, so that leg had been running an older toolchain than the one it was meant to cover.
+
 ## [0.22.0] - 2026-09-12
 
 ### Added
