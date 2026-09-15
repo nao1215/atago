@@ -18,7 +18,7 @@ require (
 	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
 	github.com/mattn/go-runewidth v0.0.30
-	github.com/mattn/go-shellwords v1.0.14
+	github.com/mattn/go-shellwords v1.0.15
 	github.com/nao1215/markdown v1.0.0
 	github.com/ohler55/ojg v1.28.6
 	github.com/rivo/uniseg v0.4.7
