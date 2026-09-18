@@ -1,4 +1,4 @@
-.PHONY: build test test-race coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve help
+.PHONY: build test test-race coverage clean vet fmt lint tools release-smoke e2e thirdparty dogfood dogfood-iso8583tool dogfood-jose dogfood-career dogfood-gup dogfood-mimixbox dogfood-mobilepkg demo docs site website website-serve bench bench-compare help
 
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
@@ -51,6 +51,13 @@ lint: ## Run golangci-lint for every target OS (a linter only sees the files tha
 
 tools: ## Install developer tools used by this repository
 	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+	$(GO_INSTALL) github.com/nao1215/himorime@latest
+
+bench: ## Measure atago with the himorime suite in bench/ (requires himorime on PATH)
+	himorime run bench
+
+bench-compare: ## Compare main with the working tree on the himorime suite (BASE=main)
+	himorime compare --against $${BASE:-main} bench
 
 release-smoke: ## Build release artifacts locally and smoke-test them (requires goreleaser; syft adds the SBOM check)
 	@if command -v syft >/dev/null; then \
