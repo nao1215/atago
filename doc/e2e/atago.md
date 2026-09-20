@@ -1,12 +1,13 @@
 # atago Behavior Specs
 ## Summary
-83 suites · 683 scenarios
+83 suites · 684 scenarios
 ## Contents
-- [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 4 scenarios
+- [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
   - [a single-quoted argument with a space stays one argument](#scenario-a-single-quoted-argument-with-a-space-stays-one-argument)
   - [a block-scalar command splits on newlines like spaces](#scenario-a-block-scalar-command-splits-on-newlines-like-spaces)
   - [a folded-scalar command drops its trailing newline](#scenario-a-folded-scalar-command-drops-its-trailing-newline)
+  - [an escaped double quote inside a double-quoted argument is a literal quote](#scenario-an-escaped-double-quote-inside-a-double-quoted-argument-is-a-literal-quote)
 - [atago self-hosting / artifacts-dir failure payloads](#atago-self-hosting--artifacts-dir-failure-payloads) — 6 scenarios
   - [a failing stdout equals writes expected and actual sidecars](#scenario-a-failing-stdout-equals-writes-expected-and-actual-sidecars)
   - [a passing scenario writes no failure payload](#scenario-a-passing-scenario-writes-no-failure-payload)
@@ -809,6 +810,15 @@ ${atago} run no-such-file.yaml
 #### Then
 - exit code is `3`
 - stderr contains `no-such-file.yaml`
+
+### Scenario: an escaped double quote inside a double-quoted argument is a literal quote
+#### When
+```shell
+${atago} run "a = \"s\""
+```
+#### Then
+- exit code is `3`
+- stderr contains `a = \"s\"`
 
 ## atago self-hosting / artifacts-dir failure payloads
 Source: `test/e2e/atago/artifacts.atago.yaml`

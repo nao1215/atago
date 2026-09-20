@@ -506,6 +506,19 @@ func TestWindowsFields(t *testing.T) {
 		{"a\r\nb", []string{"a", "b"}},
 		// A newline inside a quoted group stays literal, as it does under go-shellwords.
 		{"\"a\nb\" c", []string{"a\nb", "c"}},
+		// Inside a double-quoted group, `\"` is a literal quote that does not end
+		// the group — the one escape POSIX and Windows must agree on, because it
+		// is what a spec author writes to put a quote inside an argument (#651).
+		{"e r \"a = \\\"s\\\"\" x", []string{"e", "r", `a = "s"`, "x"}},
+		{`tool "say \"hi\" now"`, []string{"tool", `say "hi" now`}},
+		// Every other backslash stays literal: they are path separators here, not
+		// escapes, so a drive path, a UNC path, and a doubled backslash survive.
+		{`tool "C:\dir\x" "\\server\share" "a\\b"`, []string{"tool", `C:\dir\x`, `\\server\share`, `a\\b`}},
+		// Outside double quotes `\"` is not an escape: the backslash stays and the
+		// quote opens a group, so a bare path ending in a backslash still works.
+		{`tool C:\dir\"x y"`, []string{"tool", `C:\dir\x y`}},
+		// Inside single quotes nothing is an escape.
+		{`tool '\"'`, []string{"tool", `\"`}},
 	}
 	for _, tt := range tests {
 		got, err := windowsFields(tt.in)
@@ -525,6 +538,14 @@ func TestWindowsFields(t *testing.T) {
 	}
 	if _, err := windowsFields(`broken "quote`); err == nil {
 		t.Error("windowsFields with an unclosed double quote should error")
+	}
+	// A path ending in a backslash right before the closing quote reads that
+	// quote as a literal one, so the group never closes. That is an error naming
+	// the escape, not a silently wrong argv (#651).
+	if _, err := windowsFields(`tool "C:\dir\"`); err == nil {
+		t.Error(`windowsFields("tool \"C:\\dir\\\"") should error: the escaped quote leaves the group unclosed`)
+	} else if !strings.Contains(err.Error(), "unclosed double quote") || !strings.Contains(err.Error(), `\"`) {
+		t.Errorf("windowsFields error = %v; must say \"unclosed double quote\" and mention the \\\" escape", err)
 	}
 	if _, err := windowsFields(`broken 'quote`); err == nil {
 		t.Error("windowsFields with an unclosed single quote should error")
@@ -551,6 +572,10 @@ func TestWindowsFields_MatchesShellwords(t *testing.T) {
 		"tool\n--flag value",
 		"a\r\nb c",
 		"\"a\nb\" c",
+		// `\"` inside double quotes is a literal quote on every OS (#651).
+		"e r \"a = \\\"s\\\"\" x",
+		`tool "say \"hi\" now"`,
+		`tool "it's" x`,
 	}
 	for _, in := range parity {
 		win, werr := windowsFields(in)
