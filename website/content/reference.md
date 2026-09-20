@@ -130,6 +130,12 @@ atago runs on Linux, macOS, and Windows, and CI tests all three: the unit suite 
 | `sandbox_home: true` | redirects `HOME` and the XDG base directories | redirects `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `HOMEDRIVE`, `HOMEPATH` |
 | `clear_env: true` | starts from an empty environment plus `pass_env` | the same, plus `SystemRoot`, `SystemDrive`, `TEMP`, `TMP`, and `PATHEXT`, without which a process cannot start at all |
 
+### How a command is split into argv
+
+Without `shell: true`, atago splits `run.command` itself. Both quotes group an argument and are stripped, and `\"` inside a double-quoted group is a literal quote that does not end the group — on every OS. Every other backslash differs: on Windows it stays literal, because it is a path separator there, so `"C:\dir\x"`, `"\\server\share"` and `"a\\b"` arrive unchanged; on Linux and macOS the string goes through [go-shellwords](https://github.com/mattn/go-shellwords), whose escapes are C-style, so `\t` becomes a tab and `C:\dir\x` loses its backslashes. An argument that contains quotes or backslashes is therefore best written in single quotes, where nothing is an escape.
+
+One consequence on Windows: a double-quoted path ending in a backslash (`"C:\dir\"`) reads its closing quote as a literal one, so the argument is never closed and atago reports `ATG4001` rather than guessing. Write that path in single quotes.
+
 ### Choosing the shell
 
 `shell: true` runs the platform's own interpreter, so a command written for `/bin/sh` does not run under `cmd.exe`. Two ways out. Keep the command portable — `echo` and `exit` are builtins of both, and `run.env:`, `run.stdin:`, `run.stdout_to:` cover the variable prefixes and redirects a spec usually reaches for a shell to get. Or point atago at the shell you want:

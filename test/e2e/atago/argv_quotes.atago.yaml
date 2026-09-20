@@ -69,3 +69,19 @@ scenarios:
           exit_code: 3
           stderr:
             contains: "no-such-file.yaml"
+
+  - name: an escaped double quote inside a double-quoted argument is a literal quote
+    steps:
+      # The command reaches the tokenizer as `run "a = \"s\""`. Inside a
+      # double-quoted group, `\"` must produce a literal `"` and keep the group
+      # open, so atago receives `a = "s"` as one argument on every OS. Windows
+      # used to keep both backslashes and let the quotes toggle grouping, so the
+      # same spec passed here and failed there with a silently different argv
+      # (#651). The error quotes the path it could not use, so the inner quotes
+      # appear escaped — which is the proof that they arrived as quotes.
+      - run:
+          command: "${atago} run \"a = \\\"s\\\"\""
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: 'a = \"s\"'

@@ -18,6 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - golangci-lint moves to v2.13.2, which deprecates `exhaustruct` in favor of `exhaustruct_v5`. The replacement checks every struct unless told otherwise, where the old one narrowed through its include list, so the config now pairs `explicit-mode` with `enforce-patterns` to keep the scope it had: `assert.Env` and nothing else. v2.13.2 also reports the Windows leg's signal call as an always-true error check — correct on the one OS whose runner refuses every signal step, and wrong for the five that deliver them, so it is excluded there by name.
 - The race-detector job asks for `stable` rather than `"1"`, which is the reason already written into the matrix beside it: setup-go resolves `"1"` from a manifest that lags a new Go release, so that leg had been running an older toolchain than the one it was meant to cover.
 
+### Fixed
+
+- A shell-free `run.command` that writes `\"` inside a double-quoted argument now means the same thing on Windows as on Linux and macOS: a literal quote that does not end the group. The Windows tokenizer kept both backslashes and let the quotes toggle grouping, so `"defaultImpl = \"scanner\""` reached the program as `defaultImpl = \scanner\` — a different argv for the same spec, with nothing reported, so the suite passed on POSIX and failed on Windows alone. Every other backslash there is still literal, because it is a path separator rather than an escape, so `"C:\dir\x"`, `"\\server\share"` and `"a\\b"` arrive as written. The one case this changes beyond the fix is a double-quoted path ending in a backslash (`"C:\dir\"`), which now leaves the argument unclosed and is reported as ATG4001 naming the escape, instead of being split into something else. Write that path in single quotes.
+
 ## [0.22.0] - 2026-09-12
 
 ### Added

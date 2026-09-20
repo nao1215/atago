@@ -355,8 +355,10 @@ func CommandLine(command string, shell bool) (string, []string, error) {
 // continuation. Quote your command or set shell: true if you need a literal
 // backslash. Windows uses windowsFields, which groups the same single/double
 // quotes as go-shellwords (so a single-quoted argument tokenizes identically on
-// both OSes) but keeps a backslash literal — sh backslash-escape semantics would
-// corrupt every C:\ path (e.g. the expanded ${atago} binary path).
+// both OSes) and reads `\"` inside a double-quoted group as a literal quote like
+// go-shellwords does, but keeps every other backslash literal — sh
+// backslash-escape semantics would corrupt every C:\ path (e.g. the expanded
+// ${atago} binary path).
 func splitArgv(command string) ([]string, error) {
 	if runtime.GOOS == "windows" {
 		return windowsFields(command)
@@ -380,15 +382,35 @@ func splitArgv(command string) ([]string, error) {
 // POSIX instead of gluing a stray `\n` onto the final argument on Windows alone.
 //
 // A backslash stays literal OUTSIDE quotes so a bare C:\ path survives (sh
-// backslash-escape semantics would corrupt it); it is also literal inside either
-// quote. This keeps the deliberate Windows-path behavior while removing the
-// single-quote divergence, which was an unintended side effect, not a design goal.
+// backslash-escape semantics would corrupt it), and literal inside single
+// quotes, where nothing escapes. The one exception is `\"` inside a
+// DOUBLE-quoted group: it yields a literal `"` and does not close the group,
+// which is what go-shellwords does on POSIX and what a spec author writes to put
+// a quote inside an argument. Keeping the backslashes there produced a different
+// argv on Windows than on POSIX for the same spec, with no diagnostic (#651).
+// Every other backslash inside double quotes is still literal, so `"C:\dir\x"`,
+// `"\\server\share"` and `"a\\b"` are unchanged. Outside double quotes `\"` is not
+// an escape either — the backslash stays and the quote opens a group — because a
+// bare Windows path ending in a backslash followed by a quoted argument
+// (`C:\dir\"x y"`) has to keep working.
+//
+// The consequence is that a double-quoted path ending in a backslash
+// (`"C:\dir\"`) reads its closing quote as a literal one and leaves the group
+// unclosed, which is a CommandUnparsable error naming the escape rather than a
+// silently wrong argv. Write such a path in single quotes.
 func windowsFields(command string) ([]string, error) {
 	var fields []string
 	var cur strings.Builder
 	inDouble, inSingle, started := false, false, false
-	for _, r := range command {
+	runes := []rune(command)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
 		switch {
+		case inDouble && r == '\\' && i+1 < len(runes) && runes[i+1] == '"':
+			// Escaped quote: a literal `"` that leaves the group open.
+			cur.WriteRune('"')
+			i++
+			started = true
 		case r == '"' && !inSingle:
 			inDouble = !inDouble
 			started = true
@@ -407,7 +429,7 @@ func windowsFields(command string) ([]string, error) {
 		}
 	}
 	if inDouble {
-		return nil, diag.CommandUnparsable.Errorf("unclosed double quote")
+		return nil, diag.CommandUnparsable.Errorf(`unclosed double quote; inside double quotes \" is a literal quote, so a path ending in a backslash needs single quotes or no trailing backslash`)
 	}
 	if inSingle {
 		return nil, diag.CommandUnparsable.Errorf("unclosed single quote")
