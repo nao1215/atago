@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-84 suites · 688 scenarios
+85 suites · 694 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -412,6 +412,13 @@
   - [the line selector strips the trailing CR](#scenario-the-line-selector-strips-the-trailing-cr)
   - [json parses a CRLF-formatted document](#scenario-json-parses-a-crlf-formatted-document)
   - [folding does not make an absent multi-line needle match](#scenario-folding-does-not-make-an-absent-multi-line-needle-match)
+- [atago self-hosting / line relations (#658)](#atago-self-hosting--line-relations-658) — 6 scenarios
+  - [sorted output is a permutation of the input](#scenario-sorted-output-is-a-permutation-of-the-input)
+  - [two inputs that differ only in order produce the same lines](#scenario-two-inputs-that-differ-only-in-order-produce-the-same-lines)
+  - [output is a subset of a larger reference](#scenario-output-is-a-subset-of-a-larger-reference)
+  - [a duplicated line is not a subset of a reference that has it once](#scenario-a-duplicated-line-is-not-a-subset-of-a-reference-that-has-it-once)
+  - [a failing relation names the missing and the unexpected lines](#scenario-a-failing-relation-names-the-missing-and-the-unexpected-lines)
+  - [a relation against no lines at all is refused at load](#scenario-a-relation-against-no-lines-at-all-is-refused-at-load)
 - [atago self-hosting / list](#atago-self-hosting--list) — 3 scenarios
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
@@ -9188,6 +9195,148 @@ ${atago} run inner.atago.yaml
 #### Then
 - exit code is `1`
 - stdout contains `was not present`
+
+## atago self-hosting / line relations (#658)
+Source: `test/e2e/atago/line_relations.atago.yaml`
+### Scenario: sorted output is a permutation of the input
+#### Inputs
+_stdin for `sort`:_
+```text
+b
+a
+c
+```
+#### When
+```shell
+sort
+```
+#### Then
+- exit code is `0`
+- stdout has the same lines as the reference, in any order
+
+### Scenario: two inputs that differ only in order produce the same lines
+#### Inputs
+_stdin for `sort`:_
+```text
+b
+a
+c
+```
+_stdin for `sort`:_
+```text
+c
+b
+a
+```
+#### When
+```shell
+sort
+# capture ${first} from stdout
+sort
+```
+#### Then
+- after `sort`:
+  - exit code is `0`
+  - stdout has the same lines as the reference, in any order
+
+### Scenario: output is a subset of a larger reference
+#### Inputs
+_stdin for `sort`:_
+```text
+b
+a
+```
+#### When
+```shell
+sort
+```
+#### Then
+- exit code is `0`
+- stdout has only lines the reference also has
+
+### Scenario: a duplicated line is not a subset of a reference that has it once
+#### Given
+- Fixture file `dup.atago.yaml` is created.
+
+#### Inputs
+_Fixture `dup.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the same line twice
+    steps:
+      - run:
+          command: sort
+          stdin: "a\na\n"
+      - assert:
+          stdout:
+            subset_of: "a\nb"
+```
+#### When
+```shell
+${atago} run dup.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `subset_of`
+
+### Scenario: a failing relation names the missing and the unexpected lines
+#### Given
+- Fixture file `diff.atago.yaml` is created.
+
+#### Inputs
+_Fixture `diff.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: the output has one line the reference does not
+    steps:
+      - run:
+          command: sort
+          stdin: "delta\nalpha\n"
+      - assert:
+          stdout:
+            permutation_of: "alpha\nbeta"
+```
+#### When
+```shell
+${atago} run diff.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `1 line missing from stdout: "beta"`, `1 line in stdout that the reference does not have: "delta"`
+
+### Scenario: a relation against no lines at all is refused at load
+#### Given
+- Fixture file `empty.atago.yaml` is created.
+
+#### Inputs
+_Fixture `empty.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: compares against nothing
+    steps:
+      - run:
+          command: sort
+          stdin: "a\n"
+      - assert:
+          stdout:
+            permutation_of: ""
+```
+#### When
+```shell
+${atago} run empty.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2312`, `compares against no lines`, `empty: true`
 
 ## atago self-hosting / list
 Source: `test/e2e/atago/list.atago.yaml`

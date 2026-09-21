@@ -1,0 +1,143 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / line relations (#658)
+
+# Exercises the two line relations, `permutation_of` and `subset_of`: matchers
+# that compare the LINES of a stream against a reference as multisets rather
+# than its bytes against a text. They are what a spec states when the content of
+# the output is the contract and its order is not — a listing in map order, a
+# parallel run, a filtered view of an earlier one — where `equals` would be the
+# wrong claim and three `contains` matchers would be a weaker one.
+#
+# `sort` is the program throughout: it reads stdin, it ships with Windows, and
+# its output is by definition a permutation of its input, which is the relation
+# under test.
+scenarios:
+  - name: sorted output is a permutation of the input
+    steps:
+      - run:
+          command: sort
+          stdin: "b\na\nc\n"
+      - assert:
+          exit_code: 0
+          # The same three lines, in the order they went in. `equals` would fail
+          # here; that is the whole point of the relation.
+          stdout:
+            permutation_of: "b\na\nc"
+
+  - name: two inputs that differ only in order produce the same lines
+    steps:
+      # The metamorphic shape: run, remember the output, run again with the
+      # input transformed in a way that must not change the result, and state
+      # the relation between the two outputs.
+      - run:
+          command: sort
+          stdin: "b\na\nc\n"
+      - store:
+          name: first
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: sort
+          stdin: "c\nb\na\n"
+      - assert:
+          exit_code: 0
+          stdout:
+            permutation_of: "${first}"
+
+  - name: output is a subset of a larger reference
+    steps:
+      - run:
+          command: sort
+          stdin: "b\na\n"
+      - assert:
+          exit_code: 0
+          # A subset may leave reference lines out: c and d are not required.
+          stdout:
+            subset_of: "a\nb\nc\nd"
+
+  - name: a duplicated line is not a subset of a reference that has it once
+    steps:
+      - fixture:
+          file: dup.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the same line twice
+                steps:
+                  - run:
+                      command: sort
+                      stdin: "a\na\n"
+                  - assert:
+                      stdout:
+                        subset_of: "a\nb"
+      - run:
+          command: ${atago} run dup.atago.yaml
+      - assert:
+          # Lines are compared as multisets, so printing something twice where
+          # the reference has it once is a failure — the duplicate-output bug a
+          # set comparison would hide.
+          exit_code: 1
+          stdout:
+            contains: "subset_of"
+
+  - name: a failing relation names the missing and the unexpected lines
+    steps:
+      - fixture:
+          file: diff.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: the output has one line the reference does not
+                steps:
+                  - run:
+                      command: sort
+                      stdin: "delta\nalpha\n"
+                  - assert:
+                      stdout:
+                        permutation_of: "alpha\nbeta"
+      - run:
+          command: ${atago} run diff.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              # Both directions of the difference, so the reader is not left
+              # comparing two blocks of text by eye — which is the work the
+              # order-insensitive comparison was reached for in the first place.
+              - '1 line missing from stdout: "beta"'
+              - '1 line in stdout that the reference does not have: "delta"'
+
+  - name: a relation against no lines at all is refused at load
+    steps:
+      - fixture:
+          file: empty.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: compares against nothing
+                steps:
+                  - run:
+                      command: sort
+                      stdin: "a\n"
+                  - assert:
+                      stdout:
+                        permutation_of: ""
+      - run:
+          command: ${atago} run empty.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2312"
+              - "compares against no lines"
+              # The plainer way to state what an empty reference would mean.
+              - "empty: true"

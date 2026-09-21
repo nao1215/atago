@@ -109,15 +109,17 @@ var docgenYAMLStyle = docgenJSONStyle.WithPrefix(func(path string) string {
 })
 
 var docgenStreamStyle = assertdesc.StreamStyle{
-	List:      codeList,
-	Regex:     codeRegex,
-	Equals:    "equals an exact value",
-	NotEquals: "does not equal an exact value",
-	JSON:      docgenJSONStyle,
-	YAML:      docgenYAMLStyle,
-	Snapshot:  code,
-	Line:      func(n int) string { return "line " + code(fmt.Sprint(n)) },
-	NoMatcher: "is checked",
+	List:          codeList,
+	Regex:         codeRegex,
+	Equals:        "equals an exact value",
+	NotEquals:     "does not equal an exact value",
+	PermutationOf: "has the same lines as the reference, in any order",
+	SubsetOf:      "has only lines the reference also has",
+	JSON:          docgenJSONStyle,
+	YAML:          docgenYAMLStyle,
+	Snapshot:      code,
+	Line:          func(n int) string { return "line " + code(fmt.Sprint(n)) },
+	NoMatcher:     "is checked",
 }
 
 var docgenFileStyle = assertdesc.FileStyle{

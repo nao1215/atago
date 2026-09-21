@@ -47,6 +47,7 @@
 | [Test a REPL](cookbook.md#test-a-repl) | `pty:` prompt-gated expect/send, EOF via `ctrl-d` |
 | [Prove a command is idempotent](cookbook.md#prove-a-command-is-idempotent) | second-run `changes:` pinned to empty |
 | [Compare two implementations of the same command](cookbook.md#compare-two-implementations-of-the-same-command) | `store:` + `equals: ${reference}` oracle |
+| [Assert output whose order is not guaranteed](cookbook.md#assert-output-whose-order-is-not-guaranteed) | `permutation_of:` / `subset_of:` line relations |
 | [Prove the same input gives the same output](cookbook.md#prove-the-same-input-gives-the-same-output) | `deterministic:` byte-identical reruns |
 | [Record an interactive session instead of scripting it](cookbook.md#record-an-interactive-session-instead-of-scripting-it) | `atago record --pty`, secrets become `${env:...}` |
 | [Refresh snapshots when output legitimately changes](cookbook.md#refresh-snapshots-when-output-legitimately-changes) | `atago snapshot update`, `scrub:`, git-reviewable goldens |
@@ -90,7 +91,7 @@
 
 | Example | Shows |
 |---------|-------|
-| [run_and_assert](../examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
+| [run_and_assert](../examples/run_and_assert.atago.yaml) | exit code (exact, `not`, `in: [0, 2]` sets), stdout/stderr matchers (`contains`, `equals`, `matches`/`not_matches`, `empty: true`/`false`, lists, `line`), the line relations `permutation_of`/`subset_of` against a literal and against a stored run, combining `contains`/`not_contains`/`matches`/`not_matches` in one block, multi-target asserts |
 | [count_and_size](../examples/count_and_size.atago.yaml) | occurrence bounds (`count`/`min_count`/`max_count`) on stream and file matchers, byte-size bounds (`size`/`min_size`/`max_size`) that compose with a content matcher |
 | [deterministic](../examples/deterministic.atago.yaml) | `deterministic:` reruns a command and requires byte-identical observables, `runs`/`compare`, the read-only caveat |
 | [shell_and_redirect](../examples/shell_and_redirect.atago.yaml) | `shell: true` vs direct argv execution, `stdout_to`/`stderr_to` redirects |

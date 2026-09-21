@@ -52,6 +52,48 @@ scenarios:
           stdout:
             not_contains: [panic, fatal]
 
+  - name: the same lines in any order
+    steps:
+      # The line relations compare the LINES of a stream against a reference as
+      # multisets: permutation_of is "the same lines, in any order", subset_of
+      # is "every line was in the reference". They are what a spec states when
+      # the content is the contract and the order is not — a listing in map
+      # order, a parallel run, a filtered view of an earlier run — where equals
+      # would be the wrong claim and three separate contains matchers would be a
+      # weaker one (they would also pass on a fourth, unexpected line).
+      - run:
+          command: sort
+          stdin: "b\na\nc\n"
+      - assert:
+          stdout:
+            permutation_of: "b\na\nc"
+      # A subset may leave reference lines out, but every line it does have must
+      # be there — and a line printed twice needs two in the reference, so an
+      # accidentally duplicated line is still a failure.
+      - assert:
+          stdout:
+            subset_of: "a\nb\nc\nd"
+
+  - name: comparing one run against another
+    steps:
+      # The metamorphic shape: run, remember the output, run again with the
+      # input transformed in a way that must not change the result, and state
+      # the relation between the two outputs. `${first}` is the reference.
+      - run:
+          command: sort
+          stdin: "b\na\nc\n"
+      - store:
+          name: first
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: sort
+          stdin: "c\nb\na\n"
+      - assert:
+          stdout:
+            permutation_of: "${first}"
+
   - name: text matchers combine in one block
     steps:
       - run:

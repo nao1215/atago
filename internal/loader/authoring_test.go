@@ -516,3 +516,58 @@ func TestFileAssert_EveryMatcherIsNamedInTheDiagnostic(t *testing.T) {
 		}
 	}
 }
+
+// streamAssertNonMatchers are the StreamAssert keys that are not ways to
+// satisfy the "must set at least one matcher" rule: the selector that narrows
+// what a matcher sees, the store-only selector, and the bounds that qualify a
+// matcher rather than being one.
+var streamAssertNonMatchers = map[string]string{
+	"line":      "narrows the stream to one line; every matcher still applies",
+	"trim":      "store-only selector, refused in an assertion",
+	"count":     "qualifies the contains or matches matcher",
+	"min_count": "qualifies the contains or matches matcher",
+	"max_count": "qualifies the contains or matches matcher",
+}
+
+// TestStreamAssert_EveryMatcherIsNamedInTheDiagnostic is the FileAssert guard's
+// counterpart for streams: the no-matcher message lists the ways out, so a
+// matcher added later has to appear there or be recorded as something that is
+// not one. Without it the message goes stale silently, and an author who wrote
+// only the new matcher's name in the wrong place is told about every matcher
+// except the one they were reaching for.
+func TestStreamAssert_EveryMatcherIsNamedInTheDiagnostic(t *testing.T) {
+	t.Parallel()
+	named := map[string]bool{}
+	for _, k := range strings.Split(streamMatcherList, "/") {
+		named[k] = true
+	}
+	typ := reflect.TypeOf(spec.StreamAssert{})
+	for i := range typ.NumField() {
+		key, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
+		if key == "" || key == "-" {
+			continue
+		}
+		if named[key] || streamAssertNonMatchers[key] != "" {
+			continue
+		}
+		t.Errorf("spec.StreamAssert has key %q, which is neither named in the no-matcher diagnostic (%s) nor recorded in streamAssertNonMatchers; an author who writes only that key gets a message that does not mention it", key, streamMatcherList)
+	}
+	for k := range named {
+		if streamAssertNonMatchers[k] != "" {
+			t.Errorf("%q is listed both as a matcher and as a non-matcher", k)
+		}
+	}
+	// SetMatchers is what the loader and every describer read to learn which
+	// matchers an assertion set; a name in the message with no field behind it
+	// would send an author after a key the decoder rejects.
+	fields := map[string]bool{}
+	for i := range typ.NumField() {
+		key, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
+		fields[key] = true
+	}
+	for k := range named {
+		if !fields[k] {
+			t.Errorf("the no-matcher diagnostic names %q, which is not a StreamAssert key", k)
+		}
+	}
+}

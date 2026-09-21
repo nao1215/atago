@@ -74,6 +74,7 @@
 ./test/e2e/atago/json_matcher_edges.atago.yaml	bash
 ./test/e2e/atago/line.atago.yaml	bash
 ./test/e2e/atago/line_endings.atago.yaml	bash
+./test/e2e/atago/line_relations.atago.yaml	cmd
 ./test/e2e/atago/list.atago.yaml	cmd
 ./test/e2e/atago/loader_errors.atago.yaml	cmd
 ./test/e2e/atago/manifest.atago.yaml	cmd

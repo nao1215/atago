@@ -93,6 +93,12 @@ func checkStream(name string, s *spec.StreamAssert, data []byte, hasData bool, e
 			Hint:     fmt.Sprintf("%s unexpectedly equaled the given text", name),
 		}
 
+	case s.PermutationOf != nil:
+		return checkLineRelation(name, got, *s.PermutationOf, true)
+
+	case s.SubsetOf != nil:
+		return checkLineRelation(name, got, *s.SubsetOf, false)
+
 	case len(s.JSON) > 0:
 		return checkJSONChecks("assert "+name+" json", name, data, s.JSON, false)
 

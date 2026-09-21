@@ -323,9 +323,22 @@ type StreamAssert struct {
 	NotMatches  *string    `yaml:"not_matches,omitempty"`
 	Equals      *string    `yaml:"equals,omitempty"`
 	NotEquals   *string    `yaml:"not_equals,omitempty"`
-	JSON        JSONChecks `yaml:"json,omitempty"`
-	YAML        JSONChecks `yaml:"yaml,omitempty"`
-	Snapshot    string     `yaml:"snapshot,omitempty"`
+	// PermutationOf and SubsetOf are the line relations (#658): they compare the
+	// stream's LINES against a reference as multisets rather than its bytes
+	// against a text. `equals` is the only relation a spec could state before,
+	// and it is the wrong one wherever order is not part of the contract — a
+	// listing that comes back in map order, a parallel run, `ls` against `ls -r`
+	// — or where the output is a filtered view of the reference. Both are
+	// ported from metamon's relation module, which names the same two.
+	//
+	// Multisets, not sets: a line printed twice needs two in the reference. That
+	// is what makes permutation_of an equality, and what keeps subset_of from
+	// accepting output that duplicated a line it should have printed once.
+	PermutationOf *string    `yaml:"permutation_of,omitempty"`
+	SubsetOf      *string    `yaml:"subset_of,omitempty"`
+	JSON          JSONChecks `yaml:"json,omitempty"`
+	YAML          JSONChecks `yaml:"yaml,omitempty"`
+	Snapshot      string     `yaml:"snapshot,omitempty"`
 
 	// Count, MinCount, and MaxCount bound how MANY times the `contains` or
 	// `matches` matcher next to them occurs (#396). They are modifiers, not

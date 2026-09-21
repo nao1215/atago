@@ -2101,6 +2101,16 @@
                   },
                   {
                     "required": [
+                      "permutation_of"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "subset_of"
+                    ]
+                  },
+                  {
+                    "required": [
                       "json"
                     ]
                   },
@@ -2207,6 +2217,22 @@
                       "boolean"
                     ],
                     "description": "Requires the rendered screen NOT to equal this string."
+                  },
+                  "permutation_of": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
+                    "description": "Waits until the rendered screen has the SAME LINES as this reference, in any order (#658)."
+                  },
+                  "subset_of": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
+                    "description": "Waits until every LINE of the rendered screen appears in this reference (#658)."
                   },
                   "json": {
                     "$ref": "#/$defs/jsonChecks",
@@ -3122,6 +3148,16 @@
         },
         {
           "required": [
+            "permutation_of"
+          ]
+        },
+        {
+          "required": [
+            "subset_of"
+          ]
+        },
+        {
+          "required": [
             "json"
           ]
         },
@@ -3216,6 +3252,22 @@
           ],
           "description": "Requires the stream NOT to equal this string."
         },
+        "permutation_of": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Requires the stream to have the SAME LINES as this reference, in any order (#658) — the relation to state when the content is the contract and the order is not. Lines are compared as a multiset, so a line printed twice needs two in the reference. The reference is usually a `${name}` a store captured from an earlier run."
+        },
+        "subset_of": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Requires every LINE of the stream to appear in this reference (#658) — the relation a filtering flag satisfies against the unfiltered run. Lines are compared as a multiset, so output that duplicated a line the reference has once is not a subset. The reference may have lines the stream does not."
+        },
         "json": {
           "$ref": "#/$defs/jsonChecks",
           "description": "Parses the stream as JSON and applies one JSONPath check, or a list of checks that must all hold."
@@ -3306,6 +3358,22 @@
             "boolean"
           ],
           "description": "Requires the stream NOT to equal this string."
+        },
+        "permutation_of": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Requires the rendered screen to have the SAME LINES as this reference, in any order (#658), compared as a multiset."
+        },
+        "subset_of": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Requires every LINE of the rendered screen to appear in this reference (#658), compared as a multiset."
         },
         "json": {
           "$ref": "#/$defs/jsonChecks",

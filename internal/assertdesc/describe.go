@@ -89,15 +89,17 @@ func DescribeJSONMatcher(j *spec.JSONAssert, style JSONStyle) string {
 }
 
 type StreamStyle struct {
-	List      func(spec.StringList) string
-	Regex     func(string) string
-	Equals    string
-	NotEquals string
-	JSON      JSONStyle
-	YAML      JSONStyle
-	Snapshot  func(string) string
-	Line      func(int) string
-	NoMatcher string
+	List          func(spec.StringList) string
+	Regex         func(string) string
+	Equals        string
+	NotEquals     string
+	PermutationOf string
+	SubsetOf      string
+	JSON          JSONStyle
+	YAML          JSONStyle
+	Snapshot      func(string) string
+	Line          func(int) string
+	NoMatcher     string
 }
 
 // DescribeStream renders every matcher a stream assertion sets, not just the
@@ -143,6 +145,12 @@ func DescribeStream(s *spec.StreamAssert, style StreamStyle) string {
 	}
 	if s.NotEquals != nil {
 		parts = append(parts, style.NotEquals)
+	}
+	if s.PermutationOf != nil {
+		parts = append(parts, style.PermutationOf)
+	}
+	if s.SubsetOf != nil {
+		parts = append(parts, style.SubsetOf)
 	}
 	if len(s.JSON) > 0 {
 		parts = append(parts, DescribeJSONChecks(s.JSON, style.JSON))
