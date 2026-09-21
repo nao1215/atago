@@ -39,6 +39,8 @@ func defBoundaries() map[reflect.Type]string {
 		reflect.TypeOf(spec.Runner{}):         "runner",
 		reflect.TypeOf(spec.Condition{}):      "condition",
 		reflect.TypeOf(spec.Scenario{}):       "scenario",
+		reflect.TypeOf(spec.Forall{}):         "forall",
+		reflect.TypeOf(spec.Generator{}):      "generator",
 		reflect.TypeOf(spec.Service{}):        "service",
 		reflect.TypeOf(spec.Step{}):           "step",
 		reflect.TypeOf(spec.CDP{}):            "cdp",

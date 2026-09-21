@@ -1,0 +1,66 @@
+version: "1"
+
+# `forall:` generates the inputs instead of listing them: each variable gets its
+# values from a seeded generator, and the scenario runs once per generated row —
+# the same expansion `matrix:` performs, over rows nobody had to think of.
+#
+# The values come from the spec's own seed, not from the clock, so a run is
+# reproducible: the same file tests the same inputs on every machine, every
+# instance carries its value in its name, and `seed:` is how you ask for a
+# different draw. Boundary values come first (the shortest and longest string,
+# the ends of a range, every choice), because that is where a CLI breaks.
+# Runs green as-is: atago run examples/forall.atago.yaml
+
+suite:
+  name: forall
+
+scenarios:
+  # The whole opt-in is one line: a variable name and a generator. The kinds are
+  # int, bool, digits, alpha, alphanumeric, ascii, unicode; `runs:` defaults to
+  # 10. See them with: atago list examples/forall.atago.yaml
+  - name: echo prints back any word it is handed
+    forall:
+      vars: {word: alphanumeric}
+    steps:
+      - run:
+          shell: true
+          command: echo ${word}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${word}
+
+  # The mapping form narrows a kind: for a string generator min/max are the
+  # LENGTH, so this one covers the empty input as well as a long one. Generated
+  # text goes in through `stdin:` (or `env:`, or a fixture) rather than onto the
+  # command line, because that is the channel no quoting rule applies to — a
+  # value full of punctuation reaches the program as itself. `sort` is the
+  # program here because it reads stdin and ships with Windows too.
+  - name: sort survives input of any length
+    forall:
+      vars:
+        text: {type: ascii, min: 0, max: 24}
+      runs: 6
+    steps:
+      - run:
+          command: sort
+          stdin: "${text}"
+      - assert:
+          exit_code: 0
+
+  # A fixed set of choices is a generator too — the accepted values of a flag,
+  # the formats a converter takes. Rows are deduplicated, so these two choices
+  # expand to two scenarios however large `runs:` is, and referencing the
+  # variable in the name is what makes each instance read like a test.
+  - name: "echo accepts the ${fmt} argument"
+    forall:
+      vars:
+        fmt: {one_of: [json, yaml]}
+    steps:
+      - run:
+          shell: true
+          command: echo ${fmt}
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: ${fmt}

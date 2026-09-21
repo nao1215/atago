@@ -38,6 +38,7 @@
 | [Run a scenario only where it can pass](cookbook.md#run-a-scenario-only-where-it-can-pass) | `tags`, `skip:`/`only:` gates |
 | [Track a known bug with an expected-failure spec](cookbook.md#track-a-known-bug-with-an-expected-failure-spec) | `expect_fail:` — XFAIL stays green, XPASS fails the run |
 | [Run the same scenario over many inputs](cookbook.md#run-the-same-scenario-over-many-inputs) | `matrix:` expansion |
+| [Let atago generate the inputs](cookbook.md#let-atago-generate-the-inputs) | `forall:` seeded generators, `one_of` choices |
 | [Capture a value in one step and reuse it](cookbook.md#capture-a-value-in-one-step-and-reuse-it) | `store:` + `${name}` |
 | [Isolate the test from the host environment](cookbook.md#isolate-the-test-from-the-host-environment) | `clear_env`, `pass_env`, `sandbox_home` |
 | [Pin the help and misuse contract](cookbook.md#pin-the-help-and-misuse-contract) | `--help` content, unknown-flag exit code and stderr |
@@ -102,6 +103,7 @@
 | [timeouts](../examples/timeouts.atago.yaml) | the built-in 60s default step timeout, `suite.timeout`, per-step overrides, and the `timeout: "0"` escape hatch |
 | [stdin](../examples/stdin.atago.yaml) | stdin sources: inline text, `stdin: {file: ...}` from a workdir file, and binary input via `stdin: {base64: ...}` |
 | [matrix](../examples/matrix.atago.yaml) | one template scenario expanded per parameter row |
+| [forall](../examples/forall.atago.yaml) | property-based scenarios: seeded generators (`int`, `digits`, `alpha`, `alphanumeric`, `ascii`, `unicode`, `bool`, `one_of`) expand one template into one instance per generated row |
 | [mock_server](../examples/mock_server.atago.yaml) | test API-client CLIs offline: `mock_servers` serve canned routes, record every request, and `mock:` asserts what the client actually sent |
 | [project_manifest](../examples/project_manifest.atago.yaml) | directory-level `atago.project.yaml` (shared env, defaults, `fixtures_dir`), and `${specdir}` for files committed beside a spec |
 | [pty](../examples/pty.atago.yaml) | interactive testing in a real pseudo-terminal: expect/send sessions, named keys (`send: {key: enter}`), TTY-detection (scenarios use POSIX-only inner commands) |

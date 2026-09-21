@@ -237,3 +237,30 @@ func TestPTYExec_YAMLRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// TestGenerator_YAMLRoundTrip pins both authored shapes of a forall generator
+// (#656): the scalar kind name stays a scalar, and a mapping keeps its range or
+// its choices. `atago explain` and the doc generator re-marshal specs, so a
+// generator that did not survive the trip would describe a spec nobody wrote —
+// and the default struct marshal breaks it, writing a `type: ""` that the
+// unmarshaler then reads back as a kind nobody named.
+func TestGenerator_YAMLRoundTrip(t *testing.T) {
+	t.Parallel()
+	zero, eight := 0, 8
+	cases := map[string]Generator{
+		"scalar kind":    {Type: "ascii"},
+		"range":          {Type: "int", Min: &zero, Max: &eight},
+		"min only":       {Type: "alpha", Min: &zero},
+		"choices":        {OneOf: []string{"json", "yaml"}},
+		"choice numbers": {OneOf: []string{"007", "1.20"}},
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := marshalReload(t, in)
+			if !reflect.DeepEqual(in, got) {
+				t.Errorf("generator round-trip:\n in  = %+v\n got = %+v", in, got)
+			}
+		})
+	}
+}

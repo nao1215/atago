@@ -328,6 +328,13 @@ var customDecodes = map[reflect.Type]customDecode{
 	},
 	// A json check's mapping carries yaml tags; `equals` is `any` and keeps
 	// YAML's typing, which the generic walk already respects.
+	// `s: ascii` is a kind name, and a choice generator's values are text the
+	// scenario substitutes verbatim — `one_of: [007, 1.20]` means those six
+	// characters, not 7 and 1.2.
+	reflect.TypeFor[spec.Generator](): {
+		scalarField: "Type",
+		why:         "a scalar is the kind name; the mapping form carries yaml tags, so one_of's values are reached by the sequence walk",
+	},
 	reflect.TypeFor[spec.JSONAssert](): {why: "the mapping form carries yaml tags, and equals is `any`, which keeps YAML's typing"},
 	reflect.TypeFor[spec.ExitCode]():   {why: "a number, {not: N}, or {in: [...]}: every field is an int, so there is no text to lose"},
 	// A scalar or a sequence of them; repairSlice takes the scalar form as the

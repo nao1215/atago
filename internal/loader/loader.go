@@ -209,6 +209,14 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 	for i := range s.Scenarios {
 		s.Scenarios[i].SourceIndex = i
 	}
+	// A forall block is a matrix whose rows are generated (#656): validate the
+	// generators while they are still there to name, then draw the rows, so
+	// everything below this point — matrix validation included — works on the
+	// concrete inputs the scenario will actually run.
+	if errs := validateForall(&s); len(errs) > 0 {
+		return nil, &Error{Path: path, Kind: KindValidation, Msg: joinErrors(errs)}
+	}
+	expandForall(&s)
 	// Validate matrix shape on the raw spec, then expand each matrix scenario into
 	// concrete instances so the remaining validation and the engine only ever see
 	// plain scenarios.

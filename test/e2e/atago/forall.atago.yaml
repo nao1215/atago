@@ -1,0 +1,142 @@
+version: "1"
+
+suite:
+  name: atago self-hosting / forall generated scenarios (#656)
+
+# Exercises property-based scenarios via `forall:`: instead of listing the
+# inputs, a scenario declares the SHAPE of them and atago generates one instance
+# per row, seeding each row as ${name} variables exactly as `matrix:` does.
+#
+# The generated values are derived from the spec's own seed, never from the
+# clock, so these scenarios can assert the values themselves — which is what
+# proves the same spec tests the same inputs on Linux, macOS and Windows.
+scenarios:
+  - name: forall expands into one scenario per generated row
+    steps:
+      - fixture:
+          file: forall.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: generated
+            scenarios:
+              - name: echoes a word
+                forall:
+                  vars:
+                    word: {type: alphanumeric, min: 1, max: 6}
+                  runs: 4
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${word}
+                  - assert:
+                      stdout:
+                        contains: ${word}
+      - run:
+          command: ${atago} run --report junit forall.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              # Four rows, four scenarios, and each one names the input it ran
+              # with — the reproduction path for a generated failure.
+              - 'tests="4"'
+              - 'name="echoes a word [word='
+
+  - name: the generated values are the same on every machine
+    steps:
+      # The same spec text must produce the same inputs everywhere: a generated
+      # value that varied by OS or by run would make a failure impossible to
+      # reproduce, and would change what a committed document says a suite does.
+      # These are the first two instances of that suite, boundary values first —
+      # the shortest allowed word, then the longest.
+      - fixture:
+          file: stable.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: generated
+            scenarios:
+              - name: echoes a word
+                forall:
+                  vars:
+                    word: {type: alphanumeric, min: 1, max: 6}
+                  runs: 4
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${word}
+                  - assert:
+                      stdout:
+                        contains: ${word}
+      - run:
+          command: ${atago} list stable.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "echoes a word [word=z]"
+              - "echoes a word [word=8v7yTK]"
+
+  - name: runs is an upper bound because duplicate rows are dropped
+    steps:
+      # Nine runs over two choices are two scenarios, not nine: a repeated row
+      # is a repeated process start and a repeated line of report, and it tests
+      # nothing the first one did not.
+      - fixture:
+          file: choices.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: choices
+            scenarios:
+              - name: "accepts ${fmt}"
+                forall:
+                  vars:
+                    fmt: {one_of: [json, yaml]}
+                  runs: 9
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${fmt}
+                  - assert:
+                      stdout:
+                        contains: ${fmt}
+      - run:
+          command: ${atago} run --report junit choices.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'tests="2"'
+              - 'name="accepts json"'
+              - 'name="accepts yaml"'
+
+  - name: an unknown generator is a load error, not a silent default
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: a
+                forall:
+                  vars:
+                    s: strings
+                steps:
+                  - run:
+                      shell: true
+                      command: echo hi
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - "ATG2307"
+              - "is not a generator"
+              # The message lists what a generator can be, because the author
+              # cannot look the vocabulary up in the value they just typed.
+              - "alpha, alphanumeric, ascii, bool, digits, int, unicode"
