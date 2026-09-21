@@ -29,8 +29,10 @@ func TestExpandAssert_StreamAndFileMatchers(t *testing.T) {
 		},
 		Stderr: &spec.StreamAssert{Matches: ptr("^${token}$")},
 		File: &spec.FileAssert{
-			Path:     "${workdir}/note.txt",
-			Contains: spec.StringList{"${token}"},
+			Path:       "${workdir}/note.txt",
+			Contains:   spec.StringList{"${token}"},
+			Equals:     ptr("${token}\n"),
+			EqualsFile: ptr("${workdir}/want.txt"),
 		},
 	}
 
@@ -50,6 +52,12 @@ func TestExpandAssert_StreamAndFileMatchers(t *testing.T) {
 	}
 	if got := out.File.Contains[0]; got != "abc" {
 		t.Errorf("file.contains = %q, want abc", got)
+	}
+	if got := *out.File.Equals; got != "abc\n" {
+		t.Errorf("file.equals = %q, want abc\\n", got)
+	}
+	if got := *out.File.EqualsFile; got != "/tmp/wd/want.txt" {
+		t.Errorf("file.equals_file = %q, want /tmp/wd/want.txt", got)
 	}
 
 	// The original assert must be untouched (expandAssert returns a copy).

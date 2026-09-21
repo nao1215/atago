@@ -51,7 +51,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		Rows:    &StreamAssert{JSON: JSONChecks{{Path: "$.${b}", Equals: "${c}"}}},
 		Message: &StreamAssert{Equals: sp("${d}")},
 		Value:   &StreamAssert{YAML: JSONChecks{{Path: "$.x", Matches: sp("${e}")}}},
-		File:    &FileAssert{Path: "${f}", Contains: StringList{"${g}"}},
+		File:    &FileAssert{Path: "${f}", Contains: StringList{"${g}"}, Equals: sp("${y}"), EqualsFile: sp("${z}")},
 		Header:  &HeaderMatch{Name: "X", Equals: sp("${h}"), Matches: sp("${r}")},
 		Image:   &ImageAssert{Path: "${i}", SimilarTo: "${j}"},
 		Screen:  &ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${k}"}}},
@@ -69,7 +69,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		}
 		return s
 	})
-	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x"} {
+	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"} {
 		if !seen[want] {
 			t.Errorf("collect missed ${%s}; got %v", want, seen)
 		}
@@ -183,10 +183,15 @@ func TestCollectStepVars_UnscannedFields(t *testing.T) {
 	// StepAssert kind was previously uncounted.
 	assertStep := &Step{Assert: &Assert{
 		Stdout: &StreamAssert{Equals: strp("${assert_stdout_ref}")},
-		File:   &FileAssert{Path: "${assert_path_ref}", Contains: StringList{"${assert_contains_ref}"}},
+		File: &FileAssert{
+			Path:       "${assert_path_ref}",
+			Contains:   StringList{"${assert_contains_ref}"},
+			Equals:     strp("${assert_file_equals_ref}"),
+			EqualsFile: strp("${assert_equals_file_ref}"),
+		},
 	}}
 	got = collectStep(assertStep)
-	for _, want := range []string{"assert_stdout_ref", "assert_path_ref", "assert_contains_ref"} {
+	for _, want := range []string{"assert_stdout_ref", "assert_path_ref", "assert_contains_ref", "assert_file_equals_ref", "assert_equals_file_ref"} {
 		if !hasVar(got, want) {
 			t.Errorf("assert field %q not collected; got %v", want, got)
 		}
@@ -819,4 +824,98 @@ func TestSortedKeys(t *testing.T) {
 	if !reflect.DeepEqual(again, want) {
 		t.Errorf("SortedKeys not deterministic: %v", again)
 	}
+}
+
+// assertTextFieldKinds are the FileAssert / StreamAssert field types that hold
+// author-written text. Each must either be visited by WalkAssertStrings or
+// recorded as deliberately literal — the gap that left file.equals and
+// file.equals_file unexpanded (#660) while every neighbouring matcher was.
+func assertTextFieldKinds(t reflect.Type) bool {
+	if t == reflect.TypeOf(StringList(nil)) {
+		return true
+	}
+	switch t.Kind() {
+	case reflect.String:
+		return true
+	case reflect.Ptr:
+		return t.Elem().Kind() == reflect.String
+	}
+	return false
+}
+
+func setAssertTextField(v reflect.Value, f reflect.StructField, token string) {
+	fv := v.FieldByIndex(f.Index)
+	switch {
+	case fv.Kind() == reflect.String:
+		fv.SetString(token)
+	case fv.Kind() == reflect.Ptr:
+		s := token
+		fv.Set(reflect.ValueOf(&s))
+	default:
+		fv.Set(reflect.ValueOf(StringList{token}))
+	}
+}
+
+// TestWalkAssertStrings_DecidesEveryFileAndStreamTextField walks every string,
+// *string, and StringList field of FileAssert and StreamAssert and requires
+// WalkAssertStrings to visit it, or a recorded reason that it stays literal.
+// Snapshot names a committed golden and is the one field that must not expand.
+func TestWalkAssertStrings_DecidesEveryFileAndStreamTextField(t *testing.T) {
+	t.Parallel()
+	literal := map[string]map[string]string{
+		"FileAssert": {
+			"Snapshot": "names a committed golden by a stable name; expanding would retarget the snapshot file",
+		},
+		"StreamAssert": {
+			"Snapshot": "names a committed golden by a stable name; expanding would retarget the snapshot file",
+		},
+	}
+	check := func(t *testing.T, typeName string, typ reflect.Type, wrap func(any) *Assert) {
+		t.Helper()
+		reasons := literal[typeName]
+		seen := map[string]bool{}
+		for i := 0; i < typ.NumField(); i++ {
+			f := typ.Field(i)
+			if !assertTextFieldKinds(f.Type) {
+				continue
+			}
+			seen[f.Name] = true
+			if reason, ok := reasons[f.Name]; ok {
+				if reason == "" {
+					t.Errorf("%s.%s is marked literal with an empty reason", typeName, f.Name)
+				}
+				continue
+			}
+			holder := reflect.New(typ).Elem()
+			token := "probe-" + typeName + "-" + f.Name
+			setAssertTextField(holder, f, token)
+			visited := false
+			WalkAssertStrings(wrap(holder.Addr().Interface()), func(s string) string {
+				if s == token {
+					visited = true
+				}
+				return s
+			})
+			if !visited {
+				t.Errorf("%s.%s is not visited by WalkAssertStrings; wire it or record it as deliberately literal", typeName, f.Name)
+			}
+		}
+		for name := range reasons {
+			if !seen[name] {
+				t.Errorf("%s literal exemption %q names no such text field", typeName, name)
+			}
+		}
+	}
+	t.Run("FileAssert", func(t *testing.T) {
+		t.Parallel()
+		check(t, "FileAssert", reflect.TypeOf(FileAssert{}), func(v any) *Assert {
+			return &Assert{File: v.(*FileAssert)}
+		})
+	})
+	t.Run("StreamAssert", func(t *testing.T) {
+		t.Parallel()
+		check(t, "StreamAssert", reflect.TypeOf(StreamAssert{}), func(v any) *Assert {
+			return &Assert{Stdout: v.(*StreamAssert)}
+		})
+	})
 }

@@ -203,6 +203,10 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		fc.Path = visit(a.File.Path)
 		fc.Contains = walkList(a.File.Contains, visit)
 		fc.NotContains = walkList(a.File.NotContains, visit)
+		// Equals/EqualsFile take ${name} the same way stream equals does
+		// (#660). Snapshot stays a committed golden name and is not visited.
+		fc.Equals = walkPtr(a.File.Equals, visit)
+		fc.EqualsFile = walkPtr(a.File.EqualsFile, visit)
 		fc.JSON = walkJSONChecks(a.File.JSON, visit)
 		c.File = &fc
 	}

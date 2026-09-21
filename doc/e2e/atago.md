@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-85 suites · 695 scenarios
+85 suites · 696 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -15,13 +15,14 @@
   - [each repeat iteration keeps its own failure payloads](#scenario-each-repeat-iteration-keeps-its-own-failure-payloads)
   - [a file-content mismatch also writes a payload](#scenario-a-file-content-mismatch-also-writes-a-payload)
   - [a teardown failure keeps the steps failure payloads](#scenario-a-teardown-failure-keeps-the-steps-failure-payloads)
-- [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 6 scenarios
+- [atago self-hosting / variable expansion in assertion matcher values](#atago-self-hosting--variable-expansion-in-assertion-matcher-values) — 7 scenarios
   - [stdout.equals expands ${workdir}](#scenario-stdoutequals-expands-workdir)
   - [stdout.contains and not_contains expand a stored variable](#scenario-stdoutcontains-and-not_contains-expand-a-stored-variable)
   - [file.contains expands ${workdir}](#scenario-filecontains-expands-workdir)
   - [dir.path expands a stored variable](#scenario-dirpath-expands-a-stored-variable)
   - [changes entries expand a stored variable](#scenario-changes-entries-expand-a-stored-variable)
   - [screen matcher expands a stored variable](#scenario-screen-matcher-expands-a-stored-variable)
+  - [file.equals_file expands ${workdir}](#scenario-fileequals_file-expands-workdir)
 - [atago self-hosting / browser (cdp) runner](#atago-self-hosting--browser-cdp-runner) — 9 scenarios
   - [a cdp step with no actions fails validation (exit 2)](#scenario-a-cdp-step-with-no-actions-fails-validation-exit-2)
   - [a cdp step naming an undeclared runner fails validation (exit 2)](#scenario-a-cdp-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -1076,6 +1077,29 @@ echo needle
 #### Then
 - after `interactive (pty): echo needle`:
   - rendered screen contains `${pat}`
+
+### Scenario: file.equals_file expands ${workdir}
+#### Given
+- Fixture file `want.txt` is created.
+
+#### Inputs
+_Fixture `want.txt`:_
+```text
+hello
+```
+_stdin for `sort`:_
+```text
+hello
+```
+#### When
+```shell
+sort
+```
+#### Then
+- file `got.txt` is byte-identical to `${workdir}/want.txt`
+
+#### Generated artifacts
+- `got.txt`
 
 ## atago self-hosting / browser (cdp) runner
 Source: `test/e2e/atago/cdp.atago.yaml`

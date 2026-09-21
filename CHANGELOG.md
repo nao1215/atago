@@ -23,6 +23,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `file.equals` and `file.equals_file` expand `${name}` the same way every neighbouring matcher already does. `WalkAssertStrings` visited `file.path`, `contains`, `not_contains` and `json`, and the stream walk beside it visited `equals`/`equals_file`, but those two FileAssert fields were copied through unexpanded — so `equals_file: "${workdir}/want.txt"` compared against the literal text `${workdir}/want.txt` and failed with `openat ${workdir}/want.txt`. Snapshot stays a committed golden name and is still not expanded.
 - A shell-free `run.command` that writes `\"` inside a double-quoted argument now means the same thing on Windows as on Linux and macOS: a literal quote that does not end the group. The Windows tokenizer kept both backslashes and let the quotes toggle grouping, so `"defaultImpl = \"scanner\""` reached the program as `defaultImpl = \scanner\` — a different argv for the same spec, with nothing reported, so the suite passed on POSIX and failed on Windows alone. Every other backslash there is still literal, because it is a path separator rather than an escape, so `"C:\dir\x"`, `"\\server\share"` and `"a\\b"` arrive as written. The one case this changes beyond the fix is a double-quoted path ending in a backslash (`"C:\dir\"`), which now leaves the argument unclosed and is reported as ATG4001 naming the escape, instead of being split into something else. Write that path in single quotes.
 
 ## [0.22.0] - 2026-09-12

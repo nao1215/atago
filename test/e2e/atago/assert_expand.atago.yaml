@@ -102,3 +102,12 @@ scenarios:
       - assert:
           screen:
             contains: ["${pat}"]
+
+  - name: file.equals_file expands ${workdir}
+    steps:
+      - fixture: {file: want.txt, content: "hello\n"}
+      - run: {command: sort, stdin: "hello\n", stdout_to: got.txt}
+      - assert:
+          file:
+            path: got.txt
+            equals_file: "${workdir}/want.txt"
