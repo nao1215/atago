@@ -102,6 +102,13 @@ type Var struct {
 	Min    int
 	Max    int
 	Values []string
+	// Examples are values that are always tried, ahead of everything else
+	// (metamon's with_examples). They are the inputs that broke the tool once —
+	// an empty argument, `--`, a name with a trailing dot — and none of those is
+	// a boundary of any generator, so nothing else would ever reach them. They
+	// are used as written, which is why a spec may name one outside the
+	// generator's own range.
+	Examples []string
 }
 
 // Rows generates up to runs distinct variable bindings, in a fixed order.
@@ -153,10 +160,20 @@ func value(r *rng, v *Var, attempt int) string {
 	return sample(r, v)
 }
 
-// edges returns the boundary values for a variable, in the order they are tried.
-// The string edges still draw their characters from r, so asking for them
-// advances the stream exactly as a sample would.
+// edges returns the values tried before the generator samples: the author's own
+// examples first, then the kind's boundaries. The string boundaries still draw
+// their characters from r, so asking for them advances the stream exactly as a
+// sample would.
 func edges(r *rng, v *Var) []string {
+	if len(v.Examples) > 0 {
+		return append(append([]string(nil), v.Examples...), kindEdges(r, v)...)
+	}
+	return kindEdges(r, v)
+}
+
+// kindEdges returns the boundary values of a variable's kind, in the order they
+// are tried.
+func kindEdges(r *rng, v *Var) []string {
 	switch v.Kind {
 	case Bool:
 		return []string{"false", "true"}

@@ -130,6 +130,7 @@
   "forall.runs": "unreleased",
   "forall.seed": "unreleased",
   "forall.vars": "unreleased",
+  "generator.examples": "unreleased",
   "generator.max": "unreleased",
   "generator.min": "unreleased",
   "generator.one_of": "unreleased",

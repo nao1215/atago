@@ -48,6 +48,24 @@ scenarios:
       - assert:
           exit_code: 0
 
+  # `examples:` are values always tried, ahead of everything generated: the
+  # input that broke the tool once, which is never a boundary of any generator
+  # and which nothing else would ever reach. They are used as written, so one
+  # may sit outside the range — the empty line below, where the minimum is 1 —
+  # and they count toward `runs`, so the instance count still reads off the
+  # block.
+  - name: sort accepts the inputs that broke it before
+    forall:
+      vars:
+        text: {type: alphanumeric, min: 1, max: 8, examples: ["", "--", "a b"]}
+      runs: 5
+    steps:
+      - run:
+          command: sort
+          stdin: "${text}"
+      - assert:
+          exit_code: 0
+
   # A fixed set of choices is a generator too — the accepted values of a flag,
   # the formats a converter takes. Rows are deduplicated, so these two choices
   # expand to two scenarios however large `runs:` is, and referencing the

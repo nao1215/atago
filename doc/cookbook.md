@@ -1311,7 +1311,10 @@ scenarios:
     # or a fixed set with one_of. `runs:` defaults to 10.
     forall:
       vars:
-        text: {type: ascii, min: 0, max: 40}
+        # `examples:` are values always tried, ahead of everything generated:
+        # the inputs that broke the tool once, which are never a boundary of any
+        # generator. They count toward `runs` and are used as written.
+        text: {type: ascii, min: 0, max: 40, examples: ["--", "a b"]}
       runs: 8
     steps:
       # Generated text goes in through stdin, env, or a fixture: those channels

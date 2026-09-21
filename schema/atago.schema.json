@@ -859,6 +859,19 @@
             "max": {
               "type": "integer",
               "description": "Upper bound: the largest value for `int`, the longest length for a string kind."
+            },
+            "examples": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "description": "Values always tried, ahead of everything generated (#661): the input that broke the tool once, which is never a boundary of any generator. They are used as written, so one may sit outside this generator's own range, and they count toward `runs`."
             }
           }
         },
