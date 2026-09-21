@@ -1,4 +1,4 @@
-// Package gen produces the values a scenario's `forall:` block binds to its
+// Package generator produces the values a scenario's `forall:` block binds to its
 // variables (#656) — the generator half of property-based testing, ported from
 // the Gleam library metamon (https://github.com/nao1215/metamon).
 //
@@ -9,7 +9,7 @@
 // carries its own PRNG rather than calling math/rand, which this repository's
 // linter refuses outright: atago's output is a contract, and a test runner that
 // cannot reproduce its own inputs cannot tell a real failure from its noise.
-package gen
+package generator
 
 import (
 	"sort"

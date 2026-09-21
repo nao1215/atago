@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/nao1215/atago/internal/diag"
-	"github.com/nao1215/atago/internal/gen"
+	"github.com/nao1215/atago/internal/generator"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -81,11 +81,11 @@ func validateGenerator(add addFunc, where, name string, g *spec.Generator) {
 		return
 	}
 	if g.Type == "" {
-		add(diag.RequiredKey, "%s must name a generator type (%s) or list values with one_of", where, strings.Join(gen.Kinds(), ", "))
+		add(diag.RequiredKey, "%s must name a generator type (%s) or list values with one_of", where, strings.Join(generator.Kinds(), ", "))
 		return
 	}
-	if !gen.Known(g.Type) {
-		add(diag.NotAllowedValue, "%s type %q is not a generator; use one of %s, or list values with one_of", where, g.Type, strings.Join(gen.Kinds(), ", "))
+	if !generator.Known(g.Type) {
+		add(diag.NotAllowedValue, "%s type %q is not a generator; use one of %s, or list values with one_of", where, g.Type, strings.Join(generator.Kinds(), ", "))
 		return
 	}
 	validateGeneratorRange(add, where, g)
@@ -114,21 +114,21 @@ func validateOneOf(add addFunc, where string, g *spec.Generator) {
 // refuses them on the kinds that do not: `{type: bool, max: 3}` is a mistake
 // that would otherwise be accepted and ignored.
 func validateGeneratorRange(add addFunc, where string, g *spec.Generator) {
-	kind := gen.Kind(g.Type)
-	if !gen.Bounded(kind) {
+	kind := generator.Kind(g.Type)
+	if !generator.Bounded(kind) {
 		if g.Min != nil || g.Max != nil {
 			add(diag.KeyNotHere, "%s sets min/max on a %s generator, which has no range to narrow", where, g.Type)
 		}
 		return
 	}
-	low, high := gen.Defaults(kind)
+	low, high := generator.Defaults(kind)
 	if g.Min != nil {
 		low = *g.Min
 	}
 	if g.Max != nil {
 		high = *g.Max
 	}
-	if kind != gen.Int {
+	if kind != generator.Int {
 		if low < 0 {
 			add(diag.NegativeValue, "%s min is %d; a %s generator's bounds are a string LENGTH", where, low, g.Type)
 			return
@@ -194,8 +194,8 @@ func expandForall(s *spec.Spec) {
 		}
 		// The suite and scenario names are part of the seed so that two
 		// scenarios in one file do not test the same generated inputs twice.
-		seed := gen.Seed(sc.Forall.Seed, s.Suite.Name, sc.Name)
-		rows := gen.Rows(seed, runs, forallVars(sc.Forall))
+		seed := generator.Seed(sc.Forall.Seed, s.Suite.Name, sc.Name)
+		rows := generator.Rows(seed, runs, forallVars(sc.Forall))
 		sc.Forall = nil
 		if len(rows) == 0 {
 			continue
@@ -208,16 +208,16 @@ func expandForall(s *spec.Spec) {
 // by variable name. The order is what the values depend on, so it has to come
 // from the names rather than from Go's map iteration: the same spec must
 // generate the same inputs on every run.
-func forallVars(f *spec.Forall) []gen.Var {
+func forallVars(f *spec.Forall) []generator.Var {
 	names := sortedVarNames(f.Vars)
-	vars := make([]gen.Var, 0, len(names))
+	vars := make([]generator.Var, 0, len(names))
 	for _, name := range names {
 		g := f.Vars[name]
-		v := gen.Var{Name: name, Kind: gen.Kind(g.Type), Values: g.OneOf}
+		v := generator.Var{Name: name, Kind: generator.Kind(g.Type), Values: g.OneOf}
 		if len(g.OneOf) > 0 {
-			v.Kind = gen.OneOf
+			v.Kind = generator.OneOf
 		}
-		v.Min, v.Max = gen.Defaults(v.Kind)
+		v.Min, v.Max = generator.Defaults(v.Kind)
 		if g.Min != nil {
 			v.Min = *g.Min
 		}

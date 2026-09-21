@@ -31,8 +31,8 @@ type Forall struct {
 }
 
 // Generator describes one variable's values: a kind (with an optional range),
-// or a fixed set of choices. The kinds themselves live in internal/gen, which
-// owns what each one produces; this type is only what the YAML carries.
+// or a fixed set of choices. The kinds themselves live in internal/generator,
+// which owns what each one produces; this type is only what the YAML carries.
 type Generator struct {
 	// Type names the kind: int, bool, digits, alpha, alphanumeric, ascii,
 	// unicode. Empty when OneOf is used instead.
