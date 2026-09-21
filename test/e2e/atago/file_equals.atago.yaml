@@ -294,3 +294,57 @@ scenarios:
       - assert:
           stdout:
             not_contains: '"actual text"'
+
+  - name: the byte-exact matchers expand ${name} like every other matcher
+    steps:
+      # Until #660 these two were the only matcher arguments the engine did not
+      # expand, so `equals_file: "${workdir}/want.bin"` looked for a file whose
+      # name contained those ten literal characters, and a stored value compared
+      # against `${name}` never matched anything a program could write.
+      - fixture:
+          file: want.bin
+          content: "round-trip"
+      - fixture:
+          file: got.bin
+          content: "round-trip"
+      - store:
+          name: expected
+          from:
+            file:
+              path: want.bin
+              text: true
+      - assert:
+          file:
+            path: got.bin
+            # An absolute path built from a built-in variable, which is the
+            # shape a committed reference under ${fixtures} takes.
+            equals_file: "${workdir}/want.bin"
+      - assert:
+          file:
+            path: got.bin
+            equals: "${expected}"
+
+  - name: a variable in equals_file is reported as a variable the scenario uses
+    steps:
+      - fixture:
+          file: vars.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: compares against a captured reference
+                steps:
+                  - assert:
+                      file:
+                        path: got.bin
+                        equals_file: "${reference}"
+      - run:
+          command: ${atago} manifest vars.atago.yaml
+      - assert:
+          exit_code: 0
+          # The walk explain and manifest collect variables with is the one the
+          # engine expands with, so a field it skipped was also a variable
+          # neither of them reported.
+          stdout:
+            contains: '"reference"'

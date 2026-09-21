@@ -89,6 +89,34 @@ scenarios:
             modified: []
             deleted: []
 
+  - name: ignore expands ${name} like the categories beside it (portable)
+    steps:
+      # ignore is a glob list exactly as created/modified/deleted are, and until
+      # #660 it was the one of the four the engine did not expand — so a path a
+      # `store` had just captured could not be named there.
+      - run:
+          shell: true
+          command: echo volatile.log
+      - store:
+          name: noisy
+          from:
+            stdout:
+              trim: true
+      - run:
+          shell: true
+          command: echo produced
+          stdout_to: ${noisy}
+      - assert:
+          exit_code: 0
+          changes:
+            # The only file the step wrote is the one the variable names, and
+            # ignoring it leaves an empty delta in all three categories.
+            ignore:
+              - ${noisy}
+            created: []
+            modified: []
+            deleted: []
+
   - name: the delta over a retried step reflects only the converged attempt (POSIX)
     skip:
       os: windows

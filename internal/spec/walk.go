@@ -203,6 +203,14 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		fc.Path = visit(a.File.Path)
 		fc.Contains = walkList(a.File.Contains, visit)
 		fc.NotContains = walkList(a.File.NotContains, visit)
+		// The byte-exact matchers take references like every other matcher
+		// argument (#660): `equals_file: "${fixtures}/expected.json"` is the
+		// shape a directory manifest's fixtures_dir exists for, and `equals:
+		// "${captured}"` is how a file is compared against a stored value. They
+		// were the only matcher arguments the walk skipped, so both reached the
+		// comparison as the literal characters `${...}`.
+		fc.Equals = walkPtr(a.File.Equals, visit)
+		fc.EqualsFile = walkPtr(a.File.EqualsFile, visit)
 		fc.JSON = walkJSONChecks(a.File.JSON, visit)
 		c.File = &fc
 	}
@@ -266,6 +274,10 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		cc.Created = walkListPtr(a.Changes.Created, visit)
 		cc.Modified = walkListPtr(a.Changes.Modified, visit)
 		cc.Deleted = walkListPtr(a.Changes.Deleted, visit)
+		// ignore is the same kind of glob list as the three categories beside
+		// it, so it expands like them (#660): a path a step writes only
+		// sometimes is often the one a `store` just captured.
+		cc.Ignore = walkList(a.Changes.Ignore, visit)
 		c.Changes = &cc
 	}
 	return &c

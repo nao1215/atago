@@ -206,6 +206,28 @@ func TestCollectStepVars_UnscannedFields(t *testing.T) {
 		}
 	}
 
+	// The byte-exact file matchers take references too (#660): `equals_file`
+	// naming a committed reference under ${fixtures}, `equals` comparing
+	// against a value a store captured. They were the walk's only blind spot,
+	// so explain and manifest under-reported them as well.
+	fileEqualsStep := &Step{Assert: &Assert{File: &FileAssert{
+		Path:       "out.bin",
+		Equals:     strp("${file_equals_ref}"),
+		EqualsFile: strp("${file_equals_file_ref}/expected.bin"),
+	}}}
+	got = collectStep(fileEqualsStep)
+	for _, want := range []string{"file_equals_ref", "file_equals_file_ref"} {
+		if !hasVar(got, want) {
+			t.Errorf("file matcher %q not collected; got %v", want, got)
+		}
+	}
+
+	// changes.ignore is the same kind of glob list as the categories beside it.
+	ignoreStep := &Step{Assert: &Assert{Changes: &ChangesAssert{Ignore: StringList{"${changes_ignore_ref}"}}}}
+	if got := collectStep(ignoreStep); !hasVar(got, "changes_ignore_ref") {
+		t.Errorf("changes.ignore not collected; got %v", got)
+	}
+
 	// A store step's file-source path is expanded by expandStore.
 	storeStep := &Step{Store: &Store{Name: "v", From: &StoreFrom{File: &FileAssert{Path: "${store_path_ref}"}}}}
 	if got := collectStep(storeStep); !hasVar(got, "store_path_ref") {

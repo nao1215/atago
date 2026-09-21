@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-85 suites · 695 scenarios
+85 suites · 698 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -32,10 +32,11 @@
   - [an upload action without a file fails validation (exit 2)](#scenario-an-upload-action-without-a-file-fails-validation-exit-2)
   - [a download action without a click selector fails validation (exit 2)](#scenario-a-download-action-without-a-click-selector-fails-validation-exit-2)
   - [a navigate to a denied host is a policy violation (exit 6)](#scenario-a-navigate-to-a-denied-host-is-a-policy-violation-exit-6)
-- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 23 scenarios
+- [atago self-hosting / changes (workdir delta assertions)](#atago-self-hosting--changes-workdir-delta-assertions) — 24 scenarios
   - [a generator touches exactly the files it should (POSIX)](#scenario-a-generator-touches-exactly-the-files-it-should-posix)
   - [an unexpected creation breaks the exact contract (POSIX)](#scenario-an-unexpected-creation-breaks-the-exact-contract-posix)
   - [stdout_to counts as created, and modified nothing holds (portable)](#scenario-stdout_to-counts-as-created-and-modified-nothing-holds-portable)
+  - [ignore expands ${name} like the categories beside it (portable)](#scenario-ignore-expands-name-like-the-categories-beside-it-portable)
   - [the delta over a retried step reflects only the converged attempt (POSIX)](#scenario-the-delta-over-a-retried-step-reflects-only-the-converged-attempt-posix)
   - [deleting and recreating a byte-identical file appears in no list (POSIX)](#scenario-deleting-and-recreating-a-byte-identical-file-appears-in-no-list-posix)
   - [deleting and recreating with different content is modified only (POSIX)](#scenario-deleting-and-recreating-with-different-content-is-modified-only-posix)
@@ -291,7 +292,7 @@
   - [explain names an http runner and describes a retry](#scenario-explain-names-an-http-runner-and-describes-a-retry)
   - [explain names a runner definition's host environment reads](#scenario-explain-names-a-runner-definitions-host-environment-reads)
   - [explain names env and command gates](#scenario-explain-names-env-and-command-gates)
-- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 11 scenarios
+- [atago self-hosting / file equals and equals_file byte-equality (#155)](#atago-self-hosting--file-equals-and-equals_file-byte-equality-155) — 13 scenarios
   - [equals_file passes for two byte-identical files](#scenario-equals_file-passes-for-two-byte-identical-files)
   - [equals matches an inline literal byte-for-byte](#scenario-equals-matches-an-inline-literal-byte-for-byte)
   - [equals_file fails the inner spec when the two files differ by one byte](#scenario-equals_file-fails-the-inner-spec-when-the-two-files-differ-by-one-byte)
@@ -303,6 +304,8 @@
   - [an invisible difference is quoted in the failure output](#scenario-an-invisible-difference-is-quoted-in-the-failure-output)
   - [a trailing space difference is quoted too](#scenario-a-trailing-space-difference-is-quoted-too)
   - [an ordinary difference keeps its plain form](#scenario-an-ordinary-difference-keeps-its-plain-form)
+  - [the byte-exact matchers expand ${name} like every other matcher](#scenario-the-byte-exact-matchers-expand-name-like-every-other-matcher)
+  - [a variable in equals_file is reported as a variable the scenario uses](#scenario-a-variable-in-equals_file-is-reported-as-a-variable-the-scenario-uses)
 - [atago self-hosting / fixture from (copy committed testdata)](#atago-self-hosting--fixture-from-copy-committed-testdata) — 2 scenarios
   - [a committed binary blob is copied verbatim into the workdir](#scenario-a-committed-binary-blob-is-copied-verbatim-into-the-workdir)
   - [copying from a missing source errors the scenario](#scenario-copying-from-a-missing-source-errors-the-scenario)
@@ -1426,6 +1429,21 @@ echo produced
 
 #### Generated artifacts
 - `result.txt`
+
+### Scenario: ignore expands ${name} like the categories beside it (portable)
+#### When
+```shell
+echo volatile.log
+# capture ${noisy} from stdout
+echo produced
+```
+#### Then
+- after `echo produced`:
+  - exit code is `0`
+  - the step changed exactly created nothing, modified nothing, deleted nothing, ignoring `${noisy}`
+
+#### Generated artifacts
+- `${noisy}`
 
 ### Scenario: the delta over a retried step reflects only the converged attempt (POSIX)
 _skipped on Windows_
@@ -7368,6 +7386,54 @@ ${atago} run plain.atago.yaml
 - exit code is `1`
 - stdout contains `expected text`, `actual text`
 - stdout does not contain `"actual text"`
+
+### Scenario: the byte-exact matchers expand ${name} like every other matcher
+#### Given
+- Fixture file `want.bin` is created.
+- Fixture file `got.bin` is created.
+
+#### Inputs
+_Fixture `want.bin`:_
+```text
+round-trip
+```
+_Fixture `got.bin`:_
+```text
+round-trip
+```
+#### When
+```shell
+# capture ${expected} from file want.bin
+```
+#### Then
+- file `got.bin` is byte-identical to `${workdir}/want.bin`
+- file `got.bin` equals exact bytes
+
+### Scenario: a variable in equals_file is reported as a variable the scenario uses
+#### Given
+- Fixture file `vars.atago.yaml` is created.
+
+#### Inputs
+_Fixture `vars.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: compares against a captured reference
+    steps:
+      - assert:
+          file:
+            path: got.bin
+            equals_file: "${reference}"
+```
+#### When
+```shell
+${atago} manifest vars.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `"reference"`
 
 ## atago self-hosting / fixture from (copy committed testdata)
 Source: `test/e2e/atago/fixture_from.atago.yaml`
