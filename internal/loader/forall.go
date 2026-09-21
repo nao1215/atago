@@ -53,6 +53,7 @@ func validateForall(s *spec.Spec) []string {
 		for _, name := range sortedVarNames(sc.Forall.Vars) {
 			g := sc.Forall.Vars[name]
 			validateGenerator(add, fmt.Sprintf("%s.forall.vars.%s", where, name), name, &g)
+			validateExamples(add, fmt.Sprintf("%s.forall.vars.%s", where, name), &g, forallRuns(sc.Forall))
 		}
 		validateForallName(add, where, sc)
 	}
@@ -89,6 +90,34 @@ func validateGenerator(add addFunc, where, name string, g *spec.Generator) {
 		return
 	}
 	validateGeneratorRange(add, where, g)
+}
+
+// validateExamples checks the must-try values a generator names (#661). They
+// are instances of their own, so more of them than `runs` would either drop the
+// last ones or quietly run more scenarios than the block says — both of which
+// are worse than saying so.
+func validateExamples(add addFunc, where string, g *spec.Generator, runs int) {
+	if g.Examples == nil {
+		return
+	}
+	switch {
+	case len(g.Examples) == 0:
+		add(diag.EmptyList, "%s examples must list at least one value", where)
+		return
+	case len(g.OneOf) > 0:
+		add(diag.ExclusiveKeys, "%s sets examples together with one_of; a choice generator already tries every value it lists", where)
+		return
+	case len(g.Examples) > runs:
+		add(diag.OutOfRange, "%s names %d examples but forall.runs is %d, so the last of them would never run; raise runs to at least %d",
+			where, len(g.Examples), runs, len(g.Examples))
+	}
+	seen := map[string]bool{}
+	for _, v := range g.Examples {
+		if seen[v] {
+			add(diag.DuplicateEntry, "%s lists the example %q twice; rows are deduplicated, so the second one can only be a typo", where, v)
+		}
+		seen[v] = true
+	}
 }
 
 // validateOneOf checks a choice generator: it carries values and nothing else,
@@ -188,10 +217,7 @@ func expandForall(s *spec.Spec) {
 		if sc.Forall == nil {
 			continue
 		}
-		runs := sc.Forall.Runs
-		if runs == 0 {
-			runs = defaultForallRuns
-		}
+		runs := forallRuns(sc.Forall)
 		// The suite and scenario names are part of the seed so that two
 		// scenarios in one file do not test the same generated inputs twice.
 		seed := generator.Seed(sc.Forall.Seed, s.Suite.Name, sc.Name)
@@ -204,6 +230,16 @@ func expandForall(s *spec.Spec) {
 	}
 }
 
+// forallRuns is how many instances a block expands to: what it asked for, or
+// the default. Validation and expansion both read it, so the number an error
+// message quotes is the number the loader would have used.
+func forallRuns(f *spec.Forall) int {
+	if f.Runs == 0 {
+		return defaultForallRuns
+	}
+	return f.Runs
+}
+
 // forallVars renders a forall block's declarations as generator inputs, sorted
 // by variable name. The order is what the values depend on, so it has to come
 // from the names rather than from Go's map iteration: the same spec must
@@ -213,7 +249,7 @@ func forallVars(f *spec.Forall) []generator.Var {
 	vars := make([]generator.Var, 0, len(names))
 	for _, name := range names {
 		g := f.Vars[name]
-		v := generator.Var{Name: name, Kind: generator.Kind(g.Type), Values: g.OneOf}
+		v := generator.Var{Name: name, Kind: generator.Kind(g.Type), Values: g.OneOf, Examples: g.Examples}
 		if len(g.OneOf) > 0 {
 			v.Kind = generator.OneOf
 		}

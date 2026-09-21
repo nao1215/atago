@@ -252,6 +252,7 @@ func TestGenerator_YAMLRoundTrip(t *testing.T) {
 		"range":          {Type: "int", Min: &zero, Max: &eight},
 		"min only":       {Type: "alpha", Min: &zero},
 		"choices":        {OneOf: []string{"json", "yaml"}},
+		"examples":       {Type: "ascii", Examples: []string{"", "--"}},
 		"choice numbers": {OneOf: []string{"007", "1.20"}},
 	}
 	for name, in := range cases {

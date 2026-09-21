@@ -112,6 +112,41 @@ scenarios:
               - 'name="accepts json"'
               - 'name="accepts yaml"'
 
+  - name: the examples an author names are the first instances
+    steps:
+      # `examples:` are the values that must be tried however the draw goes —
+      # the input that broke the tool once. They come before the generator's
+      # own boundary values, in the order written, and they are used as written,
+      # so the empty string below is an instance even though the generator's
+      # minimum length is 1.
+      - fixture:
+          file: examples.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: must try
+            scenarios:
+              - name: parses
+                forall:
+                  vars:
+                    arg: {type: alpha, min: 1, max: 4, examples: ["", "--", "a b"]}
+                  runs: 5
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ok
+                  - assert:
+                      exit_code: 0
+      - run:
+          command: ${atago} list examples.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "parses [arg=]"
+              - "parses [arg=--]"
+              - "parses [arg=a b]"
+
   - name: an unknown generator is a load error, not a silent default
     steps:
       - fixture:

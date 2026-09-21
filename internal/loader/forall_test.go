@@ -230,3 +230,87 @@ func TestLoadBytes_ForallScalarShorthand(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadBytes_ForallExamples pins the must-try values (#661): they are the
+// first instances, in the order written, and they are used as written — an
+// example outside the generator's own range is the point, not a mistake.
+func TestLoadBytes_ForallExamples(t *testing.T) {
+	t.Parallel()
+	s, err := LoadBytes("f.atago.yaml", []byte(forallSpec("      vars:\n        s: {type: alpha, min: 3, max: 6, examples: [\"\", \"--\", \"a b\"]}\n      runs: 5\n")))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	if len(s.Scenarios) != 5 {
+		t.Fatalf("scenarios = %d, want 5", len(s.Scenarios))
+	}
+	for i, want := range []string{"", "--", "a b"} {
+		if got := s.Scenarios[i].Vars["s"]; got != want {
+			t.Errorf("instance %d bound %q, want the example %q", i, got, want)
+		}
+	}
+	for _, sc := range s.Scenarios[3:] {
+		if l := len(sc.Vars["s"]); l < 3 || l > 6 {
+			t.Errorf("generated value %q is outside the declared range", sc.Vars["s"])
+		}
+	}
+}
+
+// TestLoadBytes_ForallExamplesAreVerbatim: an example is substituted into the
+// scenario as text, so `007` means those three characters, exactly as a one_of
+// value does.
+func TestLoadBytes_ForallExamplesAreVerbatim(t *testing.T) {
+	t.Parallel()
+	s, err := LoadBytes("f.atago.yaml", []byte(forallSpec("      vars: {v: {type: digits, examples: [007, 1.20]}}\n")))
+	if err != nil {
+		t.Fatalf("LoadBytes() error = %v", err)
+	}
+	for i, want := range []string{"007", "1.20"} {
+		if got := s.Scenarios[i].Vars["v"]; got != want {
+			t.Errorf("instance %d bound %q, want %q", i, got, want)
+		}
+	}
+}
+
+// TestLoadBytes_ForallExamplesRefused walks the mistakes an examples list can
+// carry. The count rule is the one worth a message: more examples than runs
+// would either drop the last ones or run more scenarios than the block says.
+func TestLoadBytes_ForallExamplesRefused(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		block string
+		want  string
+	}{
+		"more examples than runs": {"      vars: {s: {type: alpha, examples: [a, b, c]}}\n      runs: 2\n", "raise runs to at least 3"},
+		"duplicate example":       {"      vars: {s: {type: alpha, examples: [a, a]}}\n", "twice"},
+		"examples with one_of":    {"      vars: {s: {one_of: [a, b], examples: [c]}}\n", "examples together with one_of"},
+		"examples not a list":     {"      vars: {s: {type: alpha, examples: nope}}\n", "must be a list"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadBytes("f.atago.yaml", []byte(forallSpec(c.block)))
+			if err == nil {
+				t.Fatalf("LoadBytes() error = nil, want the block refused")
+			}
+			if !strings.Contains(err.Error(), c.want) {
+				t.Errorf("error = %q, want it to mention %q", err, c.want)
+			}
+		})
+	}
+}
+
+// TestLoadBytes_ForallExamplesWithinDefaultRuns: the count rule reads the
+// default when the block states no runs, so the message quotes the number the
+// loader would actually have used.
+func TestLoadBytes_ForallExamplesWithinDefaultRuns(t *testing.T) {
+	t.Parallel()
+	many := make([]string, defaultForallRuns+1)
+	for i := range many {
+		many[i] = string(rune('a' + i))
+	}
+	block := "      vars: {s: {type: alpha, examples: [" + strings.Join(many, ", ") + "]}}\n"
+	_, err := LoadBytes("f.atago.yaml", []byte(forallSpec(block)))
+	if err == nil || !strings.Contains(err.Error(), "forall.runs is 10") {
+		t.Errorf("error = %v, want the default runs quoted", err)
+	}
+}

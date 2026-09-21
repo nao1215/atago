@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-85 suites · 694 scenarios
+85 suites · 695 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -317,10 +317,11 @@
   - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
   - [a gated-out scenario reports no repeat rate](#scenario-a-gated-out-scenario-reports-no-repeat-rate)
   - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
-- [atago self-hosting / forall generated scenarios (#656)](#atago-self-hosting--forall-generated-scenarios-656) — 4 scenarios
+- [atago self-hosting / forall generated scenarios (#656)](#atago-self-hosting--forall-generated-scenarios-656) — 5 scenarios
   - [forall expands into one scenario per generated row](#scenario-forall-expands-into-one-scenario-per-generated-row)
   - [the generated values are the same on every machine](#scenario-the-generated-values-are-the-same-on-every-machine)
   - [runs is an upper bound because duplicate rows are dropped](#scenario-runs-is-an-upper-bound-because-duplicate-rows-are-dropped)
+  - [the examples an author names are the first instances](#scenario-the-examples-an-author-names-are-the-first-instances)
   - [an unknown generator is a load error, not a silent default](#scenario-an-unknown-generator-is-a-load-error-not-a-silent-default)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 3 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
@@ -7737,6 +7738,37 @@ ${atago} run --report junit choices.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `tests="2"`, `name="accepts json"`, `name="accepts yaml"`
+
+### Scenario: the examples an author names are the first instances
+#### Given
+- Fixture file `examples.atago.yaml` is created.
+
+#### Inputs
+_Fixture `examples.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: must try
+scenarios:
+  - name: parses
+    forall:
+      vars:
+        arg: {type: alpha, min: 1, max: 4, examples: ["", "--", "a b"]}
+      runs: 5
+    steps:
+      - run:
+          shell: true
+          command: echo ok
+      - assert:
+          exit_code: 0
+```
+#### When
+```shell
+${atago} list examples.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `parses [arg=]`, `parses [arg=--]`, `parses [arg=a b]`
 
 ### Scenario: an unknown generator is a load error, not a silent default
 #### Given

@@ -291,3 +291,41 @@ func TestBoundedAndDefaults(t *testing.T) {
 		t.Errorf("Defaults(alpha) = %d, %d; want 1, 8", low, high)
 	}
 }
+
+// TestRows_ExamplesComeFirst pins metamon's with_examples semantics (#661): the
+// values an author names are tried before anything is generated, and before the
+// kind's own boundaries. They are the inputs that broke the tool once — `--`, an
+// empty argument, a name with a trailing dot — and none of them is a boundary of
+// any generator, so nothing else would ever reach them.
+func TestRows_ExamplesComeFirst(t *testing.T) {
+	t.Parallel()
+	rows := Rows(9, 6, []Var{{Name: "s", Kind: ASCII, Min: 2, Max: 6, Examples: []string{"", "--", "a b"}}})
+	if len(rows) != 6 {
+		t.Fatalf("rows = %v, want 6", rows)
+	}
+	for i, want := range []string{"", "--", "a b"} {
+		if rows[i]["s"] != want {
+			t.Errorf("row %d = %q, want the example %q", i, rows[i]["s"], want)
+		}
+	}
+	// An example is used as written, so it may sit outside the generator's own
+	// range; the generated rows after it still respect the range.
+	for _, row := range rows[3:] {
+		if l := len(row["s"]); l < 2 || l > 6 {
+			t.Errorf("generated value %q is outside the declared range", row["s"])
+		}
+	}
+}
+
+// TestRows_ExamplesAreDeduplicatedAgainstGeneratedRows: an example the generator
+// would have produced anyway is still only one instance.
+func TestRows_ExamplesAreDeduplicatedAgainstGeneratedRows(t *testing.T) {
+	t.Parallel()
+	rows := Rows(3, 8, []Var{{Name: "b", Kind: Bool, Examples: []string{"true"}}})
+	if len(rows) != 2 {
+		t.Fatalf("rows = %v, want the two booleans and no repeat of the example", rows)
+	}
+	if rows[0]["b"] != "true" {
+		t.Errorf("row 0 = %q, want the example first", rows[0]["b"])
+	}
+}

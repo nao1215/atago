@@ -44,6 +44,11 @@ type Generator struct {
 	// OneOf is the fixed set of values to pick from, the spelling of a
 	// generator whose space is a list rather than a shape.
 	OneOf []string `yaml:"one_of,omitempty"`
+	// Examples are values always tried, ahead of the generated ones (#661,
+	// metamon's with_examples): the input that broke the tool once, which is
+	// never a boundary of any generator and which nothing else would reach.
+	// They are used as written, so one may sit outside the generator's range.
+	Examples []string `yaml:"examples,omitempty"`
 }
 
 // UnmarshalYAML decodes a generator as the scalar shorthand (`s: ascii`, the
@@ -96,20 +101,25 @@ func (g *Generator) setKey(k string, v any, fail func(string, ...any) error) err
 		} else {
 			g.Max = &i
 		}
-	case "one_of":
+	case "one_of", "examples":
 		list, ok := v.([]any)
 		if !ok {
-			return fail("forall generator: one_of must be a list of values")
+			return fail("forall generator: %s must be a list of values", k)
 		}
 		// An authored empty list is kept as an empty (non-nil) slice so the
 		// loader can tell "chooses from nothing" — a generator that can produce
-		// no value — from a generator that never mentioned one_of at all.
-		g.OneOf = make([]string, 0, len(list))
+		// no value — from a generator that never mentioned the key at all.
+		values := make([]string, 0, len(list))
 		for _, item := range list {
-			g.OneOf = append(g.OneOf, fmt.Sprint(item))
+			values = append(values, fmt.Sprint(item))
+		}
+		if k == "examples" {
+			g.Examples = values
+		} else {
+			g.OneOf = values
 		}
 	default:
-		return fail("forall generator: unknown key %q (accepted: type, min, max, one_of)", k)
+		return fail("forall generator: unknown key %q (accepted: type, min, max, one_of, examples)", k)
 	}
 	return nil
 }
@@ -119,7 +129,7 @@ func (g *Generator) setKey(k string, v any, fail func(string, ...any) error) err
 // default struct marshal would write a `type: ""` for a one_of generator, which
 // the unmarshaler then reads as a kind nobody named.
 func (g Generator) MarshalYAML() (any, error) {
-	if g.Type != "" && g.Min == nil && g.Max == nil && len(g.OneOf) == 0 {
+	if g.Type != "" && g.Min == nil && g.Max == nil && len(g.OneOf) == 0 && len(g.Examples) == 0 {
 		return g.Type, nil
 	}
 	m := make(map[string]any, 4)
@@ -134,6 +144,9 @@ func (g Generator) MarshalYAML() (any, error) {
 	}
 	if len(g.OneOf) > 0 {
 		m["one_of"] = g.OneOf
+	}
+	if len(g.Examples) > 0 {
+		m["examples"] = g.Examples
 	}
 	return m, nil
 }
