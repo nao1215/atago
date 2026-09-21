@@ -51,7 +51,7 @@ func TestWalkAssertStrings_VisitsEveryTextField(t *testing.T) {
 	t.Parallel()
 	const sentinel = "P"
 	filled := &Assert{}
-	fillText(reflect.ValueOf(filled).Elem(), sentinel, 0)
+	fillText(reflect.ValueOf(filled).Elem(), sentinel, map[reflect.Type]bool{})
 	walked := WalkAssertStrings(filled, func(s string) string { return s + "!" })
 
 	var missing []string
@@ -77,22 +77,35 @@ func TestWalkAssertStrings_VisitsEveryTextField(t *testing.T) {
 }
 
 // fillText sets every string-shaped leaf under v to sentinel, allocating the
-// pointers, slices and maps it has to pass through. depth stops the recursion
-// on a self-referential type; the assert model has none, and the bound is
-// cheap insurance.
-func fillText(v reflect.Value, sentinel string, depth int) {
-	if depth > 6 || !v.CanSet() {
+// pointers, slices, maps and `any` payloads it has to pass through. active
+// carries the struct types currently on the path, so a self-referential model
+// would terminate rather than recurse forever — a depth cap would instead stop
+// quietly partway down, which for a guard means blind spots exactly where the
+// nesting is deepest (`mock.body.json[].path` is seven levels in).
+func fillText(v reflect.Value, sentinel string, active map[reflect.Type]bool) {
+	if !v.CanSet() {
 		return
 	}
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(sentinel)
+	case reflect.Interface:
+		// A decoded JSON value: the walker visits the strings inside it, so the
+		// guard has to put one there.
+		if v.NumMethod() == 0 {
+			v.Set(reflect.ValueOf(sentinel))
+		}
 	case reflect.Pointer:
 		if v.IsNil() {
 			v.Set(reflect.New(v.Type().Elem()))
 		}
-		fillText(v.Elem(), sentinel, depth+1)
+		fillText(v.Elem(), sentinel, active)
 	case reflect.Struct:
+		if active[v.Type()] {
+			return
+		}
+		active[v.Type()] = true
+		defer delete(active, v.Type())
 		for i := range v.NumField() {
 			if !v.Type().Field(i).IsExported() {
 				continue
@@ -100,11 +113,11 @@ func fillText(v reflect.Value, sentinel string, depth int) {
 			if tag, _, _ := strings.Cut(v.Type().Field(i).Tag.Get("yaml"), ","); tag == "-" {
 				continue
 			}
-			fillText(v.Field(i), sentinel, depth+1)
+			fillText(v.Field(i), sentinel, active)
 		}
 	case reflect.Slice:
 		one := reflect.MakeSlice(v.Type(), 1, 1)
-		fillText(one.Index(0), sentinel, depth+1)
+		fillText(one.Index(0), sentinel, active)
 		v.Set(one)
 	case reflect.Map:
 		if v.Type().Key().Kind() != reflect.String {
@@ -112,11 +125,11 @@ func fillText(v reflect.Value, sentinel string, depth int) {
 		}
 		m := reflect.MakeMap(v.Type())
 		val := reflect.New(v.Type().Elem()).Elem()
-		fillText(val, sentinel, depth+1)
+		fillText(val, sentinel, active)
 		m.SetMapIndex(reflect.ValueOf(sentinel).Convert(v.Type().Key()), val)
 		v.Set(m)
 	default:
-		// Numbers, booleans and `any` payloads carry no interpolatable text.
+		// Numbers and booleans carry no interpolatable text.
 	}
 }
 
@@ -129,6 +142,11 @@ func compareText(filled, walked reflect.Value, path string, report func(string, 
 	switch filled.Kind() {
 	case reflect.String:
 		report(path, walked.Kind() == reflect.String && walked.String() != filled.String())
+	case reflect.Interface:
+		if filled.IsNil() || walked.IsNil() {
+			return
+		}
+		compareText(filled.Elem(), walked.Elem(), path, report)
 	case reflect.Pointer:
 		if filled.IsNil() || walked.IsNil() {
 			return
