@@ -298,6 +298,10 @@ func walkStream(s *StreamAssert, visit func(string) string) *StreamAssert {
 	c.NotMatches = walkPtr(s.NotMatches, visit)
 	c.Equals = walkPtr(s.Equals, visit)
 	c.NotEquals = walkPtr(s.NotEquals, visit)
+	// The line relations exist to compare one run against another, so their
+	// reference is almost always a ${name} a store captured (#658).
+	c.PermutationOf = walkPtr(s.PermutationOf, visit)
+	c.SubsetOf = walkPtr(s.SubsetOf, visit)
 	c.JSON = walkJSONChecks(s.JSON, visit)
 	c.YAML = walkJSONChecks(s.YAML, visit)
 	return &c

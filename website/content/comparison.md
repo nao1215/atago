@@ -78,6 +78,7 @@ commander v2.5.0.
 | Exit code | exact, `not:`, `in:` | `run -N`, `run !`, `$status` | `The status should ...` | `exit-code` |
 | stdout / stderr as separate streams | always captured separately | `run --separate-stderr` | `The output` / `The error` | `stdout` / `stderr` |
 | contains / exact / regex | built in | Bash conditionals (richer via [bats-assert](https://github.com/bats-core/bats-assert)) | `include` / `equal` / `match pattern` | `contains` / `exactly` / `lines` / `line-count` / `not-contains` |
+| Output whose line order is not guaranteed | `permutation_of:` / `subset_of:` line relations | via `sort` in the test body | via `sort` in the test body | — |
 | JSON output | JSONPath matchers built in | via `jq` | via `jq` | GJSON paths built in |
 | YAML output | built in | — | — | — |
 | XML output | — | — | — | XPath built in |

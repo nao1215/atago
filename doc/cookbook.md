@@ -1576,6 +1576,61 @@ scenarios:
 
 Full spec: [changes](../examples/changes.atago.yaml)
 
+## Assert output whose order is not guaranteed
+
+```yaml
+version: "1"
+suite:
+  name: order-insensitive output
+
+scenarios:
+  - name: the listing has these entries, in whatever order
+    steps:
+      - run:
+          command: mytool list
+      - assert:
+          # permutation_of compares LINES as a multiset: the same lines, in any
+          # order. `equals` would pin an order the tool never promised, and
+          # three `contains` matchers would also pass on a fourth entry nobody
+          # expected.
+          stdout:
+            permutation_of: "alpha\nbeta\ngamma"
+
+  - name: --parallel changes the order and nothing else
+    steps:
+      # The metamorphic shape: run, remember the output, run again with the
+      # input transformed in a way that must not change the result, and state
+      # the relation between the two outputs.
+      - run:
+          command: mytool list
+      - store:
+          name: serial
+          from:
+            stdout:
+              trim: true
+      - run:
+          command: mytool list --parallel 8
+      - assert:
+          stdout:
+            permutation_of: "${serial}"
+
+  - name: a filter only ever removes lines
+    steps:
+      - run:
+          command: mytool list --filter active
+      - assert:
+          # subset_of is the relation a filtering flag satisfies: every line was
+          # already in the reference, which may have lines the filtered run does
+          # not. A line printed twice still needs two in the reference, so a
+          # filter that accidentally duplicates a row is a failure.
+          stdout:
+            subset_of: "${serial}"
+```
+
+Both relations compare lines, not bytes: CRLF is folded the way every stream text matcher folds it, one trailing newline is not a line, and everything else — a blank line in the middle, the spaces at the start of a line — is kept as it is. They pin the whole stream, so they are used on their own rather than beside another matcher, and a failure names the difference in both directions: the lines that were missing and the lines that appeared without a counterpart.
+
+Full spec: [run_and_assert](../examples/run_and_assert.atago.yaml)
+
 ## Prove the same input gives the same output
 
 ```yaml

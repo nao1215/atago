@@ -108,8 +108,15 @@ func validateExitCode(add addFunc, where string, e *spec.ExitCode) {
 // they all have to hold — which is the common "output has X but not Y" shape.
 var streamExclusiveMatchers = map[string]bool{
 	"empty": true, "equals": true, "not_equals": true,
+	"permutation_of": true, "subset_of": true,
 	"json": true, "yaml": true, "snapshot": true,
 }
+
+// streamMatcherList names every matcher a stream assertion may set, in the
+// order the diagnostic reads them out. TestStreamAssert_EveryMatcherIsNamedInTheDiagnostic
+// walks the struct against it, so a matcher added later cannot fall out of the
+// message that tells an author what they may write.
+const streamMatcherList = "empty/contains/not_contains/matches/not_matches/equals/not_equals/permutation_of/subset_of/json/yaml/snapshot"
 
 func validateStream(add addFunc, where string, s *spec.StreamAssert) {
 	// trim is a store-only selector (#158), not an assertion matcher.
@@ -118,7 +125,7 @@ func validateStream(add addFunc, where string, s *spec.StreamAssert) {
 	}
 	matchers := s.SetMatchers()
 	if len(matchers) == 0 {
-		add(diag.ChooseAtLeastOne, "%s: must set at least one matcher (empty/contains/not_contains/matches/not_matches/equals/not_equals/json/yaml/snapshot)", where)
+		add(diag.ChooseAtLeastOne, "%s: must set at least one matcher (%s)", where, streamMatcherList)
 	}
 	// A whole-stream matcher cannot be combined with anything else; only the
 	// text matchers compose.
@@ -139,6 +146,8 @@ func validateStream(add addFunc, where string, s *spec.StreamAssert) {
 	if s.NotMatches != nil {
 		validateRegexp(add, where, "not_matches", *s.NotMatches)
 	}
+	validateLineRelation(add, where, "permutation_of", s.PermutationOf)
+	validateLineRelation(add, where, "subset_of", s.SubsetOf)
 	validateStringList(add, where, "contains", s.Contains)
 	validateStringList(add, where, "not_contains", s.NotContains)
 	validateContainsOverlap(add, where, s.Contains, s.NotContains)
@@ -159,6 +168,17 @@ func validateStream(add addFunc, where string, s *spec.StreamAssert) {
 		if len(s.JSON) > 0 || len(s.YAML) > 0 || s.Snapshot != "" {
 			add(diag.ExclusiveKeys, "%s.line cannot be combined with json/yaml/snapshot (use contains/matches/equals/empty)", where)
 		}
+	}
+}
+
+// validateLineRelation refuses an empty reference for a line relation (#658).
+// An empty one compares against no lines at all: `permutation_of: ""` is
+// `empty: true` written obscurely, and `subset_of: ""` can then only pass for
+// output that is itself empty — both are claims the author has a plainer way to
+// state, and neither is what someone writing a relation meant.
+func validateLineRelation(add addFunc, where, key string, ref *string) {
+	if ref != nil && *ref == "" {
+		add(diag.VacuousMatcher, "%s.%s compares against no lines; use empty: true to assert that %s is empty", where, key, where)
 	}
 }
 

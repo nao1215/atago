@@ -139,15 +139,17 @@ var plainYAMLStyle = plainJSONStyle.WithPrefix(func(path string) string {
 })
 
 var plainStreamStyle = StreamStyle{
-	List:      spec.StringList.Quoted,
-	Regex:     func(s string) string { return fmt.Sprintf("/%s/", s) },
-	Equals:    "equals exact text",
-	NotEquals: "does not equal exact text",
-	JSON:      plainJSONStyle,
-	YAML:      plainYAMLStyle,
-	Snapshot:  func(s string) string { return s },
-	Line:      func(n int) string { return fmt.Sprintf("line %d", n) },
-	NoMatcher: "(no matcher)",
+	List:          spec.StringList.Quoted,
+	Regex:         func(s string) string { return fmt.Sprintf("/%s/", s) },
+	Equals:        "equals exact text",
+	NotEquals:     "does not equal exact text",
+	PermutationOf: "has the same lines as the reference, in any order",
+	SubsetOf:      "has only lines the reference also has",
+	JSON:          plainJSONStyle,
+	YAML:          plainYAMLStyle,
+	Snapshot:      func(s string) string { return s },
+	Line:          func(n int) string { return fmt.Sprintf("line %d", n) },
+	NoMatcher:     "(no matcher)",
 }
 
 var plainFileStyle = FileStyle{

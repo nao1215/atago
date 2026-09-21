@@ -184,6 +184,12 @@ func (s *StreamAssert) SetMatchers() []string {
 	if s.NotEquals != nil {
 		m = append(m, "not_equals")
 	}
+	if s.PermutationOf != nil {
+		m = append(m, "permutation_of")
+	}
+	if s.SubsetOf != nil {
+		m = append(m, "subset_of")
+	}
 	if s.JSON != nil {
 		m = append(m, "json")
 	}

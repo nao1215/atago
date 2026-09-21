@@ -192,6 +192,20 @@ func TestCollectStepVars_UnscannedFields(t *testing.T) {
 		}
 	}
 
+	// A line relation's reference is the point of the matcher: it names the
+	// ${name} a store captured from the run being compared against (#658), so a
+	// walk that skipped it would compare the literal text "${ref}".
+	relationStep := &Step{Assert: &Assert{
+		Stdout: &StreamAssert{PermutationOf: strp("${relation_perm_ref}")},
+		Stderr: &StreamAssert{SubsetOf: strp("${relation_subset_ref}")},
+	}}
+	got = collectStep(relationStep)
+	for _, want := range []string{"relation_perm_ref", "relation_subset_ref"} {
+		if !hasVar(got, want) {
+			t.Errorf("line relation reference %q not collected; got %v", want, got)
+		}
+	}
+
 	// A store step's file-source path is expanded by expandStore.
 	storeStep := &Step{Store: &Store{Name: "v", From: &StoreFrom{File: &FileAssert{Path: "${store_path_ref}"}}}}
 	if got := collectStep(storeStep); !hasVar(got, "store_path_ref") {
