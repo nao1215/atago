@@ -1296,6 +1296,57 @@ scenarios:
 
 Full spec: [matrix](../examples/matrix.atago.yaml)
 
+## Let atago generate the inputs
+
+```yaml
+version: "1"
+suite:
+  name: generated inputs
+
+scenarios:
+  - name: parsing never crashes, whatever the argument is
+    # Instead of listing the inputs, declare their SHAPE: one instance runs per
+    # generated row, with the row seeded as ${name} exactly as a matrix row is.
+    # The kinds are int, bool, digits, alpha, alphanumeric, ascii and unicode,
+    # or a fixed set with one_of. `runs:` defaults to 10.
+    forall:
+      vars:
+        text: {type: ascii, min: 0, max: 40}
+      runs: 8
+    steps:
+      # Generated text goes in through stdin, env, or a fixture: those channels
+      # have no quoting rules, so the program receives the value as itself.
+      - run:
+          command: mytool parse
+          stdin: "${text}"
+      - assert:
+          # The claim is not "it works" — it is that the tool answers rather
+          # than crashing: a parse error is exit 1, a panic is not.
+          exit_code:
+            in: [0, 1]
+          stderr:
+            not_contains: "panic"
+
+  - name: "the ${fmt} output format is accepted"
+    # A fixed set is a generator too. Rows are deduplicated, so these three
+    # choices are three scenarios however large `runs:` is, and referencing the
+    # variable in the name makes each instance read like a test of its own.
+    forall:
+      vars:
+        fmt: {one_of: [json, yaml, text]}
+    steps:
+      - run:
+          command: mytool export --format ${fmt}
+      - assert:
+          exit_code: 0
+```
+
+The values are drawn from the spec's own seed rather than from the clock, so this is a property test that still behaves like a spec: the same file tests the same inputs on every machine and in every run, `atago list` shows them before anything runs, and a failing instance names its input — `parsing never crashes [text=a b|c]` — which is the reproduction. Bumping `seed:` is how you ask for a different draw; pinning an input you want tested forever is a `matrix:` row, not a generator.
+
+Boundary values come first: the shortest and longest string, the ends of an integer range, both booleans, every choice. A run of eight instances therefore spends its first two on the empty argument and the longest one, which is where a CLI usually breaks.
+
+Full spec: [forall](../examples/forall.atago.yaml)
+
 ## Capture a value in one step and reuse it
 
 ```yaml

@@ -62,6 +62,7 @@
 ./test/e2e/atago/fixture_from.atago.yaml	bash
 ./test/e2e/atago/fixture_modes.atago.yaml	none	every scenario is a POSIX filesystem concept Windows has no counterpart for: a symlink (which needs elevation), fixture.mode permission bits (Go synthesizes a mode there), and `date -r` on the mtime
 ./test/e2e/atago/flaky.atago.yaml	bash
+./test/e2e/atago/forall.atago.yaml	cmd
 ./test/e2e/atago/grpc.atago.yaml	cmd
 ./test/e2e/atago/hermetic_env.atago.yaml	bash
 ./test/e2e/atago/http.atago.yaml	cmd

@@ -110,6 +110,7 @@ commander v2.5.0.
 | | atago | Bats | ShellSpec | commander |
 |---|---|---|---|---|
 | Parameterized tests | `matrix:` | — (per-case, or `bats_test_function`) | `Parameters` | — |
+| Generated inputs (property-based) | `forall:` seeded generators, one instance per row | — | — | — |
 | Retry / polling | `retry:` re-runs the command until an assert passes | `$BATS_TEST_RETRIES` re-runs the whole test | — | `retries` + `interval` |
 | Tags and filtering | `tags:`, `--tag` / `--skip-tag` / `--filter` | `# bats test_tags=`, `--filter-tags` (v1.8+) | `--tag`, focus (`fIt`), patterns | test-name filter |
 | Parallel execution | `--parallel`, built in | `--jobs` (needs GNU parallel or rush) | built in | — |

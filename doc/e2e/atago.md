@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-83 suites · 684 scenarios
+84 suites · 688 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -317,6 +317,11 @@
   - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
   - [a gated-out scenario reports no repeat rate](#scenario-a-gated-out-scenario-reports-no-repeat-rate)
   - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
+- [atago self-hosting / forall generated scenarios (#656)](#atago-self-hosting--forall-generated-scenarios-656) — 4 scenarios
+  - [forall expands into one scenario per generated row](#scenario-forall-expands-into-one-scenario-per-generated-row)
+  - [the generated values are the same on every machine](#scenario-the-generated-values-are-the-same-on-every-machine)
+  - [runs is an upper bound because duplicate rows are dropped](#scenario-runs-is-an-upper-bound-because-duplicate-rows-are-dropped)
+  - [an unknown generator is a load error, not a silent default](#scenario-an-unknown-generator-is-a-load-error-not-a-silent-default)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 3 scenarios
   - [a grpc runner without a target fails validation (exit 2)](#scenario-a-grpc-runner-without-a-target-fails-validation-exit-2)
   - [a grpc step naming an undeclared runner fails validation (exit 2)](#scenario-a-grpc-step-naming-an-undeclared-runner-fails-validation-exit-2)
@@ -7627,6 +7632,132 @@ ${atago} run --repeat 2 --retry-failed 1 any.atago.yaml
 #### Then
 - exit code is `3`
 - stderr contains `mutually exclusive`
+
+## atago self-hosting / forall generated scenarios (#656)
+Source: `test/e2e/atago/forall.atago.yaml`
+### Scenario: forall expands into one scenario per generated row
+#### Given
+- Fixture file `forall.atago.yaml` is created.
+
+#### Inputs
+_Fixture `forall.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: generated
+scenarios:
+  - name: echoes a word
+    forall:
+      vars:
+        word: {type: alphanumeric, min: 1, max: 6}
+      runs: 4
+    steps:
+      - run:
+          shell: true
+          command: echo ${word}
+      - assert:
+          stdout:
+            contains: ${word}
+```
+#### When
+```shell
+${atago} run --report junit forall.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `tests="4"`, `name="echoes a word [word=`
+
+### Scenario: the generated values are the same on every machine
+#### Given
+- Fixture file `stable.atago.yaml` is created.
+
+#### Inputs
+_Fixture `stable.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: generated
+scenarios:
+  - name: echoes a word
+    forall:
+      vars:
+        word: {type: alphanumeric, min: 1, max: 6}
+      runs: 4
+    steps:
+      - run:
+          shell: true
+          command: echo ${word}
+      - assert:
+          stdout:
+            contains: ${word}
+```
+#### When
+```shell
+${atago} list stable.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `echoes a word [word=z]`, `echoes a word [word=8v7yTK]`
+
+### Scenario: runs is an upper bound because duplicate rows are dropped
+#### Given
+- Fixture file `choices.atago.yaml` is created.
+
+#### Inputs
+_Fixture `choices.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: choices
+scenarios:
+  - name: "accepts ${fmt}"
+    forall:
+      vars:
+        fmt: {one_of: [json, yaml]}
+      runs: 9
+    steps:
+      - run:
+          shell: true
+          command: echo ${fmt}
+      - assert:
+          stdout:
+            contains: ${fmt}
+```
+#### When
+```shell
+${atago} run --report junit choices.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `tests="2"`, `name="accepts json"`, `name="accepts yaml"`
+
+### Scenario: an unknown generator is a load error, not a silent default
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: a
+    forall:
+      vars:
+        s: strings
+    steps:
+      - run:
+          shell: true
+          command: echo hi
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2307`, `is not a generator`, `alpha, alphanumeric, ascii, bool, digits, int, unicode`
 
 ## atago self-hosting / grpc runner
 Source: `test/e2e/atago/grpc.atago.yaml`

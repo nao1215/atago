@@ -756,6 +756,10 @@
           },
           "description": "Makes the scenario a template: one concrete instance per row, with each row's key/value pairs seeded as `${name}` variables."
         },
+        "forall": {
+          "$ref": "#/$defs/forall",
+          "description": "Makes the scenario a template over GENERATED inputs (#656): one instance per generated row, each row's values seeded as `${name}` variables. Property-based testing — \"for every input of this shape, the CLI still holds up\" — with the values derived from the spec's own seed, so they are the same on every machine and every run."
+        },
         "services": {
           "type": "array",
           "items": {
@@ -787,6 +791,100 @@
           }
         }
       }
+    },
+    "forall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vars"
+      ],
+      "properties": {
+        "vars": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/generator"
+          },
+          "description": "Each variable name and the generator that produces its values; the values are seeded as `${name}` for that instance."
+        },
+        "runs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "How many instances to generate (default 10). An upper bound rather than a promise: duplicate rows are dropped, so a generator over three choices expands to three instances."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Picks the stream (default 0). Generation is deterministic, so the same spec produces the same inputs on every machine; changing the seed is how a spec asks for different ones."
+        }
+      }
+    },
+    "generator": {
+      "description": "One forall variable's generator: a kind name as a scalar (`s: ascii`, the kind with its default range), a mapping narrowing that kind's range (`{type: int, min: 1, max: 99}`, where min/max are a string LENGTH for the string kinds), or a fixed set of choices (`{one_of: [json, yaml]}`).",
+      "oneOf": [
+        {
+          "enum": [
+            "alpha",
+            "alphanumeric",
+            "ascii",
+            "bool",
+            "digits",
+            "int",
+            "unicode"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "alpha",
+                "alphanumeric",
+                "ascii",
+                "bool",
+                "digits",
+                "int",
+                "unicode"
+              ],
+              "description": "The generator kind: an integer, a boolean, or a string of digits/letters/alphanumerics/printable ASCII/non-ASCII letters."
+            },
+            "min": {
+              "type": "integer",
+              "description": "Lower bound: the smallest value for `int`, the shortest length for a string kind."
+            },
+            "max": {
+              "type": "integer",
+              "description": "Upper bound: the largest value for `int`, the longest length for a string kind."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "one_of"
+          ],
+          "properties": {
+            "one_of": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              "description": "The fixed set of values to pick from — a flag's accepted values, a set of formats. Rows are deduplicated, so a list of three choices expands to three instances however large `runs` is."
+            }
+          }
+        }
+      ]
     },
     "service": {
       "type": "object",

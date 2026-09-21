@@ -42,6 +42,8 @@ var emptyPolicies = map[string]emptyPolicy{
 	"Spec.Scenarios":  {refuse: "version: \"1\"\nsuite:\n  name: s\nscenarios: []\n"},
 	"Scenario.Steps":  {refuse: "version: \"1\"\nsuite:\n  name: s\nscenarios:\n  - name: a\n    steps: []\n"},
 	"Scenario.Matrix": {refuse: "version: \"1\"\nsuite:\n  name: s\nscenarios:\n  - name: a\n    matrix: []\n    steps:\n      - run: {command: echo}\n"},
+	"Forall.Vars":     {refuse: "version: \"1\"\nsuite:\n  name: s\nscenarios:\n  - name: a\n    forall: {vars: {}}\n    steps:\n      - run: {command: echo}\n"},
+	"Generator.OneOf": {refuse: "version: \"1\"\nsuite:\n  name: s\nscenarios:\n  - name: a\n    forall: {vars: {x: {one_of: []}}}\n    steps:\n      - run: {command: echo}\n"},
 	"CDP.Actions": {refuse: "version: \"1\"\nsuite:\n  name: s\nrunners:\n  b: {type: browser}\nscenarios:\n" +
 		"  - name: a\n    steps:\n      - cdp: {runner: b, actions: []}\n"},
 	"Deterministic.Compare":    {refuse: policySpec("run: {command: echo, deterministic: {compare: []}}")},

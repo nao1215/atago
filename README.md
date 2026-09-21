@@ -344,6 +344,24 @@ Markdown — rendered under the matching heading, never expanded, and with no
 effect on the run. Maintenance notes stay in YAML comments, which never appear
 in the generated page.
 
+## Let atago pick the inputs
+
+`forall:` states the SHAPE of an input instead of listing values, and expands into one scenario per generated row — property-based testing in a spec file. The opt-in is one line:
+
+```yaml
+scenarios:
+  - name: parsing never crashes, whatever the argument is
+    forall:
+      vars: {text: {type: ascii, min: 0, max: 40}}
+    steps:
+      - run: {command: mytool parse, stdin: "${text}"}
+      - assert: {exit_code: {in: [0, 1]}}
+```
+
+The generators — `int`, `bool`, `digits`, `alpha`, `alphanumeric`, `ascii`, `unicode`, and `one_of` for a fixed set — are seeded from the spec itself rather than from the clock, so this stays a spec and not a lottery: the same file tests the same inputs on every machine, `atago list` shows them before anything runs, and a failing instance carries its input in its name. Boundary values come first, because that is where a CLI breaks.
+
+See [forall](examples/forall.atago.yaml).
+
 ## Snapshot testing
 
 `snapshot` matchers compare output against committed golden files; ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF are normalized so snapshots stay stable across machines. Record or refresh them with:

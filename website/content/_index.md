@@ -55,6 +55,17 @@ The first spec comes from a real run: `atago record -- <command>` executes the t
 
 `expect_fail:` marks a scenario that documents a bug you have not fixed yet. It keeps running on every commit — so the reproduction cannot rot the way a second, CI-excluded directory of "known bug" specs does — and an expected failure keeps the run green. The day it starts passing, the run turns red: the fix landed, and the spec has to be promoted into the suite that guards against a regression. An execution error stays an error, so a spec that stops running at all is never mistaken for a bug that is still there.
 
+## Or let atago pick the inputs
+
+`forall:` states the SHAPE of an input instead of listing values, and expands into one scenario per generated row — property-based testing in a spec file, one line to opt in:
+
+```yaml
+forall:
+  vars: {text: {type: ascii, min: 0, max: 40}}
+```
+
+The generators are seeded from the spec itself, never from the clock, so this stays a spec rather than a lottery: the same file tests the same inputs on every machine, `atago list` shows them before anything runs, and a failing instance carries its input in its name. Boundary values come first — the empty argument, the longest one, both booleans, every `one_of` choice — because that is where a CLI breaks.
+
 ## Snapshots built for CLI output
 
 ![snapshot testing: failure diff and one-command update](/img/snapshot.gif)

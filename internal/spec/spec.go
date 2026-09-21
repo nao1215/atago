@@ -233,6 +233,13 @@ type Scenario struct {
 	// one concrete scenario per row before validation.
 	// Each row's key/value pairs are seeded as ${name} variables for that instance.
 	Matrix []map[string]string `yaml:"matrix,omitempty"`
+	// Forall is Matrix over GENERATED rows (#656): the loader draws the rows
+	// from the seeded generators it declares and then expands them exactly as a
+	// matrix, so everything downstream — the engine, the reports, explain, doc,
+	// list, the manifest — sees ordinary scenarios carrying concrete Vars. The
+	// two are alternatives, not layers: a scenario states its inputs or
+	// generates them.
+	Forall *Forall `yaml:"forall,omitempty"`
 	// Vars holds the bound matrix row for an expanded scenario instance. It is
 	// populated by matrix expansion, never decoded from YAML, and seeded into the
 	// scenario store before steps run.
