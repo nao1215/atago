@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-21
+
 ### Added
 
 - A `forall:` generator takes an `examples:` list of values that are always tried, ahead of everything generated — metamon's `with_examples`, whose reason for existing is the same here: the input that broke the tool once is never a boundary of any generator, so nothing else would ever reach it. `{type: ascii, min: 1, max: 16, examples: ["", "--", "  "]}` runs those three first, in the order written, and generates the rest. An example is used as written, so it may sit outside the generator's own range — the empty string above, where the minimum is 1, is the point — and examples count toward `runs`, so the instance count still reads off the block. More examples than `runs` is refused, naming the number to raise it to, rather than dropping the last ones or quietly running more scenarios than the file says.
