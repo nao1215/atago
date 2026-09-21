@@ -169,6 +169,11 @@ jobs:
           - name: unzip
             dir: ./test/e2e/thirdparty/unzip
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh zip unzip
+          # rsync copies trees locally; exit codes, exhaustive changes, filter
+          # rules and symlink handling are asserted on the trees the specs build.
+          - name: rsync
+            dir: ./test/e2e/thirdparty/rsync
+            install: bash ./scripts/install_ubuntu_snapshot_packages.sh rsync
           # Ghostscript converts PostScript to PDF and rasterizes it; the
           # generated documents are asserted with pdf:/image:.
           - name: ghostscript

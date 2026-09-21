@@ -1,0 +1,253 @@
+version: "1"
+
+suite:
+  name: rsync (exit codes and stream separation)
+  description: |
+    [rsync](https://rsync.samba.org/) documents a table of exit codes, and a
+    backup script branches on them: 0 means the destination now mirrors the
+    source, 23 means some files did not make it, 25 means a safety limit
+    stopped deletions part way. This suite pins every code that a local copy
+    can reach — 0, 1 for a usage error, 11 for a file I/O error, 23 for a
+    partial transfer, and 25 for the `--max-delete` limit — together with what
+    each one leaves behind on disk, because a code is only useful when it tells
+    the truth about the tree.
+
+    Every failure is also checked for stream separation: the diagnosis goes to
+    stderr and stdout stays empty, so a script that parses stdout never
+    mistakes an error for a transfer log. The `rsync error: ... at main.c(N)`
+    trailer carries a source line number that moves between releases, so the
+    specs match the stable prefix only.
+
+    All trees are written by the spec, so nothing from rsync is committed.
+
+# Gate: `--mkpath` exists from rsync 3.2.3 on, so this probe admits the rsync
+# the specs were written against and turns away older builds and openrsync
+# (the rsync macOS ships), whose messages and codes differ.
+scenarios:
+  - name: a successful copy is silent and exits 0
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - fixture: {file: src/sub/b.txt, content: "bravo\n"}
+      - run:
+          sandbox_home: true
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+          # Without -v or -i rsync prints nothing on success; a cron job relies
+          # on that to mail only when something went wrong.
+          stdout: {empty: true}
+          stderr: {empty: true}
+          # Exhaustive: the mirror is the only new content, the source is not
+          # touched, and nothing lands in the sandboxed HOME.
+          changes:
+            created: [dst/a.txt, dst/sub/b.txt]
+            modified: []
+            deleted: []
+
+  - name: "exit 1: an unknown option is a usage error that copies nothing"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - run:
+          command: rsync -a --no-such-option src/ dst/
+      - assert:
+          exit_code: 1
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - "--no-such-option: unknown option"
+              - "rsync error: syntax or usage error (code 1)"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: "exit 1: no arguments prints the usage on stderr, not stdout"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - run:
+          command: rsync
+      - assert:
+          exit_code: 1
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - "Usage: rsync [OPTION]... SRC [SRC]... DEST"
+              - "rsync error: syntax or usage error (code 1)"
+
+  - name: a forgotten destination turns a --delete sync into a listing that exits 0
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # A hazard worth pinning as it is: with a single argument rsync lists the
+      # source, --delete is accepted and ignored, and the exit code is 0. A
+      # script that checks only the code cannot tell that no sync happened.
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - run:
+          command: rsync -a --delete src/
+      - assert:
+          exit_code: 0
+          stderr: {empty: true}
+          stdout:
+            matches: '(?m) a\.txt$'
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: "exit 11: a destination whose parent is missing fails and creates nothing"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - run:
+          command: rsync -a src/ missing/parent/dst/
+      - assert:
+          exit_code: 11
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - 'mkdir "'
+              - 'missing/parent/dst" failed: No such file or directory'
+              - "rsync error: error in file IO (code 11)"
+      - assert:
+          # rsync creates only the last path component; it does not quietly
+          # build the parents, so the failed run leaves no half-made tree.
+          file:
+            path: missing
+            exists: false
+
+  - name: --mkpath creates the missing parents that exit 11 refused
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # The metamorphic pair of the exit 11 case: the same command with the one
+      # flag that documents building the destination path succeeds.
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - run:
+          command: rsync -a --mkpath src/ missing/parent/dst/
+      - assert:
+          exit_code: 0
+          stdout: {empty: true}
+          changes:
+            created: [missing/parent/dst/a.txt]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: missing/parent/dst/a.txt
+            equals_file: src/a.txt
+
+  - name: "exit 23: a missing source is reported as a partial transfer"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # rsync does not have a separate code for "the source does not exist"; it
+      # is one of the files that were not transferred. The other source in the
+      # same command is still copied, which is what "partial" means.
+      - fixture: {file: present.txt, content: "here\n"}
+      - run:
+          command: rsync -a present.txt absent.txt dst/
+      - assert:
+          exit_code: 23
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - 'link_stat "'
+              - 'absent.txt" failed: No such file or directory'
+              - "some files/attrs were not transferred"
+              - "(code 23)"
+          changes:
+            created: [dst/present.txt]
+            modified: []
+            deleted: []
+
+  - name: "exit 23: an unreadable file is skipped and everything else still arrives"
+    only:
+      command: rsync --mkpath --version
+    # root reads a mode-000 file anyway, so the partial transfer never happens.
+    skip:
+      command: test "$(id -u)" = 0
+    steps:
+      - fixture: {file: src/ok.txt, content: "readable\n"}
+      - fixture: {file: src/locked.txt, content: "secret\n", mode: "0000"}
+      - run:
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 23
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - 'locked.txt": Permission denied'
+              - "(code 23)"
+          # The readable sibling is copied; the unreadable file does not appear
+          # as an empty or truncated stand-in at the destination.
+          changes:
+            created: [dst/ok.txt]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/locked.txt
+            exists: false
+
+  - name: "exit 25: --max-delete stops deleting at the limit and says how many it kept"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - fixture: {file: dst/a.txt, content: "alpha\n"}
+      - fixture: {file: dst/extra1, content: "x\n"}
+      - fixture: {file: dst/extra2, content: "x\n"}
+      - fixture: {file: dst/extra3, content: "x\n"}
+      - run:
+          command: rsync -a --delete --max-delete=1 src/ dst/
+      - assert:
+          exit_code: 25
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - "Deletions stopped due to --max-delete limit (2 skipped)"
+              - "(code 25)"
+      - assert:
+          # Exactly one of the three extraneous files is gone. Which one is an
+          # ordering detail, so the count is pinned instead of the name.
+          dir:
+            path: dst
+            count: 3
+            contains: [a.txt]
+
+  - name: listing a single source prints it and changes nothing
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # With no destination rsync behaves like ls: stdout is the listing, and
+      # the negative space is that no copy is written anywhere.
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - fixture: {file: src/sub/b.txt, content: "bravo\n"}
+      - run:
+          command: rsync src/
+      - assert:
+          exit_code: 0
+          stderr: {empty: true}
+          stdout:
+            matches: '(?m)^d[rwx-]{9} +[0-9,]+ [0-9/]+ [0-9:]+ \.$'
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          # The size column is the file's byte count, which the spec knows.
+          stdout:
+            matches: '(?m)^-[rwx-]{9} +6 [0-9/]+ [0-9:]+ a\.txt$'
+      - assert:
+          stdout:
+            matches: '(?m)^d[rwx-]{9} +[0-9,]+ [0-9/]+ [0-9:]+ sub$'
+      - assert:
+          # Listing is not recursive without -r.
+          stdout:
+            not_contains: "b.txt"

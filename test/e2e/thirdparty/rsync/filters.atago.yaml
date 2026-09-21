@@ -1,0 +1,263 @@
+version: "1"
+
+suite:
+  name: rsync (filter rules, file lists, and symlinks)
+  description: |
+    Filter rules are where rsync surprises people most, and a wrong rule does not
+    fail: it silently copies too much or too little. This suite fixes the rules
+    by the tree they produce, asserted with `dir:` and `changes:`, so a pattern
+    that matches one path more or fewer turns a scenario red.
+
+    It covers an unanchored pattern against an anchored one; the
+    include-directories-then-exclude-everything idiom and the empty directory
+    chains it leaves unless `--prune-empty-dirs` is given; excluded files at the
+    destination surviving `--delete` and going away with `--delete-excluded`;
+    rule files read with `--exclude-from`; an explicit `--files-from` list; and
+    the three ways rsync treats a symlink: kept as a link by `-a`, replaced by
+    its target's bytes by `-L`, and skipped with only a stdout notice and exit 0
+    by a bare `-r`.
+
+    All trees are written by the spec, so nothing from rsync is committed.
+
+# Gate: rsync 3.2.3 or later (see rsync.atago.yaml for why --mkpath is the
+# probe).
+scenarios:
+  - name: an unanchored pattern matches at any depth, an anchored one only at the root
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.log, content: "1\n"}
+      - fixture: {file: src/keep/b.log, content: "2\n"}
+      - fixture: {file: src/keep/c.txt, content: "3\n"}
+      - fixture: {file: src/cache/d.txt, content: "4\n"}
+      - fixture: {file: src/keep/cache/e.txt, content: "5\n"}
+      # The rules live in a file so no shell quoting stands between the spec
+      # and the pattern rsync sees.
+      - fixture:
+          file: rules
+          content: |
+            *.log
+            /cache/
+      - run:
+          command: rsync -a --exclude-from=rules src/ dst/
+      - assert:
+          exit_code: 0
+          # *.log goes at every depth; /cache/ only at the transfer root, so the
+          # nested keep/cache/ is copied.
+          changes:
+            created: [dst/keep/c.txt, dst/keep/cache/e.txt]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/cache
+            exists: false
+
+  - name: including directories then excluding everything else leaves empty chains
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/top.log, content: "1\n"}
+      - fixture: {file: src/a/b/deep.log, content: "2\n"}
+      - fixture: {file: src/a/b/deep.txt, content: "3\n"}
+      - fixture: {file: src/only_txt/x.txt, content: "4\n"}
+      - fixture:
+          file: rules
+          content: |
+            + */
+            + *.log
+            - *
+      - run:
+          command: rsync -a --filter=". rules" src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/top.log, dst/a/b/deep.log]
+            modified: []
+            deleted: []
+      - assert:
+          # The idiom copies every directory so it can look inside, so only_txt
+          # arrives as an empty directory.
+          dir:
+            path: dst/only_txt
+            count: 0
+
+  - name: --prune-empty-dirs drops the directory chains that end up empty
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # The metamorphic pair of the case above: the same rules plus -m give the
+      # same files and no empty directory.
+      - fixture: {file: src/top.log, content: "1\n"}
+      - fixture: {file: src/a/b/deep.log, content: "2\n"}
+      - fixture: {file: src/only_txt/nested/x.txt, content: "4\n"}
+      - fixture:
+          file: rules
+          content: |
+            + */
+            + *.log
+            - *
+      - run:
+          command: rsync -a -m --filter=". rules" src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/top.log, dst/a/b/deep.log]
+            modified: []
+            deleted: []
+      - assert:
+          dir:
+            path: dst
+            count: 2
+            contains: [top.log, a]
+      - assert:
+          file:
+            path: dst/only_txt
+            exists: false
+
+  - name: --delete spares excluded destination files; --delete-excluded removes them
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/app.conf, content: "conf\n"}
+      - fixture: {file: dst/app.conf, content: "conf\n"}
+      - fixture: {file: dst/local.secret, content: "do not lose me\n"}
+      - fixture: {file: dst/stray.txt, content: "stray\n"}
+      - run:
+          command: rsync -a --delete --exclude=*.secret src/ dst/
+      - assert:
+          exit_code: 0
+          # An exclude also protects the destination side: the stray file goes,
+          # the excluded one stays even though the source does not have it.
+          changes:
+            created: []
+            modified: []
+            deleted: [dst/stray.txt]
+      - assert:
+          file:
+            path: dst/local.secret
+            contains: "do not lose me"
+      - run:
+          command: rsync -a --delete --delete-excluded --exclude=*.secret src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: [dst/local.secret]
+
+  - name: --files-from copies exactly the listed paths and keeps their layout
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "a\n"}
+      - fixture: {file: src/b.txt, content: "b\n"}
+      - fixture: {file: src/sub/c.txt, content: "c\n"}
+      - fixture: {file: src/sub/d.txt, content: "d\n"}
+      - fixture:
+          file: list
+          content: |
+            a.txt
+            sub/c.txt
+      - run:
+          command: rsync -a --files-from=list src/ dst/
+      - assert:
+          exit_code: 0
+          # Listed paths only, relative to the source, with the implied sub/
+          # directory recreated; the unlisted siblings are not copied.
+          changes:
+            created: [dst/a.txt, dst/sub/c.txt]
+            modified: []
+            deleted: []
+
+  - name: "--files-from: a listed path that does not exist is exit 23"
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "a\n"}
+      - fixture:
+          file: list
+          content: |
+            a.txt
+            ghost.txt
+      - run:
+          command: rsync -a --files-from=list src/ dst/
+      - assert:
+          exit_code: 23
+          stdout: {empty: true}
+          stderr:
+            contains:
+              - 'ghost.txt" failed: No such file or directory'
+              - "(code 23)"
+          changes:
+            created: [dst/a.txt]
+            modified: []
+            deleted: []
+
+  - name: -a copies a symlink as a symlink
+    only:
+      command: rsync --mkpath --version
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/target.txt, content: "target bytes\n"}
+      - run:
+          command: ln -s target.txt src/link
+      - run:
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+      - run:
+          # The link keeps its relative target, not a resolved absolute path.
+          command: readlink dst/link
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "target.txt\n"
+
+  - name: -L replaces a symlink with its target's bytes
+    only:
+      command: rsync --mkpath --version
+    skip: {os: windows}
+    steps:
+      - fixture: {file: src/target.txt, content: "target bytes\n"}
+      - run:
+          command: ln -s target.txt src/link
+      - run:
+          command: rsync -rL src/ dst/
+      - assert:
+          exit_code: 0
+          file:
+            path: dst/link
+            equals_file: src/target.txt
+      - run:
+          command: test -L dst/link
+      - assert:
+          # A regular file now, not a link.
+          exit_code: 1
+
+  - name: -r without -l skips a symlink with a stdout notice and still exits 0
+    only:
+      command: rsync --mkpath --version
+    skip: {os: windows}
+    steps:
+      # A quiet data loss worth pinning as it is: the link is not copied, the
+      # notice goes to stdout rather than stderr, and the exit code is 0, so
+      # neither `2>log` nor `|| alert` catches it.
+      - fixture: {file: src/target.txt, content: "target bytes\n"}
+      - run:
+          command: ln -s target.txt src/link
+      - run:
+          command: rsync -r src/ dst/
+      - assert:
+          exit_code: 0
+          stdout:
+            equals: "skipping non-regular file \"link\"\n"
+          stderr: {empty: true}
+          changes:
+            created: [dst/target.txt]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/link
+            exists: false

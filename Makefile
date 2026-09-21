@@ -155,6 +155,7 @@ docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error ref
 	./dist/$(APP) doc --out doc/e2e/imagemagick.md ./test/e2e/thirdparty/imagemagick
 	./dist/$(APP) doc --out doc/e2e/zstd.md        ./test/e2e/thirdparty/zstd
 	./dist/$(APP) doc --out doc/e2e/unzip.md       ./test/e2e/thirdparty/unzip
+	./dist/$(APP) doc --out doc/e2e/rsync.md       ./test/e2e/thirdparty/rsync
 	./dist/$(APP) doc --out doc/e2e/ghostscript.md ./test/e2e/thirdparty/ghostscript
 	./dist/$(APP) doc --out doc/e2e/terraform.md   ./test/e2e/thirdparty/terraform
 	./dist/$(APP) doc --out doc/e2e/age.md         ./test/e2e/thirdparty/age

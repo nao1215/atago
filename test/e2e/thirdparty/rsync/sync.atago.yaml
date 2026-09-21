@@ -1,0 +1,354 @@
+version: "1"
+
+suite:
+  name: rsync (what a sync changes and what it leaves alone)
+  description: |
+    An rsync run is judged by the tree it leaves behind. This suite asserts that
+    tree with `changes:`, which is exhaustive in both directions, so a scenario
+    fails when rsync writes, rewrites, or deletes one path more or one path
+    fewer than the contract says.
+
+    The contracts covered are the ones a backup or deploy script leans on: the
+    trailing slash on the source decides whether the directory itself or only
+    its contents is copied; a second identical run is a no-op; `--dry-run`
+    reports the plan and changes nothing, and the real run then does exactly
+    that plan; `--delete` removes only what the source no longer has; the quick
+    check trusts size and modification time, so a same-size, same-time file with
+    different bytes is skipped unless `--checksum` is given; `--update`,
+    `--ignore-existing`, and `--backup` each protect a destination file in their
+    own way; `--remove-source-files` moves files but never directories; and the
+    bytes that arrive are the bytes that left, checked with `equals_file` for an
+    empty file, NUL bytes, CRLF without a final newline, and a file name with
+    spaces and non-ASCII characters.
+
+    All trees are written by the spec, so nothing from rsync is committed.
+
+# Gate: rsync 3.2.3 or later (see rsync.atago.yaml for why --mkpath is the
+# probe).
+scenarios:
+  - name: a trailing slash copies the contents, no slash copies the directory
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - fixture: {file: src/sub/b.txt, content: "bravo\n"}
+      - run:
+          command: rsync -a src dir_itself
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dir_itself/src/a.txt, dir_itself/src/sub/b.txt]
+            modified: []
+            deleted: []
+      - run:
+          command: rsync -a src/ contents_only
+      - assert:
+          exit_code: 0
+          changes:
+            created: [contents_only/a.txt, contents_only/sub/b.txt]
+            modified: []
+            deleted: []
+
+  - name: a second identical run is a no-op
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/a.txt, content: "alpha\n"}
+      - fixture: {file: src/sub/b.txt, content: "bravo\n"}
+      - run:
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+      - run:
+          command: rsync -a -i src/ dst/
+      - assert:
+          exit_code: 0
+          # -i prints one line per updated item; an empty report is rsync's own
+          # statement that there was nothing left to do.
+          stdout: {empty: true}
+          changes:
+            created: []
+            modified: []
+            deleted: []
+
+  - name: --dry-run reports the plan and changes nothing, then the real run does exactly that
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/new.txt, content: "new\n"}
+      - fixture: {file: src/same.txt, content: "same\n"}
+      - fixture: {file: dst/same.txt, content: "same\n"}
+      - fixture: {file: dst/stale.txt, content: "stale\n"}
+      # Give both copies of same.txt one mtime, so the quick check skips it and
+      # the plan is only the addition and the deletion.
+      - run:
+          command: touch -r src/same.txt dst/same.txt
+      - run:
+          command: rsync -a -i --delete --dry-run src/ dst/
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "*deleting   stale.txt"
+              - ">f+++++++++ new.txt"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          stdout:
+            not_contains: "same.txt"
+      - run:
+          command: rsync -a -i --delete src/ dst/
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - "*deleting   stale.txt"
+              - ">f+++++++++ new.txt"
+          # The real run does what the dry run announced and nothing else.
+          changes:
+            created: [dst/new.txt]
+            modified: []
+            deleted: [dst/stale.txt]
+
+  - name: --delete removes extraneous files and directories and nothing else
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/keep.txt, content: "keep\n"}
+      - fixture: {file: src/sub/keep.txt, content: "keep\n"}
+      - fixture: {file: dst/keep.txt, content: "keep\n"}
+      - fixture: {file: dst/sub/keep.txt, content: "keep\n"}
+      - fixture: {file: dst/sub/gone.txt, content: "gone\n"}
+      - fixture: {file: dst/olddir/deep/gone.txt, content: "gone\n"}
+      - run:
+          command: rsync -a --delete src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            deleted: [dst/sub/gone.txt, dst/olddir/deep/gone.txt]
+      - assert:
+          # The directory chain that held the extraneous file goes too.
+          file:
+            path: dst/olddir
+            exists: false
+
+  - name: without --delete an extraneous destination file survives
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # The negative space of the --delete case: the default never removes.
+      - fixture: {file: src/keep.txt, content: "keep\n"}
+      - fixture: {file: dst/extra.txt, content: "mine\n"}
+      - run:
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/keep.txt]
+            modified: []
+            deleted: []
+
+  - name: the quick check skips a same-size, same-mtime file that --checksum then fixes
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/f.txt, content: "AAAA\n"}
+      - fixture: {file: dst/f.txt, content: "BBBB\n"}
+      - run:
+          command: touch -r src/f.txt dst/f.txt
+      - run:
+          command: rsync -a -i src/ dst/
+      - assert:
+          exit_code: 0
+          # Size and mtime match, so rsync trusts the file without reading it:
+          # the stale bytes stay. This is documented behavior, not a bug, and
+          # the reason --checksum exists.
+          stdout:
+            not_contains: "f.txt"
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - run:
+          command: rsync -a -i -c src/ dst/
+      - assert:
+          exit_code: 0
+          # c in the checksum column: transferred because the content differs.
+          stdout:
+            contains: ">fc........ f.txt"
+          changes:
+            created: []
+            modified: [dst/f.txt]
+            deleted: []
+      - assert:
+          file:
+            path: dst/f.txt
+            equals_file: src/f.txt
+
+  - name: -a preserves the mtime, so the next run skips; -r alone does not
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/f.txt, content: "payload\n"}
+      # An mtime far in the past, so a copy stamped "now" can never tie with it.
+      - run:
+          command: touch -t 202001020304.05 src/f.txt
+      - run:
+          command: rsync -r src/ plain/
+      - run:
+          command: rsync -r -i src/ plain/
+      - assert:
+          exit_code: 0
+          # T: the time differs and will be set to the transfer time again.
+          stdout:
+            equals: ">f..T...... f.txt\n"
+      - run:
+          command: rsync -a src/ archived/
+      - run:
+          command: rsync -a -i src/ archived/
+      - assert:
+          exit_code: 0
+          stdout: {empty: true}
+      - run:
+          # Oracle outside rsync: find -newer compares the two mtimes directly.
+          command: find archived/f.txt plain/f.txt -newer src/f.txt
+      - assert:
+          stdout:
+            equals: "plain/f.txt\n"
+
+  - name: --update keeps a destination file that is newer than the source
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/f.txt, content: "old source\n"}
+      - fixture: {file: dst/f.txt, content: "newer edit\n"}
+      - run:
+          command: touch -t 202001020304.05 src/f.txt
+      - run:
+          command: rsync -a -u src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/f.txt
+            contains: "newer edit"
+      - run:
+          # Without -u the same command overwrites the newer file.
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: []
+            modified: [dst/f.txt]
+            deleted: []
+
+  - name: --ignore-existing adds new files and never touches existing ones
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/exists.txt, content: "from source\n"}
+      - fixture: {file: src/fresh.txt, content: "fresh\n"}
+      - fixture: {file: dst/exists.txt, content: "hand edited\n"}
+      - run:
+          command: rsync -a --ignore-existing src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/fresh.txt]
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/exists.txt
+            contains: "hand edited"
+
+  - name: --backup keeps the replaced destination file under the suffix
+    only:
+      command: rsync --mkpath --version
+    steps:
+      # Different sizes on purpose: with equal sizes and fixtures written in the
+      # same second, the quick check would skip the file and there would be
+      # nothing to back up.
+      - fixture: {file: src/f.txt, content: "version two, longer\n"}
+      - fixture: {file: dst/f.txt, content: "version one\n"}
+      - run:
+          command: rsync -a --backup --suffix=.bak src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/f.txt.bak]
+            modified: [dst/f.txt]
+            deleted: []
+      - assert:
+          file:
+            path: dst/f.txt.bak
+            contains: "version one"
+      - assert:
+          file:
+            path: dst/f.txt
+            equals_file: src/f.txt
+
+  - name: --remove-source-files moves the files and leaves the directories
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/one.txt, content: "1\n"}
+      - fixture: {file: src/sub/two.txt, content: "2\n"}
+      - run:
+          command: rsync -a --remove-source-files src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created: [dst/one.txt, dst/sub/two.txt]
+            modified: []
+            deleted: [src/one.txt, src/sub/two.txt]
+      - assert:
+          # "(non-dir)" in the help: the emptied source directory is kept.
+          dir:
+            path: src
+            count: 1
+            contains: [sub]
+
+  - name: awkward bytes and file names arrive unchanged
+    only:
+      command: rsync --mkpath --version
+    steps:
+      - fixture: {file: src/empty.bin, content: ""}
+      - fixture: {file: src/nul.bin, base64: "AAECAAP//wA="}
+      - fixture: {file: src/mixed.txt, content: "unix\nwindows\r\nno trailing newline"}
+      - fixture: {file: "src/with space/日本語 ファイル.txt", content: "名前\n"}
+      - run:
+          command: rsync -a src/ dst/
+      - assert:
+          exit_code: 0
+          changes:
+            created:
+              - dst/empty.bin
+              - dst/nul.bin
+              - dst/mixed.txt
+              - "dst/with space/日本語 ファイル.txt"
+            modified: []
+            deleted: []
+      - assert:
+          file:
+            path: dst/empty.bin
+            equals_file: src/empty.bin
+      - assert:
+          file:
+            path: dst/nul.bin
+            equals_file: src/nul.bin
+      - assert:
+          file:
+            path: dst/mixed.txt
+            equals_file: src/mixed.txt
+      - assert:
+          file:
+            path: "dst/with space/日本語 ファイル.txt"
+            equals_file: "src/with space/日本語 ファイル.txt"
