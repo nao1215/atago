@@ -31,6 +31,8 @@ func TestMain(m *testing.M) {
 		os.Exit(keysChild())
 	case "vtinput":
 		os.Exit(vtInputChild())
+	case "stdinprobe":
+		os.Exit(stdinProbeChild())
 	}
 	os.Exit(m.Run())
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -257,6 +258,17 @@ func TestRun_Windows_PasteKeepsAnEmoji(t *testing.T) {
 	})
 }
 
+// TestRun_Windows_KeysAfterATerminalProbe is the path a ratatui-image TUI
+// takes: it probes the terminal on stdin, then reads keys. The probe must end
+// on its status report, or its reader stays behind and takes the keys.
+func TestRun_Windows_KeysAfterATerminalProbe(t *testing.T) {
+	t.Parallel()
+	got := runInputChild(t, "stdinprobe", true, expect("ANSWER:.*\n"), key("esc"), expect("K:esc"), text("q"), expect("K:0071"))
+	if got != "esc 0071" {
+		t.Errorf("keys = %q, want %q", got, "esc 0071")
+	}
+}
+
 // TestRun_Windows_InputThroughTheInboxHost records, for comparison, what the
 // same sends look like behind the console host in Windows. It asserts nothing
 // that host does not already do.
@@ -277,4 +289,43 @@ func TestRun_Windows_InputThroughTheInboxHost(t *testing.T) {
 			t.Logf("in-box %s: %q %s", c.name, got, problem)
 		})
 	}
+}
+
+// stdinProbeChild asks what ratatui-image asks before a TUI starts reading
+// keys: the kitty graphics query, DA1, the cell size, and a status report
+// (DSR) that marks the end of the answers. It reads the answers the way Rust's
+// stdin does on a console, ReadConsoleW with echo, line and processed input
+// turned off but no VT input, and then carries on as keysChild.
+func stdinProbeChild() int {
+	in, out, err := childConsole()
+	if err != nil {
+		fmt.Printf("console: %v\r\n", err)
+		return 2
+	}
+	if err := windows.SetConsoleMode(in, windows.ENABLE_EXTENDED_FLAGS|windows.ENABLE_INSERT_MODE|windows.ENABLE_QUICK_EDIT_MODE); err != nil {
+		fmt.Printf("console mode: %v\r\n", err)
+		return 2
+	}
+	childWrite(out, "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c\x1b[16t\x1b[5n")
+	done := make(chan string, 1)
+	go func() {
+		var units []uint16
+		buf := make([]uint16, 50)
+		for !strings.HasSuffix(utf16Decode(units), "\x1b[0n") {
+			var n uint32
+			if err := windows.ReadConsole(in, &buf[0], uint32(len(buf)), &n, nil); err != nil {
+				break
+			}
+			units = append(units, buf[:n]...)
+		}
+		done <- utf16Decode(units)
+	}()
+	select {
+	case got := <-done:
+		childWrite(out, "ANSWER:"+strings.ReplaceAll(got, "\x1b", "E")+"\r\n")
+	case <-time.After(5 * time.Second):
+		childWrite(out, "ANSWER:TIMEOUT\r\n")
+		return 0
+	}
+	return keysChild()
 }
