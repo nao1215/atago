@@ -16,3 +16,5 @@
 *.ico -text
 *.bin -text
 *.pdf -text
+*.dll -text
+*.exe -text

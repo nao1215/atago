@@ -123,6 +123,7 @@ atago runs on Linux, macOS, and Windows, and CI tests all three: the unit suite 
 | `signal:` steps | delivers `TERM`, `INT`, `HUP`, `USR1`, `USR2`, `KILL` to the service's process group | not supported — Windows has no POSIX signals. Gate with `skip: {os: windows}` |
 | cancel / timeout teardown | kills the whole process group | kills the whole process tree (`taskkill /T`) |
 | `pty:` steps and `atago record --pty` | a real pty | a ConPTY, which needs Windows 10 version 1809 or later. `record --pty` cannot auto-detect a password prompt there, because a ConPTY exposes no echo state — convert a secret send to `${env:...}` by hand |
+| `pty: {graphics: kitty}` | the same pty | a ConPTY hosted by the Windows Terminal console host (OpenConsole, from Microsoft's MIT-licensed ConPTY package) instead of the one built into Windows, which drops the kitty graphics protocol on its way through. atago embeds it for amd64 and arm64 and writes it to `%LOCALAPPDATA%\atago` on first use; a build for any other architecture reports the step as unsupported on the platform |
 | `file: {executable: ...}` | the mode bits | the file extension against `PATHEXT`, which is what Windows uses to decide what it runs by name. There is no execute bit to read |
 | `fixture: {mode: ...}` | sets the permission bits | no effect — Windows has no POSIX permissions |
 | `fixture: {symlink: ...}` | always available | needs Developer Mode or an elevated process |

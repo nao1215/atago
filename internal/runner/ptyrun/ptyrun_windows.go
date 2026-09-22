@@ -4,7 +4,9 @@ package ptyrun
 
 import (
 	"context"
+	"errors"
 	"os/exec"
+	"runtime"
 	"strconv"
 
 	"github.com/nao1215/atago/internal/diag"
@@ -47,7 +49,18 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// env is whatever the engine resolved (clear_env/pass_env already applied):
 	// nil inherits the parent's environment; a non-nil slice starts the child
 	// from exactly that set.
-	cpty, err := conpty.Start(cmdLine, dir, env, rows, cols)
+	// The console host in Windows drops the kitty graphics protocol on its way
+	// through (#676), so a step that emulates a graphics terminal runs behind
+	// the Windows Terminal host atago bundles instead. Every other step keeps
+	// the in-box host.
+	start := conpty.Start
+	if p.KittyGraphics() {
+		start = conpty.StartOpenConsole
+	}
+	cpty, err := start(cmdLine, dir, env, rows, cols)
+	if errors.Is(err, conpty.ErrNoOpenConsole) {
+		return nil, nil, diag.UnsupportedOnPlatform.Errorf("pty `graphics: kitty` on Windows needs the Windows Terminal console host, which atago bundles only for amd64 and arm64, not %s (gate the scenario with `skip: {os: windows}`)", runtime.GOARCH)
+	}
 	if err != nil {
 		return nil, nil, diag.CommandNotStarted.Errorf("pty: start %q: %w", p.Command, err)
 	}

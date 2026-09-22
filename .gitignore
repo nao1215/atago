@@ -53,3 +53,7 @@ go.work.sum
 /website/public/
 /website/resources/
 /website/.hugo_build.lock
+
+# The Windows Terminal console host atago embeds for pty graphics on Windows.
+!internal/conpty/openconsole/*/conpty.dll
+!internal/conpty/openconsole/*/OpenConsole.exe
