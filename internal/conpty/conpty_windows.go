@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -38,6 +39,16 @@ type PseudoConsole struct {
 	pid       uint32
 	attrList  *windows.ProcThreadAttributeListContainer
 	closeOnce sync.Once
+	// ioMu guards closed and the start of every Read and Write, so no read
+	// or write begins once Close has set closed; io counts the ones already
+	// under way, which Close waits for before it closes the pipes. A handle
+	// closed under a reader between two ReadFile calls can be handed to
+	// another scenario's new handle at once, and the next ReadFile then
+	// fails with an unrelated error ("The parameter is incorrect") that
+	// reports a complete transcript as incomplete.
+	ioMu   sync.Mutex
+	closed bool
+	io     sync.WaitGroup
 	// win32Input is set behind the bundled console host, whose input parser
 	// needs replies sent as key presses (see EncodeReply).
 	win32Input bool
@@ -231,6 +242,10 @@ func start(api consoleAPI, flags uint32, commandLine, workDir string, env []stri
 //     caller can report the transcript as incomplete instead of silently
 //     truncating it.
 func (c *PseudoConsole) Read(p []byte) (int, error) {
+	if !c.beginIO() {
+		return 0, os.ErrClosed
+	}
+	defer c.io.Done()
 	var done uint32
 	if err := windows.ReadFile(c.outRead, p, &done, nil); err != nil {
 		return int(done), classifyReadError(err)
@@ -257,6 +272,10 @@ func classifyReadError(err error) error {
 
 // Write delivers a send to the child.
 func (c *PseudoConsole) Write(p []byte) (int, error) {
+	if !c.beginIO() {
+		return 0, os.ErrClosed
+	}
+	defer c.io.Done()
 	var done uint32
 	if err := windows.WriteFile(c.inWrite, p, &done, nil); err != nil {
 		return int(done), err
@@ -335,14 +354,48 @@ func (c *PseudoConsole) Pid() int { return int(c.pid) }
 // is nothing to cancel when no read is pending, which is the common case.
 func (c *PseudoConsole) Close() error {
 	c.closeOnce.Do(func() {
+		c.ioMu.Lock()
+		c.closed = true
+		c.ioMu.Unlock()
 		c.api.close(c.hpc)
-		_ = windows.CancelIoEx(c.outRead, nil)
+		idle := make(chan struct{})
+		go func() { c.io.Wait(); close(idle) }()
+		// Cancel until every read and write under way has returned: a cancel
+		// issued just before a reader enters ReadFile finds nothing to cancel.
+		deadline := time.After(closeWait)
+	wait:
+		for {
+			_ = windows.CancelIoEx(c.outRead, nil)
+			_ = windows.CancelIoEx(c.inWrite, nil)
+			select {
+			case <-idle:
+				break wait
+			case <-deadline:
+				break wait
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
 		closeHandles(c.inWrite, c.outRead, c.process)
 		if c.attrList != nil {
 			c.attrList.Delete()
 		}
 	})
 	return nil
+}
+
+// closeWait bounds how long Close waits for a read or write under way to
+// return before it closes the pipes anyway.
+const closeWait = 2 * time.Second
+
+// beginIO registers a read or write, or reports false once Close has begun.
+func (c *PseudoConsole) beginIO() bool {
+	c.ioMu.Lock()
+	defer c.ioMu.Unlock()
+	if c.closed {
+		return false
+	}
+	c.io.Add(1)
+	return true
 }
 
 // closeHandles best-effort closes each valid handle.

@@ -170,3 +170,15 @@ func TestClose_ReleasesAPendingRead(t *testing.T) {
 		}
 	}
 }
+
+// A read or write that begins after Close must not touch the closed pipes:
+// their handle values may already belong to another scenario's console.
+func TestReadAndWriteAfterClose_DoNotTouchTheHandles(t *testing.T) {
+	c := &PseudoConsole{closed: true, outRead: windows.InvalidHandle, inWrite: windows.InvalidHandle}
+	if _, err := c.Read(make([]byte, 8)); !errors.Is(err, os.ErrClosed) {
+		t.Errorf("Read after Close = %v, want os.ErrClosed", err)
+	}
+	if _, err := c.Write([]byte("x")); !errors.Is(err, os.ErrClosed) {
+		t.Errorf("Write after Close = %v, want os.ErrClosed", err)
+	}
+}
