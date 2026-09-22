@@ -580,7 +580,7 @@ func validateDuration(add addFunc, where string, d *spec.DurationAssert) {
 
 // validateMockAssert checks a `mock:` assertion (#24): a declared server
 // name (listed on a miss, mirroring the unknown-runner message), a sane
-// count, and well-formed header/body matchers. A nil mockNames (retry.until)
+// count, and well-formed header/query/body matchers. A nil mockNames (retry.until)
 // skips the declared-name check.
 func validateMockAssert(add addFunc, where string, m *spec.MockAssert, mockNames map[string]bool) {
 	switch {
@@ -597,12 +597,15 @@ func validateMockAssert(add addFunc, where string, m *spec.MockAssert, mockNames
 		if *m.Count < 0 {
 			add(diag.NegativeValue, "%s.count must be >= 0 (got %d)", where, *m.Count)
 		}
-		if *m.Count == 0 && (m.Header != nil || m.Body != nil) {
-			add(diag.ExclusiveKeys, "%s: count: 0 cannot be combined with header/body matchers (there is no request to match)", where)
+		if *m.Count == 0 && (m.Header != nil || m.Query != nil || m.Body != nil) {
+			add(diag.ExclusiveKeys, "%s: count: 0 cannot be combined with header/query/body matchers (there is no request to match)", where)
 		}
 	}
 	if m.Header != nil {
 		validateHeaderMatch(add, where+".header", m.Header)
+	}
+	if m.Query != nil {
+		validateHeaderMatch(add, where+".query", m.Query)
 	}
 	if m.Body != nil {
 		validateStream(add, where+".body", m.Body)

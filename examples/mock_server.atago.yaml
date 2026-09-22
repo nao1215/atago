@@ -9,7 +9,9 @@ version: "1"
 # sent: request count, and header/body matchers applied to the last matching
 # request. Response bodies come from `json:` (inline document), `body:`
 # (inline text), or `body_file:` (spec-relative file); `delay:` slows a route
-# down for retry testing.
+# down for retry testing. `json:` strings, `body:`, and header values take
+# ${name} expansion, so a response can link back to ${<name>.url} itself;
+# `body_file:` is served verbatim.
 #
 # The client here is stock curl; single-quoted shell args are POSIX, so these
 # scenarios skip on Windows (the engine itself is pure Go and cross-platform —

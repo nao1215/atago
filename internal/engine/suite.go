@@ -263,6 +263,7 @@ func (x *suiteStepper) execMockServer(ctx context.Context, step *spec.Step, sr *
 	x.rt.mocks = append(x.rt.mocks, ms)
 	x.rt.set(ms.Name()+".url", ms.URL())
 	x.rt.set(ms.Name()+".port", ms.Port())
+	ms.ExpandRoutes(x.rt.st.Expand)
 	return false
 }
 

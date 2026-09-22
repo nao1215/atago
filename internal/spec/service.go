@@ -90,6 +90,11 @@ type MockAssert struct {
 	Count *int `yaml:"count,omitempty"`
 	// Header matches a header of the last matching request.
 	Header *HeaderMatch `yaml:"header,omitempty"`
+	// Query matches one query-string parameter of the last matching request,
+	// by name, with the same matchers as Header. Routes match on the path
+	// alone, so this is where what the client asked FOR is checked: the search
+	// term, the page cursor, the filter.
+	Query *HeaderMatch `yaml:"query,omitempty"`
 	// Body matches the body of the last matching request with the stream
 	// matchers (json path, contains, ...).
 	Body *StreamAssert `yaml:"body,omitempty"`

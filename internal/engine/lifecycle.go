@@ -64,7 +64,7 @@ func (x *scenarioRun) checkEnvRefs() bool {
 
 // startMocks starts the scenario's mock servers (#24) before the leading
 // fixtures and services, so fixture contents and service commands/env can
-// reference ${<mock>.url}. Each binds an ephemeral loopback port and seeds
+// reference ${<mock>.url}, and so can the routes' own payloads. Each binds an ephemeral loopback port and seeds
 // ${<name>.url} / ${<name>.port} into the store; they stop LIFO with the
 // scenario. It reports false (after recording the error) if any fails to start.
 func (x *scenarioRun) startMocks(ctx context.Context) bool {
@@ -79,6 +79,11 @@ func (x *scenarioRun) startMocks(ctx context.Context) bool {
 		x.mocks = append(x.mocks, ms)
 		x.st.Set(ms.Name()+".url", ms.URL())
 		x.st.Set(ms.Name()+".port", ms.Port())
+	}
+	// Expand only once every server is listening, so a route can name any of
+	// the scenario's mocks, itself included.
+	for _, ms := range x.mocks {
+		ms.ExpandRoutes(x.st.Expand)
 	}
 	return true
 }

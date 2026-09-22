@@ -1248,6 +1248,9 @@ func TestBugHunt_Rejections(t *testing.T) {
 		{"mock count zero with matcher", mockScenario("assert: {mock: {name: api, count: 0, header: {name: X, equals: y}}}"), "count: 0 cannot be combined"},
 		{"mock header invalid", mockScenario("assert: {mock: {name: api, header: {name: X}}}"), "must set one of contains/equals/matches"},
 		{"mock body invalid", mockScenario("assert: {mock: {name: api, body: {}}}"), "must set at least one matcher"},
+		{"mock query invalid", mockScenario("assert: {mock: {name: api, query: {name: q}}}"), "assert.mock.query: must set one of contains/equals/matches"},
+		{"mock query name required", mockScenario("assert: {mock: {name: api, query: {equals: x}}}"), "mock.query.name is required"},
+		{"mock count zero with query", mockScenario("assert: {mock: {name: api, count: 0, query: {name: q, equals: y}}}"), "cannot be combined with header/query/body matchers"},
 
 		// ---- empty-matching regexps outside not_matches (#557) ----
 		{"count bound on an empty-matching pattern", specSteps("run: {command: echo}", "assert: {stdout: {matches: \"q*\", max_count: 0}}"), "matches the empty string"},

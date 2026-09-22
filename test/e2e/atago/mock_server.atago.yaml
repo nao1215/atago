@@ -52,6 +52,95 @@ scenarios:
             body:
               json: { path: "$.title", equals: "report" }
 
+  # A response that links back to the API — a next-page URL, an image, a
+  # download — names the mock's own address, which exists only once it listens.
+  - name: a route payload can name its own server
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/items
+            json:
+              items: [{ id: 1, thumb: "${api.url}/img/1.png" }]
+              next: "${api.url}/v1/items?page=2"
+          - method: GET
+            path: /v1/where
+            body: "moved to ${api.url}/v1/items"
+            header: { Location: "${api.url}/v1/items" }
+    steps:
+      - fixture:
+          file: client.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: client
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+            scenarios:
+              - name: follow the links
+                steps:
+                  - http: { runner: api, method: GET, path: /v1/items }
+                  - assert:
+                      status: 200
+                      body:
+                        json:
+                          - { path: "$.items[0].thumb", equals: "${api.url}/img/1.png" }
+                          - { path: "$.next", equals: "${api.url}/v1/items?page=2" }
+                          - { path: "$.items[0].id", equals: 1 }
+                  - http: { runner: api, method: GET, path: /v1/where }
+                  - assert:
+                      body: { equals: "moved to ${api.url}/v1/items" }
+                      header: { name: Location, equals: "${api.url}/v1/items" }
+      - run:
+          command: ${atago} run client.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
+  # Routes match on the path alone, so what the client asked FOR (a search
+  # term, a page size) is checked on the recorded request's query string.
+  - name: a query matcher checks the parameters the client sent
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/search
+            json: { hits: [] }
+    steps:
+      - fixture:
+          file: client.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: client
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+            scenarios:
+              - name: search
+                steps:
+                  - http: { runner: api, method: GET, path: "/v1/search?q=rust%20lang&limit=5" }
+                  - assert: { status: 200 }
+      - run:
+          command: ${atago} run client.atago.yaml
+      - assert:
+          exit_code: 0
+      - assert:
+          mock:
+            name: api
+            path: /v1/search
+            count: 1
+            query: { name: q, equals: "rust lang" }
+      - assert:
+          mock:
+            name: api
+            path: /v1/search
+            query: { name: limit, matches: "^[0-9]+$" }
+
   - name: a failing count summarizes the recorded requests
     mock_servers:
       - name: stub

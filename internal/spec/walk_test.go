@@ -57,7 +57,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		Screen:  &ScreenAssert{StreamAssert: StreamAssert{Contains: StringList{"${k}"}}},
 		Dir:     &DirAssert{Path: "${l}", Contains: []string{"${m}"}, NotContains: []string{"${n}"}, Glob: "${o}", Ignore: []string{"${p}"}},
 		PDF:     &PDFAssert{Path: "${q}", Metadata: map[string]string{"title": "${s}"}, Text: &StreamAssert{Contains: StringList{"${t}"}}},
-		Mock:    &MockAssert{Name: "api", Path: "${u}", Header: &HeaderMatch{Name: "Y", Contains: sp("${v}")}, Body: &StreamAssert{Contains: StringList{"${w}"}}},
+		Mock:    &MockAssert{Name: "api", Path: "${u}", Header: &HeaderMatch{Name: "Y", Contains: sp("${v}")}, Query: &HeaderMatch{Name: "q", Equals: sp("${y}")}, Body: &StreamAssert{Contains: StringList{"${w}"}}},
 		Changes: &ChangesAssert{Created: &StringList{"${x}"}, Modified: &emptyList},
 	}
 
@@ -69,7 +69,7 @@ func TestWalkAssertStrings_CollectAndExpand(t *testing.T) {
 		}
 		return s
 	})
-	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x"} {
+	for _, want := range []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y"} {
 		if !seen[want] {
 			t.Errorf("collect missed ${%s}; got %v", want, seen)
 		}
