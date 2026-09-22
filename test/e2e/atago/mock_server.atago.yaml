@@ -100,6 +100,47 @@ scenarios:
           stdout:
             contains: "1 passed"
 
+  # Routes match on the path alone, so what the client asked FOR (a search
+  # term, a page size) is checked on the recorded request's query string.
+  - name: a query matcher checks the parameters the client sent
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/search
+            json: { hits: [] }
+    steps:
+      - fixture:
+          file: client.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: client
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+            scenarios:
+              - name: search
+                steps:
+                  - http: { runner: api, method: GET, path: "/v1/search?q=rust%20lang&limit=5" }
+                  - assert: { status: 200 }
+      - run:
+          command: ${atago} run client.atago.yaml
+      - assert:
+          exit_code: 0
+      - assert:
+          mock:
+            name: api
+            path: /v1/search
+            count: 1
+            query: { name: q, equals: "rust lang" }
+      - assert:
+          mock:
+            name: api
+            path: /v1/search
+            query: { name: limit, matches: "^[0-9]+$" }
+
   - name: a failing count summarizes the recorded requests
     mock_servers:
       - name: stub

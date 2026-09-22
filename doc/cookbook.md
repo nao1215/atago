@@ -765,6 +765,10 @@ scenarios:
               json: { path: "$.title", equals: "report" }
 ```
 
+Routes match on the path alone. What the client asked for in the query string, such as a search
+term or a page cursor, is checked with `query:`, which takes the same matchers as `header:`:
+`query: { name: q, equals: "rust lang" }` (the value is compared decoded).
+
 The payloads a route answers with (`json:` strings, `body:`, header values) take `${name}`
 expansion once every mock is listening, so a response can link back to the stub itself: a
 next-page URL, a download, an image the client fetches next.

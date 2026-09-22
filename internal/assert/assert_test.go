@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/png"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1972,6 +1973,37 @@ func TestCheckMock_CountAndFilter(t *testing.T) {
 	}
 	if cr := checkMock(&spec.MockAssert{Name: "api", Path: "/zzz"}, env); cr.OK {
 		t.Error("no request for /zzz must fail")
+	}
+}
+
+// TestCheckMock_Query pins the query matcher: it reads one parameter of the
+// LAST matching request, and its failure names the parameter, not a header.
+func TestCheckMock_Query(t *testing.T) {
+	t.Parallel()
+	env := mockEnv(map[string][]mock.Record{"api": {
+		{Method: "GET", Path: "/search", Status: 200, Query: url.Values{"q": {"old"}}},
+		{Method: "GET", Path: "/search", Status: 200, Query: url.Values{"q": {"rust lang"}, "limit": {"30"}}},
+	}})
+	for _, tc := range []struct {
+		name string
+		q    spec.HeaderMatch
+		ok   bool
+	}{
+		{"equals decoded value", spec.HeaderMatch{Name: "q", Equals: strp("rust lang")}, true},
+		{"only the last request counts", spec.HeaderMatch{Name: "q", Equals: strp("old")}, false},
+		{"matches", spec.HeaderMatch{Name: "limit", Matches: strp(`^\d+$`)}, true},
+		{"missing parameter is empty", spec.HeaderMatch{Name: "cursor", Contains: strp("x")}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cr := checkMock(&spec.MockAssert{Name: "api", Path: "/search", Query: &tc.q}, env)
+			if cr.OK != tc.ok {
+				t.Fatalf("OK = %v, want %v: %+v", cr.OK, tc.ok, cr)
+			}
+			if !cr.OK && !strings.Contains(cr.Desc, "query parameter") {
+				t.Fatalf("Desc should name a query parameter: %q", cr.Desc)
+			}
+		})
 	}
 }
 

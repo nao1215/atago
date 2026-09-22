@@ -63,20 +63,25 @@ func checkMock(m *spec.MockAssert, env Env) *CheckResult {
 	return pass(desc + " received a matching request")
 }
 
-// checkMockRequestMatchers applies the header/body matchers to the LAST
+// checkMockRequestMatchers applies the header/query/body matchers to the LAST
 // matching recorded request. It returns nil when they hold (or none are set).
 func checkMockRequestMatchers(m *spec.MockAssert, desc string, matched []mock.Record, env Env) *CheckResult {
-	if m.Header == nil && m.Body == nil {
+	if m.Header == nil && m.Query == nil && m.Body == nil {
 		return nil
 	}
 	if len(matched) == 0 {
 		// Count: 0 with matchers is contradictory; the validator rejects it,
 		// but stay safe for direct API users.
-		return &CheckResult{Desc: desc, Hint: "header/body matchers need at least one matching request"}
+		return &CheckResult{Desc: desc, Hint: "header/query/body matchers need at least one matching request"}
 	}
 	last := matched[len(matched)-1]
 	if m.Header != nil {
 		if cr := checkHeaderValue(m.Header, last.Header.Get(m.Header.Name), "recorded request"); !cr.OK {
+			return cr
+		}
+	}
+	if m.Query != nil {
+		if cr := checkNamedValue(m.Query, last.Query.Get(m.Query.Name), "recorded request", "query parameter"); !cr.OK {
 			return cr
 		}
 	}

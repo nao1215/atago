@@ -113,8 +113,8 @@ func validateMockRoutes(add addFunc, where string, routes []spec.MockRoute) {
 			// Matching compares the request's path, which the server has already
 			// split from its query, so a declared query can never be part of a
 			// match. Serve on the path and assert the query with the mock
-			// target's own matchers instead.
-			add(diag.BadFormat, "%s.path %q must not contain a query string; matching ignores the query, so this route can never answer", rw, rt.Path)
+			// target's own `query:` matcher instead.
+			add(diag.BadFormat, "%s.path %q must not contain a query string; matching ignores the query, so this route can never answer (declare the path alone and check the parameters with an assert mock query)", rw, rt.Path)
 		}
 		if rt.Method != "" && rt.Path != "" {
 			key := strings.ToUpper(rt.Method) + " " + rt.Path

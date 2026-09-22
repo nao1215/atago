@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -30,6 +31,8 @@ const maxRecordedBody = 8 << 20 // 8 MiB
 type Record struct {
 	Method string
 	Path   string
+	// Query is the parsed query string; Path excludes it.
+	Query  url.Values
 	Header http.Header
 	Body   []byte
 	// Status is the response status the mock answered with (404 for an
@@ -134,7 +137,7 @@ func (s *Server) RequestLog() string {
 // an unmatched request answers 404 and is still recorded.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(io.LimitReader(r.Body, maxRecordedBody))
-	rec := Record{Method: r.Method, Path: r.URL.Path, Header: r.Header.Clone(), Body: body}
+	rec := Record{Method: r.Method, Path: r.URL.Path, Query: r.URL.Query(), Header: r.Header.Clone(), Body: body}
 
 	route := s.match(r.Method, r.URL.Path)
 	if route == nil {
