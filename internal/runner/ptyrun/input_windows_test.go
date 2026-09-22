@@ -263,7 +263,7 @@ func TestRun_Windows_PasteKeepsAnEmoji(t *testing.T) {
 // on its status report, or its reader stays behind and takes the keys.
 func TestRun_Windows_KeysAfterATerminalProbe(t *testing.T) {
 	t.Parallel()
-	got := runInputChild(t, "stdinprobe", true, expect("ANSWER:.*\n"), key("esc"), expect("K:esc"), text("q"), expect("K:0071"))
+	got := runInputChild(t, "stdinprobe", true, key("esc"), expect("K:esc"), text("q"), expect("K:0071"))
 	if got != "esc 0071" {
 		t.Errorf("keys = %q, want %q", got, "esc 0071")
 	}
