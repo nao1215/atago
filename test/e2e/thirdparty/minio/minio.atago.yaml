@@ -33,6 +33,14 @@ runners:
     type: http
     base_url: http://127.0.0.1:18121
     timeout: 10s
+  s3_lifecycle:
+    type: http
+    base_url: http://127.0.0.1:18122
+    timeout: 10s
+  s3_versioned:
+    type: http
+    base_url: http://127.0.0.1:18123
+    timeout: 10s
   s3_public:
     type: http
     base_url: http://127.0.0.1:18124
@@ -106,6 +114,21 @@ scenarios:
           port: 127.0.0.1:18122
           timeout: 30s
     steps:
+      # An open port is not a ready server: /minio/health/live and /ready answer
+      # 200 before the object layer, bucket metadata and IAM are initialized,
+      # and a bucket policy written in that window can be lost when bucket
+      # metadata loads. /minio/health/cluster stays 503 until all three are up.
+      - http:
+          runner: s3_lifecycle
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - run:
           command: mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key
       - assert:
@@ -171,10 +194,25 @@ scenarios:
           port: 127.0.0.1:18123
           timeout: 30s
     steps:
+      - http:
+          runner: s3_versioned
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - run:
           command: mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key
+      - assert:
+          exit_code: 0
       - run:
           command: mc mb versioned/versioned
+      - assert:
+          exit_code: 0
       - run:
           command: mc version enable versioned/versioned
       - assert:
@@ -198,15 +236,32 @@ scenarios:
           port: 127.0.0.1:18124
           timeout: 30s
     steps:
+      - http:
+          runner: s3_public
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - run:
           command: mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
+      - assert:
+          exit_code: 0
       - run:
           command: mc mb publichost/public-bucket
+      - assert:
+          exit_code: 0
       - fixture:
           file: page.txt
           content: "published via bucket policy"
       - run:
           command: mc cp page.txt publichost/public-bucket/
+      - assert:
+          exit_code: 0
       # Before the policy: anonymous reads are denied.
       - http:
           runner: s3_public

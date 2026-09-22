@@ -36,10 +36,17 @@ scenarios:
           session:
             - expect: "a.txt"
             - send: "j"
-            - expect: "b.txt"
+            - expect_screen:
+                contains: "2/2"
+                stable_for: 100ms
             - send: {key: space}
+            - expect_screen:
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
             - send: "k"
-            - expect: "a.txt"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b.txt"}}
 
@@ -60,10 +67,17 @@ scenarios:
           session:
             - expect: "a-dir"
             - send: "j"
-            - expect: "b-dir"
+            - expect_screen:
+                contains: "2/2"
+                stable_for: 100ms
             - send: {key: space}
+            - expect_screen:
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
             - send: "k"
-            - expect: "a-dir"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b-dir"}}
 
@@ -84,10 +98,17 @@ scenarios:
           session:
             - expect: "a one"
             - send: "j"
-            - expect: "b two"
+            - expect_screen:
+                contains: "2/2"
+                stable_for: 100ms
             - send: {key: space}
+            - expect_screen:
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
             - send: "k"
-            - expect: "a one"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b two"}}
 
@@ -286,11 +307,22 @@ scenarios:
           session:
             - expect: "a-dir"
             - send: {key: space}
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
+            - send: "k"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: space}
-            - send: "j"
-            - expect: "b-dir"
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]*$'
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b-dir"}}
+      - assert: {file: {path: chosen.txt, not_contains: "/a-dir"}}
 
   - name: toggling the same spaced directory twice removes the explicit selection
     only: {command: yazi --version}
@@ -309,11 +341,22 @@ scenarios:
           session:
             - expect: "a one"
             - send: {key: space}
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
+            - send: "k"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: space}
-            - send: "j"
-            - expect: "b two"
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]*$'
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b two"}}
+      - assert: {file: {path: chosen.txt, not_contains: "/a one"}}
 
   - name: ctrl-a then esc on files restores enter to the hovered file
     only: {command: yazi --version}

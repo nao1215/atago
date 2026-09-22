@@ -508,6 +508,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b-dir`
+- file `chosen.txt` does not contain `/a-dir`
 
 ### Scenario: toggling the same spaced directory twice removes the explicit selection
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -532,6 +533,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b two`
+- file `chosen.txt` does not contain `/a one`
 
 ### Scenario: ctrl-a then esc on files restores enter to the hovered file
 _only when `yazi --version` succeeds · skipped on Windows_
@@ -3029,6 +3031,7 @@ b
 ```
 #### Then
 - file `chosen.txt` contains `/b.txt`
+- file `chosen.txt` does not contain `/a.txt`
 
 ### Scenario: inverse selection flips one picked file into the other two
 _only when `yazi --version` succeeds · skipped on Windows_

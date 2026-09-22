@@ -1746,20 +1746,38 @@ scenarios:
           sandbox_home: true
           session:
             - expect: "a-dir"
+            - expect_screen:
+                contains: ["a.txt", "1/2"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "a.txt"
+            - expect_screen:
+                contains: "1/1"
+                matches: '\A\S+/a-dir\s'
+                stable_for: 100ms
             - send: "tt"
-            - expect: "a.txt"
+            - expect_screen:
+                contains: "2 a-dir"
+                stable_for: 100ms
             - send: "h"
-            - expect: "z-dir"
+            - expect_screen:
+                contains: ["1 a-dir", "1/2"]
+                stable_for: 100ms
             - send: "j"
-            - expect: "z-dir"
+            - expect_screen:
+                contains: ["z.txt", "2/2"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "z.txt"
+            - expect_screen:
+                contains: ["2 z-dir", "1/1"]
+                stable_for: 100ms
             - send: "["
-            - expect: "a-dir"
+            - expect_screen:
+                matches: '\A\S+/a-dir\s'
+                stable_for: 100ms
             - send: "]"
-            - expect: "z-dir"
+            - expect_screen:
+                matches: '\A\S+/z-dir\s'
+                stable_for: 100ms
             - send: "q"
       - assert:
           exit_code: 0
@@ -2080,17 +2098,32 @@ scenarios:
           session:
             - expect: "dst"
             - send: "j"
-            - expect: "src"
+            - expect_screen:
+                contains: ["2/2", "sub"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "sub"
+            - expect_screen:
+                contains: "1/1"
+                matches: '(?m)\A\S+/src[ \t]*$'
+                stable_for: 100ms
             - send: "y"
             - send: "h"
-            - expect: "src"
+            - expect_screen:
+                contains: "2/2"
+                stable_for: 100ms
             - send: "k"
-            - expect: "dst"
+            - expect_screen:
+                contains: ["1/2", "No items"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "No items"
+            - expect_screen:
+                contains: "0/0"
+                matches: '\A\S+/dst\s'
+                stable_for: 100ms
             - send: "_"
+            - expect_screen:
+                contains: ["sub", "1/1"]
+                stable_for: 100ms
             - send: "Q"
       - run:
           command: readlink dst/sub
@@ -2274,14 +2307,28 @@ scenarios:
           session:
             - expect: "a.txt"
             - send: {key: space}
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
+                stable_for: 100ms
+            - send: "k"
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: {key: space}
-            - send: "j"
-            - expect: "b.txt"
+            - expect_screen:
+                contains: "2/2"
+                matches: '(?m)\A\S+[ \t]*$'
+                stable_for: 100ms
             - send: {key: enter}
       - assert:
           file:
             path: chosen.txt
             contains: "/b.txt"
+      - assert:
+          file:
+            path: chosen.txt
+            not_contains: "/a.txt"
 
   - name: inverse selection flips one picked file into the other two
     only:
@@ -2344,16 +2391,30 @@ scenarios:
           sandbox_home: true
           session:
             - expect: "one"
+            - expect_screen:
+                contains: ["a.txt", "1/2"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "a.txt"
+            - expect_screen:
+                contains: "1/1"
+                matches: '\A\S+/one\s'
+                stable_for: 100ms
             - send: "tt"
-            - expect: "a.txt"
+            - expect_screen:
+                contains: "2 one"
+                stable_for: 100ms
             - send: "h"
-            - expect: "one"
+            - expect_screen:
+                contains: ["1 one", "1/2"]
+                stable_for: 100ms
             - send: "j"
-            - expect: "two"
+            - expect_screen:
+                contains: ["b.txt", "2/2"]
+                stable_for: 100ms
             - send: "l"
-            - expect: "b.txt"
+            - expect_screen:
+                contains: ["2 two", "1/1"]
+                stable_for: 100ms
             - send: "1"
             - expect_screen:
                 contains: "a.txt"

@@ -23,6 +23,28 @@ suite:
 # .github/workflows/thirdparty.yml for the pinned server version and the CI
 # client-install path. Gate: only runs where the aws CLI is installed.
 
+permissions:
+  network:
+    allow: [127.0.0.1]
+
+runners:
+  s3_0:
+    type: http
+    base_url: http://127.0.0.1:18530
+    timeout: 10s
+  s3_1:
+    type: http
+    base_url: http://127.0.0.1:18531
+    timeout: 10s
+  s3_2:
+    type: http
+    base_url: http://127.0.0.1:18532
+    timeout: 10s
+  s3_3:
+    type: http
+    base_url: http://127.0.0.1:18533
+    timeout: 10s
+
 secrets:
   - AWS_SECRET_ACCESS_KEY
 
@@ -50,6 +72,21 @@ scenarios:
           port: 127.0.0.1:18530
           timeout: 30s
     steps:
+      # An open port is not a ready server: /minio/health/live and /ready answer
+      # 200 before the object layer, bucket metadata and IAM are initialized,
+      # and a bucket policy written in that window can be lost when bucket
+      # metadata loads. /minio/health/cluster stays 503 until all three are up.
+      - http:
+          runner: s3_0
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - fixture:
           file: payload.txt
           content: "hello from atago via the aws cli\n"
@@ -98,6 +135,17 @@ scenarios:
           port: 127.0.0.1:18531
           timeout: 30s
     steps:
+      - http:
+          runner: s3_1
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - fixture:
           file: obj.txt
           content: "twelve bytes"
@@ -142,6 +190,17 @@ scenarios:
           port: 127.0.0.1:18532
           timeout: 30s
     steps:
+      - http:
+          runner: s3_2
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - fixture:
           file: signed.txt
           content: "presigned body content"
@@ -180,6 +239,17 @@ scenarios:
           port: 127.0.0.1:18533
           timeout: 30s
     steps:
+      - http:
+          runner: s3_3
+          method: GET
+          path: /minio/health/cluster
+          retry:
+            times: 120
+            interval: 250ms
+            until:
+              status: 200
+      - assert:
+          status: 200
       - run:
           command: aws --endpoint-url http://127.0.0.1:18533 s3 mb s3://errbucket
       - assert:
