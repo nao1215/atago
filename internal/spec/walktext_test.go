@@ -33,6 +33,7 @@ var literalAssertFields = map[string]string{
 	"dir.snapshot":       "same as file.snapshot",
 	"mock.method":        "an HTTP method, matched case-insensitively against what the client sent",
 	"mock.header.name":   "a protocol header name, as in header.name",
+	"mock.query.name":    "a query parameter name, a protocol name like mock.header.name",
 	"duration.lt":        "a Go duration the loader parses at load time, before any variable exists",
 	"duration.lte":       "a Go duration the loader parses at load time, before any variable exists",
 	"duration.gt":        "a Go duration the loader parses at load time, before any variable exists",

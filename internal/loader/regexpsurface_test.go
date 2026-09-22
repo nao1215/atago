@@ -75,8 +75,8 @@ var regexpSurfaces = map[string]regexpSurface{
 		field:  "assert matches under a count bound at check time",
 		reason: "validated at load by validateStreamCount, which refuses an empty-matching pattern there",
 	},
-	"assert.checkHeaderValue": {
-		field:  "assert header matches at check time",
+	"assert.checkNamedValue": {
+		field:  "assert header / mock query matches at check time",
 		reason: "validated at load by validateRegexp",
 	},
 	"assert.jsonMatches": {

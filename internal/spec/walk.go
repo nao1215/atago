@@ -275,6 +275,7 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 		// spec, checked against the declared set at load time.
 		mc.Path = visit(a.Mock.Path)
 		mc.Header = walkHeaderMatch(a.Mock.Header, visit)
+		mc.Query = walkHeaderMatch(a.Mock.Query, visit)
 		mc.Body = walkStream(a.Mock.Body, visit)
 		c.Mock = &mc
 	}

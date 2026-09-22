@@ -183,6 +183,7 @@
   "mockAssert.method": "v0.3.0",
   "mockAssert.name": "v0.3.0",
   "mockAssert.path": "v0.3.0",
+  "mockAssert.query": "unreleased",
   "mockRoute.body": "v0.3.0",
   "mockRoute.body_file": "v0.3.0",
   "mockRoute.delay": "v0.3.0",

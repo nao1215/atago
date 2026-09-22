@@ -103,7 +103,7 @@ func TestKittyGraphics_ChunkedTransferAcrossReads(t *testing.T) {
 	if imgs := decodeRecorded(t, g); len(imgs) != 1 {
 		t.Fatalf("recorded %d images, want 1", len(imgs))
 	}
-	// The reply is keyed by the first chunk's id and honours the last
+	// The reply is keyed by the first chunk's id and honors the last
 	// chunk-independent keys of that first chunk (no q there), so it is sent.
 	if got := string(bytes.Join(g.takeReplies(), nil)); got != "\x1b_Gi=7;OK\x1b\\" {
 		t.Fatalf("replies = %q", got)
