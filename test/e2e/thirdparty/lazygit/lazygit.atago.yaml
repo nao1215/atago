@@ -662,7 +662,13 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "Local branches"
+            # The branches panel title is drawn before its rows load ("No branches
+            # for this repo"); a key sent in that window hits an empty list and is
+            # dropped as "No item selected". Wait for the rows.
+            - expect_screen:
+                contains: ["Local branches"]
+                not_contains: ["No branches for this repo"]
+                stable_for: 100ms
             - send: "n"
             - expect: "New branch name"
             - send: "feature-one"
@@ -708,7 +714,13 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "Local branches"
+            # The branches panel title is drawn before its rows load ("No branches
+            # for this repo"); a key sent in that window hits an empty list and is
+            # dropped as "No item selected". Wait for the rows.
+            - expect_screen:
+                contains: ["Local branches"]
+                not_contains: ["No branches for this repo"]
+                stable_for: 100ms
             - send: "n"
             - expect: "New branch name"
             - send: "feature/two"
@@ -754,7 +766,13 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "Local branches"
+            # The branches panel title is drawn before its rows load ("No branches
+            # for this repo"); a key sent in that window hits an empty list and is
+            # dropped as "No item selected". Wait for the rows.
+            - expect_screen:
+                contains: ["Local branches"]
+                not_contains: ["No branches for this repo"]
+                stable_for: 100ms
             - send: "n"
             - expect: "New branch name"
             - send: {key: esc}
@@ -804,7 +822,13 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "master"
+            # The branches panel title is drawn before its rows load ("No branches
+            # for this repo"); a key sent in that window hits an empty list and is
+            # dropped as "No item selected". Wait for the rows.
+            - expect_screen:
+                contains: ["Local branches"]
+                not_contains: ["No branches for this repo"]
+                stable_for: 100ms
             - send: {key: down}
             - expect: "feature-one"
             - send: " "
