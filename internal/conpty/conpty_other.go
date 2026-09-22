@@ -35,6 +35,9 @@ func StartOpenConsole(string, string, []string, int, int) (*PseudoConsole, error
 // EncodeReply returns p unchanged off Windows.
 func (c *PseudoConsole) EncodeReply(p []byte) []byte { return p }
 
+// EncodeInput returns p unchanged off Windows.
+func (c *PseudoConsole) EncodeInput(p []byte) []byte { return p }
+
 // Read is unsupported off Windows.
 func (c *PseudoConsole) Read([]byte) (int, error) { return 0, errUnsupported }
 

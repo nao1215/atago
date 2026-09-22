@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"sync"
@@ -38,6 +39,11 @@ type transcriptDrain struct {
 	// graphics records the images a `graphics: kitty` session draws; nil
 	// otherwise.
 	graphics *kittyGraphics
+	// encodeInput, when set, rewrites what a send types before it is written
+	// (#678): the Windows console host that forwards graphics parses raw input
+	// as a terminal's, holding a lone ESC and dropping characters outside the
+	// BMP, so there a send goes out as key presses.
+	encodeInput func([]byte) []byte
 }
 
 func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
@@ -51,6 +57,9 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 	queries := newTerminalQueries(p, writerFunc(t.write))
 	if e, ok := rw.(replyEncoder); ok {
 		queries.encodeGraphicsReply = e.EncodeReply
+	}
+	if e, ok := rw.(inputEncoder); ok {
+		t.encodeInput = e.EncodeInput
 	}
 	t.graphics = queries.graphics
 	var modeScan decsetScanner
@@ -123,6 +132,28 @@ func (t *transcriptDrain) write(b []byte) (int, error) {
 	t.writeMu.Lock()
 	defer t.writeMu.Unlock()
 	return t.rw.Write(b)
+}
+
+// inputEncoder is implemented by a terminal whose host needs typed input
+// rewritten to reach the program the way a terminal's keys do (the Windows
+// pseudo console).
+type inputEncoder interface {
+	EncodeInput(p []byte) []byte
+}
+
+// typeInput writes a send's bytes the way the terminal's host needs them.
+// times > 1 repeats one key: each repeat is encoded on its own, so pressing Esc
+// three times is three Esc presses rather than one sequence of three ESC bytes,
+// and all of them still go out in one write, as a held key does.
+func (t *transcriptDrain) typeInput(b []byte, times int) error {
+	if t.encodeInput != nil {
+		b = t.encodeInput(b)
+	}
+	if times > 1 {
+		b = bytes.Repeat(b, times)
+	}
+	_, err := t.write(b)
+	return err
 }
 
 func (t *transcriptDrain) snapshot() []byte {

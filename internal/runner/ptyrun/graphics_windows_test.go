@@ -27,6 +27,12 @@ func TestMain(m *testing.M) {
 		os.Exit(graphicsProbeChild())
 	case "image":
 		os.Exit(graphicsImageChild())
+	case "keys":
+		os.Exit(keysChild())
+	case "vtinput":
+		os.Exit(vtInputChild())
+	case "stdinprobe":
+		os.Exit(stdinProbeChild())
 	}
 	os.Exit(m.Run())
 }
