@@ -9,7 +9,7 @@ import (
 )
 
 func TestDA1Scanner_AcrossChunks(t *testing.T) {
-	var s da1Scanner
+	var s probeScanner
 	if got := len(s.consume([]byte("\x1b["))); got != 0 {
 		t.Fatalf("first chunk matches = %d, want 0", got)
 	}
@@ -22,7 +22,7 @@ func TestDA1Scanner_AcrossChunks(t *testing.T) {
 }
 
 func TestDA1Scanner_DECID(t *testing.T) {
-	var s da1Scanner
+	var s probeScanner
 	if got := len(s.consume([]byte("\x1bZ"))); got != 1 {
 		t.Fatalf("DECID matches = %d, want 1", got)
 	}
@@ -103,5 +103,57 @@ func TestTerminalQueries_AbortedStringStillAnswersCPR(t *testing.T) {
 
 	if got := out.String(); !strings.HasSuffix(got, "R") {
 		t.Fatalf("no cursor-position reply after an aborted string sequence: %q", got)
+	}
+}
+
+// TestTerminalQueries_RepliesFollowRequestOrder pins that an answer written by
+// atago (DA1) is not overtaken by one the emulator writes (DSR) for a probe
+// asked after it. Programs read up to the DSR reply as their end-of-answers
+// marker, so an overtaken reply is a reply they never see.
+func TestTerminalQueries_RepliesFollowRequestOrder(t *testing.T) {
+	var out bytes.Buffer
+	q := newTerminalQueries(&spec.PTY{Rows: 10, Cols: 40}, &out)
+
+	q.consume([]byte("\x1b[c\x1b[5n"))
+
+	if got, want := out.String(), vt102DA1+"\x1b[0n"; got != want {
+		t.Fatalf("replies = %q, want %q", got, want)
+	}
+}
+
+func TestTerminalQueries_CellSizeOnlyWithGraphics(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		graphics string
+		want     string
+	}{
+		{"", "\x1b[0n"},
+		{spec.PTYGraphicsKitty, "\x1b[6;20;10t\x1b[0n"},
+	} {
+		var out bytes.Buffer
+		q := newTerminalQueries(&spec.PTY{Rows: 10, Cols: 40, Graphics: tc.graphics}, &out)
+		q.consume([]byte("\x1b[16t\x1b[5n"))
+		if got := out.String(); got != tc.want {
+			t.Errorf("graphics %q: replies = %q, want %q", tc.graphics, got, tc.want)
+		}
+	}
+}
+
+// TestTerminalQueries_KittyQueryInOrder is the startup probe ratatui-image and
+// similar libraries send: graphics query, DA1, cell size, then DSR as the end
+// marker. Every answer must precede the DSR reply.
+func TestTerminalQueries_KittyQueryInOrder(t *testing.T) {
+	var out bytes.Buffer
+	q := newTerminalQueries(&spec.PTY{Rows: 10, Cols: 40, Graphics: spec.PTYGraphicsKitty}, &out)
+
+	probe := "\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c\x1b[16t\x1b[5n"
+	// Byte-at-a-time delivery is the worst case for a stateful scanner.
+	for i := range len(probe) {
+		q.consume([]byte{probe[i]})
+	}
+
+	want := "\x1b_Gi=31;OK\x1b\\" + vt102DA1 + "\x1b[6;20;10t" + "\x1b[0n"
+	if got := out.String(); got != want {
+		t.Fatalf("replies = %q, want %q", got, want)
 	}
 }

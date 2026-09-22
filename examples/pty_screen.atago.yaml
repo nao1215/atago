@@ -76,3 +76,25 @@ scenarios:
       - assert:
           screen:
             snapshot: snapshots/menu_screen.txt
+
+  # `graphics: kitty` makes the pty answer like a terminal that draws images
+  # (the kitty graphics protocol), and records every image the program sends.
+  # `screen.images` asserts them: how many, and which, by size or pixels. The
+  # program here sends one 1x1 red pixel as raw RGBA (f=32, s=1, v=1).
+  - name: an image-drawing program sees a kitty terminal
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          graphics: kitty
+          command: "printf '\\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\\033\\\\'; printf 'caption\\r\\n'"
+          rows: 10
+          cols: 40
+      - assert:
+          screen:
+            contains: caption
+            images:
+              count: 1
+              contains:
+                - { width: 1, height: 1, alpha: false }

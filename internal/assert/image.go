@@ -48,6 +48,14 @@ func checkImage(im *spec.ImageAssert, env Env) *CheckResult {
 		}
 	}
 
+	return checkImageData(im, data, env)
+}
+
+// checkImageData evaluates an image assertion against already-read image bytes;
+// im.Path only names the image in messages. It is shared by the file-based
+// `image:` target and `screen.images`, so a drawn image meets exactly the
+// constraints a file would.
+func checkImageData(im *spec.ImageAssert, data []byte, env Env) *CheckResult {
 	// Every constraint that is set must hold (conjunctive), so each check returns
 	// only on failure and the assertion passes only if all of them pass.
 	if im.Format != "" {

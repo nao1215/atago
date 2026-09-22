@@ -35,6 +35,9 @@ type transcriptDrain struct {
 	// effect (#379), so the replay that renders the screen applies the same
 	// sizes at the same points the live terminal did.
 	resizes []screenResize
+	// graphics records the images a `graphics: kitty` session draws; nil
+	// otherwise.
+	graphics *kittyGraphics
 }
 
 func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
@@ -46,6 +49,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		modes:     map[int]bool{},
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
+	t.graphics = queries.graphics
 	var modeScan decsetScanner
 	// reading is closed by the reader goroutine when it has nothing left to do
 	// but read, and startTranscriptDrain waits for it. What that buys is modest

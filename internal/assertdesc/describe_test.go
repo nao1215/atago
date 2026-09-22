@@ -384,3 +384,35 @@ func TestDescribeFile_SizeBoundsCompose(t *testing.T) {
 func ip(n int) *int       { return &n }
 func sp(s string) *string { return &s }
 func i64p(n int64) *int64 { return &n }
+
+// TestDescribeScreen_Images pins the plain phrase for `screen.images`, alone
+// and composed with a text matcher, as explain and the report print it.
+func TestDescribeScreen_Images(t *testing.T) {
+	t.Parallel()
+	one, w, h := 1, 40, 20
+	opaque := false
+	tests := []struct {
+		name string
+		s    *spec.ScreenAssert
+		want string
+	}{
+		{"count alone", &spec.ScreenAssert{Images: &spec.ScreenImages{Count: &one}}, "draws exactly 1 image(s)"},
+		{"min count and an entry", &spec.ScreenAssert{Images: &spec.ScreenImages{
+			MinCount: &one,
+			Contains: []spec.ScreenImage{{Width: &w, MaxHeight: &h, Alpha: &opaque, SimilarTo: "a.png"}},
+		}}, "draws at least 1 image(s) and an image width 40px, height <= 20px, without transparency, like a.png"},
+		{"with text", &spec.ScreenAssert{
+			StreamAssert: spec.StreamAssert{Contains: spec.StringList{"caption"}},
+			Images:       &spec.ScreenImages{Count: &one},
+		}, `contains "caption" and draws exactly 1 image(s)`},
+		{"nil", nil, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := DescribeScreen(tt.s); got != tt.want {
+				t.Errorf("DescribeScreen() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

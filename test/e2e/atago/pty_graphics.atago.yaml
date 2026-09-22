@@ -1,0 +1,222 @@
+# pty `graphics: kitty` and `screen.images`: a pty that answers like a terminal
+# with the kitty graphics protocol, and assertions over the images a program
+# draws on it. POSIX-only (the helper programs are sh + stty + dd); every
+# scenario here skips on Windows.
+#
+# The probe scenarios read the terminal's answers back and print them with ESC
+# shown as "E", so the screen spells out exactly what the terminal replied,
+# and in which order.
+version: "1"
+
+suite:
+  name: atago self-hosting / pty graphics
+
+scenarios:
+  - name: a kitty terminal acknowledges the graphics query and reports its cell size
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          graphics: kitty
+          command: >-
+            stty raw -echo;
+            printf '\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[c';
+            r=$(dd bs=1 count=27 2>/dev/null);
+            stty sane;
+            printf '%s\n' "$r" | tr '\033' E
+          timeout: 10s
+      - assert:
+          exit_code: 0
+          # Order is part of the contract: the answers come back in the order
+          # the probes were sent, graphics reply first and DA1 last.
+          screen:
+            equals: 'E_Gi=31;OKE\E[6;20;10tE[?6c'
+
+  - name: without graphics the terminal answers only DA1
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: >-
+            stty raw -echo;
+            printf '\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[c';
+            r=$(dd bs=1 count=5 2>/dev/null);
+            stty sane;
+            printf '%s\n' "$r" | tr '\033' E
+          timeout: 10s
+      - assert:
+          exit_code: 0
+          # The first five bytes back are the DA1 reply: nothing answered the
+          # graphics or cell-size query, which is how a program learns that
+          # this terminal cannot draw images.
+          screen:
+            equals: 'E[?6c'
+
+  - name: a status report does not overtake an earlier device-attributes reply
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: >-
+            stty raw -echo;
+            printf '\033[c\033[5n';
+            r=$(dd bs=1 count=9 2>/dev/null);
+            stty sane;
+            printf '%s\n' "$r" | tr '\033' E
+          timeout: 10s
+      - assert:
+          exit_code: 0
+          # Programs read up to the DSR reply as their end-of-answers marker, so
+          # a DA1 reply sent after it is never seen.
+          screen:
+            equals: 'E[?6cE[0n'
+
+  - name: drawn images are recorded whether sent as PNG or as chunked raw pixels
+    skip:
+      os: windows
+    steps:
+      # The same 4x2 picture twice: once as a PNG (f=100), once as raw RGBA
+      # (f=32) split over two chunks (m=1, then m=0).
+      - fixture:
+          file: expected.png
+          base64: iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAFUlEQVR4nGP4z8DwHwwZ/oMBA7oAADT7E+1KaAUsAAAAAElFTkSuQmCC
+      - pty:
+          shell: true
+          graphics: kitty
+          command: >-
+            printf '\033_Ga=T,q=2,f=100;iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAFUlEQVR4nGP4z8DwHwwZ/oMBA7oAADT7E+1KaAUsAAAAAElFTkSuQmCC\033\\';
+            printf '\033_Ga=T,q=2,f=32,s=4,v=2,m=1;/wAA/wD/AP8AAP////////8A\033\\';
+            printf '\033_Gm=0;AP8A/wD/AAD///////8=\033\\';
+            printf 'drawn\r\n'
+          timeout: 10s
+      - assert:
+          exit_code: 0
+          screen:
+            contains: drawn
+            images:
+              count: 2
+              contains:
+                - { width: 4, height: 2, alpha: false }
+                - { similar_to: expected.png }
+      # Both images match the baseline pixel for pixel, so one entry can pin the
+      # size and the pixels together with max_diff 0.
+      - assert:
+          screen:
+            images:
+              contains:
+                - { width: 4, height: 2, similar_to: expected.png, max_diff: 0 }
+
+  - name: a session waits for an image to arrive
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          graphics: kitty
+          command: >-
+            sleep 0.3;
+            printf '\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\033\\';
+            read -r line
+          timeout: 10s
+          session:
+            - expect_screen:
+                images: { min_count: 1 }
+            - send: "done\r"
+      - assert:
+          exit_code: 0
+          screen:
+            images:
+              count: 1
+              contains:
+                - { width: 1, height: 1 }
+
+  - name: an image that was not drawn fails and lists what was
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: missing.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: wrong size
+                steps:
+                  - pty:
+                      shell: true
+                      graphics: kitty
+                      command: "printf '\\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\\033\\\\'"
+                  - assert:
+                      screen:
+                        images:
+                          contains:
+                            - { width: 40 }
+      - run:
+          command: ${atago} run missing.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "assert screen draws an image width 40px"
+              - "1 image(s) drawn (1: 1x1)"
+      - fixture:
+          file: nographics.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: forgot graphics
+                steps:
+                  - pty:
+                      shell: true
+                      command: "printf '\\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\\033\\\\'"
+                  - assert:
+                      screen:
+                        images: { count: 1 }
+      - run:
+          command: ${atago} run nographics.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            contains:
+              - "no images drawn"
+              - "images are recorded only by a pty step with graphics: kitty"
+
+  - name: graphics and images mistakes are load-time errors
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: bad.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: bad
+            scenarios:
+              - name: bad
+                steps:
+                  - pty:
+                      command: "true"
+                      graphics: sixel
+                      session:
+                        - expect_screen:
+                            images:
+                              contains:
+                                - { similar_to: a.png }
+                  - assert:
+                      screen:
+                        images: {}
+      - run:
+          command: ${atago} run bad.atago.yaml
+      - assert:
+          exit_code: 2
+          stderr:
+            contains:
+              - 'graphics "sixel" is not supported'
+              - "similar_to is not supported in expect_screen"
+              - "images needs at least one of count/min_count/contains"
