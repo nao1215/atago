@@ -197,9 +197,15 @@ const (
 	thumbsUpKeys    = "D83D DC4D D83C DFFD"
 )
 
+// keyReaderModes are the two states the program meets the host in: fresh,
+// and after a terminal probe whose kitty answer went out as win32-input-mode
+// key presses. From then on the host takes every raw ESC for the start of a
+// sequence, which is where a lone Esc used to disappear.
+var keyReaderModes = []string{"keys", "stdinprobe"}
+
 // TestRun_Windows_InputReachesAKeyReader is #678: behind the console host a
-// `graphics: kitty` step runs under, a lone Esc never arrived and swallowed the
-// key after it, and characters outside the BMP were dropped. A program reading
+// `graphics: kitty` step runs under, a lone Esc never arrived once a TUI had
+// probed the terminal, and swallowed the key after it. A program reading
 // console input records must get the keys a terminal user would have typed.
 func TestRun_Windows_InputReachesAKeyReader(t *testing.T) {
 	t.Parallel()
@@ -226,68 +232,34 @@ func TestRun_Windows_InputReachesAKeyReader(t *testing.T) {
 			"esc " + familyEmojiKeys + " 0020 0074 0075 0069",
 		},
 		{"Enter", []spec.PTYAction{text("a"), key("enter")}, "0061 enter"},
+		{
+			// A paste reaches a key reader as its content; the host keeps the
+			// markers for a program that reads VT input.
+			"a paste with an emoji after an Esc",
+			[]spec.PTYAction{key("esc"), expect("K:esc"), paste("rust\n" + familyEmoji + " tui"), expect("K:0069")},
+			"esc 0072 0075 0073 0074 000A " + familyEmojiKeys + " 0020 0074 0075 0069",
+		},
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			if got := runInputChild(t, "keys", true, c.actions...); got != c.want {
-				t.Errorf("keys = %q, want %q", got, c.want)
-			}
-		})
-	}
-}
-
-// TestRun_Windows_PasteKeepsAnEmoji checks the other half of #678: a
-// bracketed paste behind that host keeps its content, emoji included, for a
-// program reading key records and for one reading VT input.
-func TestRun_Windows_PasteKeepsAnEmoji(t *testing.T) {
-	t.Parallel()
-	t.Run("key records", func(t *testing.T) {
-		t.Parallel()
-		got := runInputChild(t, "keys", true, key("esc"), expect("K:esc"), paste("rust\n"+familyEmoji+" tui"), expect("K:0069"))
-		if want := "esc 0072 0075 0073 0074 000A " + familyEmojiKeys + " 0020 0074 0075 0069"; got != want {
-			t.Errorf("keys = %q, want %q", got, want)
+	for _, mode := range keyReaderModes {
+		for _, c := range cases {
+			t.Run(mode+"/"+c.name, func(t *testing.T) {
+				t.Parallel()
+				if got := runInputChild(t, mode, true, c.actions...); got != c.want {
+					t.Errorf("keys = %q, want %q", got, c.want)
+				}
+			})
 		}
-	})
-	t.Run("VT input", func(t *testing.T) {
-		t.Parallel()
-		got := runInputChild(t, "vtinput", true, paste("a"+thumbsUp+"b"))
-		if want := "E 005B 0032 0030 0030 007E 0061 " + thumbsUpKeys + " 0062 E 005B 0032 0030 0031 007E"; !strings.HasPrefix(got, want) {
-			t.Errorf("units = %q, want them to start with %q", got, want)
-		}
-	})
-}
-
-// TestRun_Windows_KeysAfterATerminalProbe is the path a ratatui-image TUI
-// takes: it probes the terminal on stdin, then reads keys. The probe must end
-// on its status report, or its reader stays behind and takes the keys.
-func TestRun_Windows_KeysAfterATerminalProbe(t *testing.T) {
-	t.Parallel()
-	got := runInputChild(t, "stdinprobe", true, key("esc"), expect("K:esc"), text("q"), expect("K:0071"))
-	if got != "esc 0071" {
-		t.Errorf("keys = %q, want %q", got, "esc 0071")
 	}
 }
 
-// TestRun_Windows_InputThroughTheInboxHost records, for comparison, what the
-// same sends look like behind the console host in Windows. It asserts nothing
-// that host does not already do.
-func TestRun_Windows_InputThroughTheInboxHost(t *testing.T) {
+// TestRun_Windows_PasteKeepsItsMarkers checks that a bracketed paste behind
+// that host still reaches a program reading VT input as a paste, emoji
+// included.
+func TestRun_Windows_PasteKeepsItsMarkers(t *testing.T) {
 	t.Parallel()
-	for _, c := range []struct {
-		name, mode string
-		actions    []spec.PTYAction
-	}{
-		{"esc q", "keys", []spec.PTYAction{key("esc"), expect("K:esc"), text("q")}},
-		{"emoji", "keys", []spec.PTYAction{text(familyEmoji + " tui")}},
-		{"paste keys", "keys", []spec.PTYAction{paste("a" + thumbsUp + "b")}},
-		{"paste vt", "vtinput", []spec.PTYAction{paste("a" + thumbsUp + "b")}},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-			got, problem := inputChildReport(t, c.mode, false, c.actions...)
-			t.Logf("in-box %s: %q %s", c.name, got, problem)
-		})
+	got := runInputChild(t, "vtinput", true, paste("a"+thumbsUp+"b"))
+	if want := "E 005B 0032 0030 0030 007E 0061 " + thumbsUpKeys + " 0062 E 005B 0032 0030 0031 007E"; !strings.HasPrefix(got, want) {
+		t.Errorf("units = %q, want them to start with %q", got, want)
 	}
 }
 
