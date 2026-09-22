@@ -114,7 +114,7 @@ func vtInputChild() int {
 	childWrite(out, "\x1b[?2004hREADY\r\n")
 	var units []uint16
 	buf := make([]uint16, 256)
-	for !strings.HasSuffix(string(utf16Decode(units)), "\x1b[24~") {
+	for !strings.HasSuffix(utf16Decode(units), "\x1b[24~") {
 		var n uint32
 		if err := windows.ReadConsole(in, &buf[0], uint32(len(buf)), &n, nil); err != nil {
 			fmt.Printf("ReadConsoleW: %v\r\n", err)
@@ -191,7 +191,7 @@ func expect(re string) spec.PTYAction { return spec.PTYAction{Expect: re} }
 // The family emoji is four people joined by ZWJ; each person is outside the
 // BMP, so it is a surrogate pair.
 const (
-	familyEmoji     = "\U0001F468‍\U0001F469‍\U0001F467‍\U0001F466"
+	familyEmoji     = "\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466"
 	familyEmojiKeys = "D83D DC68 200D D83D DC69 200D D83D DC67 200D D83D DC66"
 	thumbsUp        = "\U0001F44D\U0001F3FD"
 	thumbsUpKeys    = "D83D DC4D D83C DFFD"
