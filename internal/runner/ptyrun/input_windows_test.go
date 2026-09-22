@@ -51,9 +51,9 @@ func (r *inputRecord) key() keyPress {
 
 // keysChild reads its input the way crossterm does on Windows: raw console
 // mode and ReadConsoleInputW, one KEY_EVENT record per key. It turns on
-// bracketed paste so atago lets a test paste, and reports every key press
-// until F12: Escape and Enter by name, any other key as the UTF-16 code unit
-// it carries.
+// bracketed paste so atago lets a test paste, and reports every key press as
+// it arrives and all of them again at F12: Escape and Enter by name, any other
+// key as the UTF-16 code unit it carries.
 func keysChild() int {
 	in, out, err := childConsole()
 	if err != nil {
@@ -85,14 +85,15 @@ func keysChild() int {
 		if k.vk == vkF12 {
 			break
 		}
+		token := fmt.Sprintf("%04X", k.char)
 		switch k.vk {
 		case vkEscape:
-			got = append(got, "esc")
+			token = "esc"
 		case vkReturn:
-			got = append(got, "enter")
-		default:
-			got = append(got, fmt.Sprintf("%04X", k.char))
+			token = "enter"
 		}
+		got = append(got, token)
+		childWrite(out, "K:"+token+"\r\n")
 	}
 	childWrite(out, "RAW:"+strings.Join(raw, " ")+"\r\n")
 	childWrite(out, "GOT:"+strings.Join(got, " ")+" END\r\n")
@@ -139,9 +140,9 @@ func utf16Decode(u []uint16) string {
 // runInputChild runs a helper under the host a `graphics: kitty` step uses
 // (openConsole) or the one in Windows, performs sends after it is ready, ends
 // them with F12, and returns what the helper reported after "GOT:".
-func runInputChild(t *testing.T, mode string, openConsole bool, sends ...spec.PTYSend) string {
+func runInputChild(t *testing.T, mode string, openConsole bool, actions ...spec.PTYAction) string {
 	t.Helper()
-	got, problem := inputChildReport(t, mode, openConsole, sends...)
+	got, problem := inputChildReport(t, mode, openConsole, actions...)
 	if problem != "" {
 		t.Fatal(problem)
 	}
@@ -149,13 +150,10 @@ func runInputChild(t *testing.T, mode string, openConsole bool, sends ...spec.PT
 }
 
 // inputChildReport is runInputChild reporting a failed run instead of failing.
-func inputChildReport(t *testing.T, mode string, openConsole bool, sends ...spec.PTYSend) (string, string) {
+func inputChildReport(t *testing.T, mode string, openConsole bool, actions ...spec.PTYAction) (string, string) {
 	t.Helper()
 	command, env := graphicsChild(t, mode)
-	session := []spec.PTYAction{{Expect: "READY"}}
-	for i := range sends {
-		session = append(session, spec.PTYAction{Send: &sends[i]})
-	}
+	session := append([]spec.PTYAction{{Expect: "READY"}}, actions...)
 	session = append(session, spec.PTYAction{Send: &spec.PTYSend{Key: "f12"}}, spec.PTYAction{Expect: "GOT:.* END"})
 	p := &spec.PTY{
 		Command: command,
@@ -184,8 +182,10 @@ func inputChildReport(t *testing.T, mode string, openConsole bool, sends ...spec
 	return screen[start+len("GOT:") : end], ""
 }
 
-func text(s string) spec.PTYSend  { return spec.PTYSend{Text: &s} }
-func paste(s string) spec.PTYSend { return spec.PTYSend{Paste: &s} }
+func key(name string) spec.PTYAction  { return spec.PTYAction{Send: &spec.PTYSend{Key: name}} }
+func text(s string) spec.PTYAction    { return spec.PTYAction{Send: &spec.PTYSend{Text: &s}} }
+func paste(s string) spec.PTYAction   { return spec.PTYAction{Send: &spec.PTYSend{Paste: &s}} }
+func expect(re string) spec.PTYAction { return spec.PTYAction{Expect: re} }
 
 // The family emoji is four people joined by ZWJ; each person is outside the
 // BMP, so it is a surrogate pair.
@@ -203,19 +203,33 @@ const (
 func TestRun_Windows_InputReachesAKeyReader(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		name  string
-		sends []spec.PTYSend
-		want  string
+		name    string
+		actions []spec.PTYAction
+		want    string
 	}{
-		{"Esc and then q are two keys", []spec.PTYSend{{Key: "esc"}, text("q")}, "esc 0071"},
-		{"Esc pressed three times", []spec.PTYSend{{Key: "esc", Times: 3}}, "esc esc esc"},
-		{"an emoji string", []spec.PTYSend{text(familyEmoji + " tui")}, familyEmojiKeys + " 0020 0074 0075 0069"},
-		{"Enter", []spec.PTYSend{text("a"), {Key: "enter"}}, "0061 enter"},
+		{
+			// Each key must arrive before anything else is sent, the way a
+			// TUI closes an overlay on Esc and only then gets the next key.
+			"Esc and then q are two keys, each delivered on its own",
+			[]spec.PTYAction{key("esc"), expect("K:esc"), text("q"), expect("K:0071")},
+			"esc 0071",
+		},
+		{
+			"Esc pressed three times",
+			[]spec.PTYAction{{Send: &spec.PTYSend{Key: "esc", Times: 3}}},
+			"esc esc esc",
+		},
+		{
+			"an emoji string after an Esc",
+			[]spec.PTYAction{key("esc"), expect("K:esc"), text(familyEmoji + " tui"), expect("K:0069")},
+			"esc " + familyEmojiKeys + " 0020 0074 0075 0069",
+		},
+		{"Enter", []spec.PTYAction{text("a"), key("enter")}, "0061 enter"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			if got := runInputChild(t, "keys", true, c.sends...); got != c.want {
+			if got := runInputChild(t, "keys", true, c.actions...); got != c.want {
 				t.Errorf("keys = %q, want %q", got, c.want)
 			}
 		})
@@ -229,10 +243,9 @@ func TestRun_Windows_PasteKeepsAnEmoji(t *testing.T) {
 	t.Parallel()
 	t.Run("key records", func(t *testing.T) {
 		t.Parallel()
-		got := runInputChild(t, "keys", true, paste("a"+thumbsUp+"b"))
-		t.Logf("keys = %q", got)
-		if want := "0061 " + thumbsUpKeys + " 0062"; !strings.Contains(got, want) {
-			t.Errorf("keys = %q, want them to contain %q", got, want)
+		got := runInputChild(t, "keys", true, key("esc"), expect("K:esc"), paste("rust\n"+familyEmoji+" tui"), expect("K:0069"))
+		if want := "esc 0072 0075 0073 0074 000A " + familyEmojiKeys + " 0020 0074 0075 0069"; got != want {
+			t.Errorf("keys = %q, want %q", got, want)
 		}
 	})
 	t.Run("VT input", func(t *testing.T) {
@@ -251,16 +264,16 @@ func TestRun_Windows_InputThroughTheInboxHost(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		name, mode string
-		sends      []spec.PTYSend
+		actions    []spec.PTYAction
 	}{
-		{"esc q", "keys", []spec.PTYSend{{Key: "esc"}, text("q")}},
-		{"emoji", "keys", []spec.PTYSend{text(familyEmoji + " tui")}},
-		{"paste keys", "keys", []spec.PTYSend{paste("a" + thumbsUp + "b")}},
-		{"paste vt", "vtinput", []spec.PTYSend{paste("a" + thumbsUp + "b")}},
+		{"esc q", "keys", []spec.PTYAction{key("esc"), expect("K:esc"), text("q")}},
+		{"emoji", "keys", []spec.PTYAction{text(familyEmoji + " tui")}},
+		{"paste keys", "keys", []spec.PTYAction{paste("a" + thumbsUp + "b")}},
+		{"paste vt", "vtinput", []spec.PTYAction{paste("a" + thumbsUp + "b")}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			got, problem := inputChildReport(t, c.mode, false, c.sends...)
+			got, problem := inputChildReport(t, c.mode, false, c.actions...)
 			t.Logf("in-box %s: %q %s", c.name, got, problem)
 		})
 	}
