@@ -27,6 +27,14 @@ func CommandLine(string, bool) (string, error) { return "", errUnsupported }
 // Start is unsupported off Windows.
 func Start(string, string, []string, int, int) (*PseudoConsole, error) { return nil, errUnsupported }
 
+// StartOpenConsole is unsupported off Windows.
+func StartOpenConsole(string, string, []string, int, int) (*PseudoConsole, error) {
+	return nil, errUnsupported
+}
+
+// EncodeReply returns p unchanged off Windows.
+func (c *PseudoConsole) EncodeReply(p []byte) []byte { return p }
+
 // Read is unsupported off Windows.
 func (c *PseudoConsole) Read([]byte) (int, error) { return 0, errUnsupported }
 

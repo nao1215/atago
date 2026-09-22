@@ -49,6 +49,9 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		modes:     map[int]bool{},
 	}
 	queries := newTerminalQueries(p, writerFunc(t.write))
+	if e, ok := rw.(replyEncoder); ok {
+		queries.encodeGraphicsReply = e.EncodeReply
+	}
 	t.graphics = queries.graphics
 	var modeScan decsetScanner
 	// reading is closed by the reader goroutine when it has nothing left to do

@@ -30,6 +30,7 @@ import (
 // PseudoConsole wires a child process's console I/O to a pipe pair through a
 // Windows pseudo console and exposes Read/Write/Resize/Wait/Close.
 type PseudoConsole struct {
+	api       consoleAPI
 	hpc       windows.Handle // the pseudo console (HPCON)
 	inWrite   windows.Handle // parent → child (sends)
 	outRead   windows.Handle // child → parent (transcript)
@@ -37,6 +38,9 @@ type PseudoConsole struct {
 	pid       uint32
 	attrList  *windows.ProcThreadAttributeListContainer
 	closeOnce sync.Once
+	// win32Input is set behind the bundled console host, whose input parser
+	// needs replies sent as key presses (see EncodeReply).
+	win32Input bool
 }
 
 // IsAvailable reports whether the host exposes the ConPTY API (Windows 10
@@ -87,6 +91,25 @@ func CommandLine(command string, shell bool) (string, error) {
 // is called with bInheritHandles=false, so the child reaches its console only
 // through the PSEUDOCONSOLE attribute.
 func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoConsole, error) {
+	return start(inboxAPI, 0, commandLine, workDir, env, rows, cols)
+}
+
+// consoleAPI is the set of pseudo-console entry points a PseudoConsole is
+// driven through: the in-box kernel32 ones, or those of a conpty.dll.
+type consoleAPI struct {
+	create func(size windows.Coord, in, out windows.Handle, flags uint32, hpc *windows.Handle) error
+	resize func(hpc windows.Handle, size windows.Coord) error
+	close  func(hpc windows.Handle)
+}
+
+// inboxAPI is the pseudo console that ships with Windows.
+var inboxAPI = consoleAPI{
+	create: windows.CreatePseudoConsole,
+	resize: windows.ResizePseudoConsole,
+	close:  windows.ClosePseudoConsole,
+}
+
+func start(api consoleAPI, flags uint32, commandLine, workDir string, env []string, rows, cols int) (*PseudoConsole, error) {
 	// Two anonymous pipes: one carries parent→child input, the other
 	// child→parent output. CreatePseudoConsole takes the child's ends (inRead,
 	// outWrite); the parent keeps inWrite and outRead.
@@ -101,7 +124,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 
 	var hpc windows.Handle
 	size := windows.Coord{X: termDim(cols), Y: termDim(rows)}
-	if err := windows.CreatePseudoConsole(size, inRead, outWrite, 0, &hpc); err != nil {
+	if err := api.create(size, inRead, outWrite, flags, &hpc); err != nil {
 		closeHandles(inRead, inWrite, outRead, outWrite)
 		return nil, fmt.Errorf("create pseudo console: %w", err)
 	}
@@ -112,7 +135,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 
 	attrList, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
-		windows.ClosePseudoConsole(hpc)
+		api.close(hpc)
 		closeHandles(inWrite, outRead)
 		return nil, fmt.Errorf("alloc attribute list: %w", err)
 	}
@@ -124,7 +147,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 		unsafe.Sizeof(hpc),
 	); err != nil {
 		attrList.Delete()
-		windows.ClosePseudoConsole(hpc)
+		api.close(hpc)
 		closeHandles(inWrite, outRead)
 		return nil, fmt.Errorf("set pseudo-console attribute: %w", err)
 	}
@@ -143,7 +166,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 	argv, err := windows.UTF16PtrFromString(commandLine)
 	if err != nil {
 		attrList.Delete()
-		windows.ClosePseudoConsole(hpc)
+		api.close(hpc)
 		closeHandles(inWrite, outRead)
 		return nil, fmt.Errorf("encode command line: %w", err)
 	}
@@ -151,7 +174,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 	if workDir != "" {
 		if dir, err = windows.UTF16PtrFromString(workDir); err != nil {
 			attrList.Delete()
-			windows.ClosePseudoConsole(hpc)
+			api.close(hpc)
 			closeHandles(inWrite, outRead)
 			return nil, fmt.Errorf("encode workdir: %w", err)
 		}
@@ -165,12 +188,12 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 	// EXTENDED_STARTUPINFO_PRESENT makes CreateProcess read the attribute list;
 	// CREATE_UNICODE_ENVIRONMENT matches the UTF-16 env block. bInheritHandles is
 	// false: the child reaches the console through the attribute, not inheritance.
-	flags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT | windows.CREATE_UNICODE_ENVIRONMENT)
+	createFlags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT | windows.CREATE_UNICODE_ENVIRONMENT)
 	if err := windows.CreateProcess(
-		nil, argv, nil, nil, false, flags, envBlock, dir, &si.StartupInfo, pi,
+		nil, argv, nil, nil, false, createFlags, envBlock, dir, &si.StartupInfo, pi,
 	); err != nil {
 		attrList.Delete()
-		windows.ClosePseudoConsole(hpc)
+		api.close(hpc)
 		closeHandles(inWrite, outRead)
 		return nil, fmt.Errorf("create process: %w", err)
 	}
@@ -178,6 +201,7 @@ func Start(commandLine, workDir string, env []string, rows, cols int) (*PseudoCo
 	closeHandles(pi.Thread)
 
 	return &PseudoConsole{
+		api:      api,
 		hpc:      hpc,
 		inWrite:  inWrite,
 		outRead:  outRead,
@@ -242,7 +266,7 @@ func (c *PseudoConsole) Write(p []byte) (int, error) {
 
 // Resize changes the pseudo console's dimensions.
 func (c *PseudoConsole) Resize(rows, cols int) error {
-	return windows.ResizePseudoConsole(c.hpc, windows.Coord{X: termDim(cols), Y: termDim(rows)})
+	return c.api.resize(c.hpc, windows.Coord{X: termDim(cols), Y: termDim(rows)})
 }
 
 // termDim clamps a terminal dimension into the positive int16 range a Coord
@@ -311,7 +335,7 @@ func (c *PseudoConsole) Pid() int { return int(c.pid) }
 // is nothing to cancel when no read is pending, which is the common case.
 func (c *PseudoConsole) Close() error {
 	c.closeOnce.Do(func() {
-		windows.ClosePseudoConsole(c.hpc)
+		c.api.close(c.hpc)
 		_ = windows.CancelIoEx(c.outRead, nil)
 		closeHandles(c.inWrite, c.outRead, c.process)
 		if c.attrList != nil {

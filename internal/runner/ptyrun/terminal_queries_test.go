@@ -2,7 +2,9 @@ package ptyrun
 
 import (
 	"bytes"
+	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/nao1215/atago/internal/spec"
@@ -154,6 +156,54 @@ func TestTerminalQueries_KittyQueryInOrder(t *testing.T) {
 
 	want := "\x1b_Gi=31;OK\x1b\\" + vt102DA1 + "\x1b[6;20;10t" + "\x1b[0n"
 	if got := out.String(); got != want {
+		t.Fatalf("replies = %q, want %q", got, want)
+	}
+}
+
+// encodingPTY is a terminal whose host needs replies rewritten, as the Windows
+// console host that forwards graphics does (#676). It serves one chunk of
+// program output, then ends the session.
+type encodingPTY struct {
+	mu      sync.Mutex
+	out     []byte
+	written bytes.Buffer
+}
+
+func (f *encodingPTY) Read(p []byte) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.out) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, f.out)
+	f.out = f.out[n:]
+	return n, nil
+}
+
+func (f *encodingPTY) Write(p []byte) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.written.Write(p)
+}
+
+func (f *encodingPTY) EncodeReply(p []byte) []byte { return []byte("<" + string(p) + ">") }
+
+// TestTranscriptDrain_EncodesOnlyGraphicsReplies pins what goes through the
+// terminal's EncodeReply: the kitty graphics answer, which the host would drop,
+// and nothing else. The DA1 and cell-size replies stay as they are, because
+// the host consumes a DA1 reply to its own startup query only when it arrives
+// unencoded, and passes the rest through.
+func TestTranscriptDrain_EncodesOnlyGraphicsReplies(t *testing.T) {
+	t.Parallel()
+	f := &encodingPTY{out: []byte("\x1b_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[16t\x1b[c")}
+	d := startTranscriptDrain(f, &spec.PTY{Rows: 10, Cols: 40, Graphics: spec.PTYGraphicsKitty})
+	<-d.readDone
+
+	f.mu.Lock()
+	got := f.written.String()
+	f.mu.Unlock()
+	want := "<\x1b_Gi=31;OK\x1b\\>" + "\x1b[6;20;10t" + vt102DA1
+	if got != want {
 		t.Fatalf("replies = %q, want %q", got, want)
 	}
 }

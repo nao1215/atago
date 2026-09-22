@@ -24,6 +24,15 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    # The Windows binary embeds the Windows Terminal console host (MIT), whose
+    # notice has to travel with it.
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - src: internal/conpty/openconsole/LICENSE
+        dst: third_party/OpenConsole
+        strip_parent: true
 # Linux system packages for apt/dnf/apk users (the same set gup and sqly ship).
 nfpms:
   - maintainer: Naohiro CHIKAMATSU <n.chika156@gmail.com>

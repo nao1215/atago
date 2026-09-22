@@ -50,6 +50,16 @@ type terminalQueries struct {
 	// answers the graphics query and records images, and its presence turns on
 	// the cell-size reply.
 	graphics *kittyGraphics
+	// encodeGraphicsReply, when set, rewrites a graphics reply before it is
+	// written. The Windows console host that forwards graphics drops an APC
+	// string written to it as is, so there the reply goes out as key presses.
+	encodeGraphicsReply func([]byte) []byte
+}
+
+// replyEncoder is implemented by a terminal whose host needs some replies
+// rewritten to reach the program (the Windows pseudo console).
+type replyEncoder interface {
+	EncodeReply(p []byte) []byte
 }
 
 func newTerminalQueries(p *spec.PTY, w io.Writer) *terminalQueries {
@@ -108,6 +118,9 @@ func (t *terminalQueries) consume(chunk []byte) {
 		start = i + 1
 		if graphicsDone {
 			for _, r := range t.graphics.takeReplies() {
+				if t.encodeGraphicsReply != nil {
+					r = t.encodeGraphicsReply(r)
+				}
 				_, _ = t.w.Write(r)
 			}
 		}
