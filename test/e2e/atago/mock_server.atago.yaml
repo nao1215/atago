@@ -52,6 +52,54 @@ scenarios:
             body:
               json: { path: "$.title", equals: "report" }
 
+  # A response that links back to the API — a next-page URL, an image, a
+  # download — names the mock's own address, which exists only once it listens.
+  - name: a route payload can name its own server
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/items
+            json:
+              items: [{ id: 1, thumb: "${api.url}/img/1.png" }]
+              next: "${api.url}/v1/items?page=2"
+          - method: GET
+            path: /v1/where
+            body: "moved to ${api.url}/v1/items"
+            header: { Location: "${api.url}/v1/items" }
+    steps:
+      - fixture:
+          file: client.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: client
+            runners:
+              api:
+                type: http
+                base_url: ${api.url}
+            scenarios:
+              - name: follow the links
+                steps:
+                  - http: { runner: api, method: GET, path: /v1/items }
+                  - assert:
+                      status: 200
+                      body:
+                        json:
+                          - { path: "$.items[0].thumb", equals: "${api.url}/img/1.png" }
+                          - { path: "$.next", equals: "${api.url}/v1/items?page=2" }
+                          - { path: "$.items[0].id", equals: 1 }
+                  - http: { runner: api, method: GET, path: /v1/where }
+                  - assert:
+                      body: { equals: "moved to ${api.url}/v1/items" }
+                      header: { name: Location, equals: "${api.url}/v1/items" }
+      - run:
+          command: ${atago} run client.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+
   - name: a failing count summarizes the recorded requests
     mock_servers:
       - name: stub

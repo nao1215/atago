@@ -208,3 +208,44 @@ func TestStop_NilSafe(t *testing.T) {
 	nilServer.Stop() // must not panic
 	(&Server{}).Stop()
 }
+
+// TestExpandRoutes_PayloadsNameTheServer pins ${name} substitution in what the
+// routes answer with — json strings at any depth, body text, and header values
+// — while a body_file is served verbatim and non-string JSON is untouched.
+func TestExpandRoutes_PayloadsNameTheServer(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "raw.txt"), []byte("${api.url} stays"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := startTest(t, &spec.MockServer{
+		Name: "api",
+		Routes: []spec.MockRoute{
+			{Method: http.MethodGet, Path: "/json", JSON: map[string]any{
+				"self": "${api.url}/json", "n": 1, "nested": []any{map[string]any{"img": "${api.url}/a.png"}},
+			}},
+			{Method: http.MethodGet, Path: "/text", Body: "see ${api.url}/text", Header: map[string]string{"Location": "${api.url}/next"}},
+			{Method: http.MethodGet, Path: "/file", BodyFile: "raw.txt"},
+		},
+	}, dir)
+	vars := map[string]string{"api.url": s.URL()}
+	s.ExpandRoutes(func(in string) string {
+		for k, v := range vars {
+			in = strings.ReplaceAll(in, "${"+k+"}", v)
+		}
+		return in
+	})
+
+	_, _, body := do(t, http.MethodGet, s.URL()+"/json", nil)
+	want := `{"n":1,"nested":[{"img":"` + s.URL() + `/a.png"}],"self":"` + s.URL() + `/json"}`
+	if string(body) != want {
+		t.Fatalf("json body = %s, want %s", body, want)
+	}
+	_, hdr, body := do(t, http.MethodGet, s.URL()+"/text", nil)
+	if string(body) != "see "+s.URL()+"/text" || hdr.Get("Location") != s.URL()+"/next" {
+		t.Fatalf("text body = %q, Location = %q", body, hdr.Get("Location"))
+	}
+	if _, _, body := do(t, http.MethodGet, s.URL()+"/file", nil); string(body) != "${api.url} stays" {
+		t.Fatalf("body_file was rewritten: %q", body)
+	}
+}

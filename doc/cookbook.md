@@ -765,6 +765,32 @@ scenarios:
               json: { path: "$.title", equals: "report" }
 ```
 
+The payloads a route answers with (`json:` strings, `body:`, header values) take `${name}`
+expansion once every mock is listening, so a response can link back to the stub itself: a
+next-page URL, a download, an image the client fetches next.
+
+```yaml
+version: "1"
+suite:
+  name: offline api client
+scenarios:
+  - name: the client follows the link it was given
+    mock_servers:
+      - name: api
+        routes:
+          - method: GET
+            path: /v1/items
+            json: { items: [{ id: 1, thumb: "${api.url}/img/1.png" }] }
+          - method: GET
+            path: /img/1.png
+            body_file: testdata/1.png   # served verbatim, never expanded
+    steps:
+      - run:
+          command: mytool items --endpoint ${api.url} --download-thumbs
+      - assert:
+          mock: { name: api, path: /img/1.png, method: GET, count: 1 }
+```
+
 Full spec: [mock_server](../examples/mock_server.atago.yaml)
 
 ## Test a CLI that starts a server

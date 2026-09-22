@@ -49,6 +49,32 @@ type Server struct {
 	records []Record
 }
 
+// ExpandRoutes applies ${name} substitution to the payloads the routes answer
+// with: every string in `json:`, the `body:` text, and header values. It runs
+// once, after the server is listening, so a route can name the server's own
+// ${<name>.url} — an API whose responses carry links back to itself (a
+// download URL, a next-page cursor, an image) cannot be stubbed otherwise.
+// A `body_file:` is served verbatim: it may be binary, and a file is where a
+// payload goes precisely when it must not be rewritten.
+func (s *Server) ExpandRoutes(expand func(string) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	routes := make([]spec.MockRoute, len(s.routes))
+	for i, rt := range s.routes {
+		rt.JSON = spec.WalkJSONValueStrings(rt.JSON, expand)
+		rt.Body = expand(rt.Body)
+		if len(rt.Header) > 0 {
+			h := make(map[string]string, len(rt.Header))
+			for k, v := range rt.Header {
+				h[k] = expand(v)
+			}
+			rt.Header = h
+		}
+		routes[i] = rt
+	}
+	s.routes = routes
+}
+
 // Start launches the mock server on an ephemeral 127.0.0.1 port. The returned
 // server is ready to accept connections when Start returns (the listener
 // binds synchronously); ctx only scopes the bind itself.
@@ -148,12 +174,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(payload)
 }
 
-// match returns the first route with the request's exact method and path.
+// match returns a copy of the first route with the request's exact method and
+// path.
 func (s *Server) match(method, path string) *spec.MockRoute {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i := range s.routes {
-		rt := &s.routes[i]
-		if strings.EqualFold(rt.Method, method) && rt.Path == path {
-			return rt
+		if rt := s.routes[i]; strings.EqualFold(rt.Method, method) && rt.Path == path {
+			return &rt
 		}
 	}
 	return nil

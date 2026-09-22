@@ -2386,7 +2386,7 @@
           "description": "Response status code (default 200)."
         },
         "json": {
-          "description": "Inline response document, marshaled with Content-Type: application/json."
+          "description": "Inline response document, marshaled with Content-Type: application/json. Its strings take ${name} expansion when the scenario starts, so a response can link back to the mock itself with ${<name>.url}."
         },
         "body": {
           "type": [
@@ -2394,7 +2394,7 @@
             "number",
             "boolean"
           ],
-          "description": "Inline text response body."
+          "description": "Inline text response body. Takes ${name} expansion when the scenario starts, like `json`."
         },
         "body_file": {
           "type": [
@@ -2403,7 +2403,7 @@
             "boolean"
           ],
           "minLength": 1,
-          "description": "Spec-relative response body file, confined to the spec directory."
+          "description": "Spec-relative response body file, confined to the spec directory. Served verbatim, without ${name} expansion, so it may hold binary data."
         },
         "header": {
           "type": "object",
@@ -2414,7 +2414,7 @@
               "boolean"
             ]
           },
-          "description": "Extra response headers to set."
+          "description": "Extra response headers to set. Values take ${name} expansion when the scenario starts, like `json`."
         },
         "delay": {
           "type": "string",

@@ -10,6 +10,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Third-party suite for rsync, 31 scenarios over local copies judged by the tree they leave behind. `changes:` pins the trailing-slash rule, a second run being a no-op, `--dry-run` announcing exactly what the real run then does, `--delete` removing only what the source lacks, and the quick check skipping a same-size, same-mtime file with different bytes until `--checksum` is given, alongside `--update`, `--ignore-existing`, `--backup` and `--remove-source-files`. Filter rules are fixed by the tree they produce, and the exit codes 0, 1, 11, 23 and 25 are each checked together with stderr, stdout, and what was left on disk. Two hazards are pinned as rsync behaves: a forgotten destination turns `rsync -a --delete src/` into a listing that exits 0, and a bare `-r` skips a symlink with a notice on stdout and exit 0.
+- A mock route's payload takes `${name}` expansion: the strings of `json:`, the `body:` text, and header values are expanded once every mock of the scenario (or, for a suite-level mock, that mock) is listening. A response that links back to the API it came from, such as a next-page URL, a download, or an image the client fetches next, could not be stubbed before, because the mock's address exists only once it listens and the payload was served as written. `body_file:` stays verbatim, since it may be binary and a file is where a payload goes when it must not be rewritten.
 
 ## [0.23.0] - 2026-09-21
 

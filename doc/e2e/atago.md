@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-85 suites · 698 scenarios
+85 suites · 699 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -477,8 +477,9 @@
   - [an empty matrix row list is a load-time error](#scenario-an-empty-matrix-row-list-is-a-load-time-error)
   - [rows that expand to the same name are rejected as duplicates](#scenario-rows-that-expand-to-the-same-name-are-rejected-as-duplicates)
   - [a row that leaves a referenced name unbound is a load-time error](#scenario-a-row-that-leaves-a-referenced-name-unbound-is-a-load-time-error)
-- [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 4 scenarios
+- [atago self-hosting / mock http server (offline API-client testing)](#atago-self-hosting--mock-http-server-offline-api-client-testing) — 5 scenarios
   - [count, header, and body-json asserts pass against a real client](#scenario-count-header-and-body-json-asserts-pass-against-a-real-client)
+  - [a route payload can name its own server](#scenario-a-route-payload-can-name-its-own-server)
   - [a failing count summarizes the recorded requests](#scenario-a-failing-count-summarizes-the-recorded-requests)
   - [an unknown mock name in an assert is a load-time error](#scenario-an-unknown-mock-name-in-an-assert-is-a-load-time-error)
   - [a route that can never answer is a load-time error](#scenario-a-route-that-can-never-answer-is-a-load-time-error)
@@ -10709,6 +10710,44 @@ ${atago} run client.atago.yaml
 #### Then
 - exit code is `0`
 - mock `api` received `POST /v1/reports` exactly 1 time(s)
+
+### Scenario: a route payload can name its own server
+#### Given
+- Stub HTTP server `api` serves 2 canned route(s) at `${api.url}` and records every request (#24).
+- Fixture file `client.atago.yaml` is created.
+
+#### Inputs
+_Fixture `client.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: client
+runners:
+  api:
+    type: http
+    base_url: ${api.url}
+scenarios:
+  - name: follow the links
+    steps:
+      - http: { runner: api, method: GET, path: /v1/items }
+      - assert:
+          status: 200
+          body:
+            json:
+              - { path: "$.items[0].thumb", equals: "${api.url}/img/1.png" }
+              - { path: "$.next", equals: "${api.url}/v1/items?page=2" }
+              - { path: "$.items[0].id", equals: 1 }
+      - http: { runner: api, method: GET, path: /v1/where }
+      - assert:
+… (truncated, 2 more lines)
+```
+#### When
+```shell
+${atago} run client.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `1 passed`
 
 ### Scenario: a failing count summarizes the recorded requests
 #### Given
