@@ -77,6 +77,17 @@ func (c *PseudoConsole) EncodeReply(p []byte) []byte {
 	return Win32InputKeys(p)
 }
 
+// EncodeInput prepares what a terminal user types, as an xterm-class terminal
+// sends it, for Write. Behind the bundled host it is sent as key presses
+// (Win32InputSend), because that host's input parser holds a lone ESC and drops
+// characters outside the BMP; behind the in-box host it is sent as is.
+func (c *PseudoConsole) EncodeInput(p []byte) []byte {
+	if !c.win32Input {
+		return p
+	}
+	return Win32InputSend(p)
+}
+
 // loadOpenConsole writes the bundled host to disk and binds conpty.dll.
 func loadOpenConsole() (consoleAPI, error) {
 	if openConsoleDLL == nil {

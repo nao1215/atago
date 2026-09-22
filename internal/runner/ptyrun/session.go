@@ -553,7 +553,13 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// meaningful — it is the boundary between what the terminal had already
 	// shown and what this send causes.
 	at := d.term.curLen()
-	if _, werr := d.term.write(sent); werr != nil {
+	// A repeated key is handed over as one key and a count, so a host that
+	// needs keys encoded one by one (#678) can repeat the encoded key.
+	typed, times := sent, 1
+	if s.Key != "" && s.Times > 1 {
+		typed, times = (&spec.PTYSend{Key: s.Key}).Bytes(), s.Times
+	}
+	if werr := d.term.typeInput(typed, times); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
 	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent)})
