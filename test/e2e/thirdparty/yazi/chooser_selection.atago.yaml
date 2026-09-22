@@ -41,7 +41,7 @@ scenarios:
                 stable_for: 100ms
             - send: {key: space}
             - expect_screen:
-                matches: '(?m)^\S+\s+1\s*$'
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
                 stable_for: 100ms
             - send: "k"
             - expect_screen:
@@ -72,7 +72,7 @@ scenarios:
                 stable_for: 100ms
             - send: {key: space}
             - expect_screen:
-                matches: '(?m)^\S+\s+1\s*$'
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
                 stable_for: 100ms
             - send: "k"
             - expect_screen:
@@ -103,7 +103,7 @@ scenarios:
                 stable_for: 100ms
             - send: {key: space}
             - expect_screen:
-                matches: '(?m)^\S+\s+1\s*$'
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
                 stable_for: 100ms
             - send: "k"
             - expect_screen:
@@ -309,7 +309,7 @@ scenarios:
             - send: {key: space}
             - expect_screen:
                 contains: "2/2"
-                matches: '(?m)^\S+\s+1\s*$'
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
                 stable_for: 100ms
             - send: "k"
             - expect_screen:
@@ -318,7 +318,7 @@ scenarios:
             - send: {key: space}
             - expect_screen:
                 contains: "2/2"
-                matches: '(?m)\A\S+\s*$'
+                matches: '(?m)\A\S+[ \t]*$'
                 stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b-dir"}}
@@ -343,7 +343,7 @@ scenarios:
             - send: {key: space}
             - expect_screen:
                 contains: "2/2"
-                matches: '(?m)^\S+\s+1\s*$'
+                matches: '(?m)\A\S+[ \t]+1[ \t]*$'
                 stable_for: 100ms
             - send: "k"
             - expect_screen:
@@ -352,7 +352,7 @@ scenarios:
             - send: {key: space}
             - expect_screen:
                 contains: "2/2"
-                matches: '(?m)\A\S+\s*$'
+                matches: '(?m)\A\S+[ \t]*$'
                 stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/b two"}}
