@@ -325,6 +325,7 @@ func (d *sessionDriver) finish(timedOut bool, code int, ef *ExpectFailure) *sess
 		Screen: screenText,
 		// The same frame with its colors and attributes, for `attrs:` (#382).
 		ScreenCells: screenCells,
+		Images:      d.term.graphics.snapshot(),
 	}
 	if timedOut {
 		res.ExitCode = -1
@@ -462,7 +463,7 @@ func (d *sessionDriver) waitExpectScreen(ctx context.Context, es *spec.PTYExpect
 // screen.
 func (d *sessionDriver) checkScreen(es *spec.PTYExpectScreen) *assert.CheckResult {
 	screen, cells := d.term.currentScreen()
-	return checkRenderedScreen(es, screen, cells)
+	return checkRenderedScreen(es, screen, cells, d.term.graphics.snapshot())
 }
 
 // stability tracks an expect_screen stable_for window: the matcher must hold
@@ -601,7 +602,7 @@ func parsePositiveDuration(s string) time.Duration {
 	return d
 }
 
-func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runner.ScreenCell) *assert.CheckResult {
+func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runner.ScreenCell, images []runner.TerminalImage) *assert.CheckResult {
 	// A mid-session screen check needs no run context: the loader rejects snapshot
 	// and trim inside expect_screen, so there is no workdir, spec directory, or
 	// snapshot bookkeeping for this comparison to read.
@@ -610,5 +611,6 @@ func checkRenderedScreen(es *spec.PTYExpectScreen, screen []byte, cells [][]runn
 		IsPTY:       true,
 		Screen:      screen,
 		ScreenCells: cells,
+		Images:      images,
 	}, env)
 }

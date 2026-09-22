@@ -551,6 +551,54 @@ not just the text.
 
 Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
 
+## Test a TUI that draws images
+
+A program that shows pictures inline asks the terminal whether it can draw them, and one that
+needs them refuses to start on a terminal that says no. `graphics: kitty` makes the pty answer
+like a terminal with the kitty graphics protocol and records every image the program draws for
+`screen.images`. Leaving it out gives the terminal that says no, so both branches are testable.
+
+```yaml
+version: "1"
+suite:
+  name: image viewer
+
+scenarios:
+  - name: the thumbnails are drawn
+    steps:
+      - fixture: { file: photo.png, from: testdata/photo.png }
+      - pty:
+          command: myviewer photo.png
+          graphics: kitty
+          session:
+            - expect_screen: { images: { min_count: 1 } }
+            - send: q
+      - assert:
+          screen:
+            contains: "photo.png"
+            images:
+              count: 1
+              contains:
+                - { max_width: 400, similar_to: testdata/photo-thumb.png, max_diff: 0.02 }
+
+  - name: a terminal without image support is refused
+    steps:
+      - pty:
+          command: myviewer photo.png
+      - assert:
+          exit_code: 2
+          screen:
+            contains: "cannot display images"
+```
+
+A `contains` entry holds when at least one drawn image meets every constraint it sets, by size,
+transparency, or pixels (`similar_to` with `max_diff`, like the `image:` assertion). Matching is
+by content rather than order, because a program that downloads images concurrently draws them in
+no fixed order. Only directly transmitted images (`t=d`) are recorded; without `graphics: kitty`
+none are, and the capability and cell-size queries go unanswered.
+
+Full spec: [pty_screen](../examples/pty_screen.atago.yaml)
+
 ## Click and scroll in a TUI
 
 lazygit, yazi, htop, `fzf --mouse`, and anything built on bubbletea accept the mouse. A click

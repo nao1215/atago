@@ -1,6 +1,7 @@
 package ptyrun
 
 import (
+	"fmt"
 	"io"
 	"sync"
 
@@ -37,14 +38,18 @@ type terminalQueries struct {
 	// mu guards term. consume runs on the drain goroutine while resize is
 	// called from the session goroutine (#379), so the emulator has two writers
 	// even though each is single-threaded on its own.
-	mu   sync.Mutex
-	term vt10x.Terminal
-	da1  da1Scanner
+	mu     sync.Mutex
+	term   vt10x.Terminal
+	probes probeScanner
 	// sanitize holds an incomplete trailing escape between chunks so a CSI split
 	// across reads is bounded as one sequence instead of reassembling inside
-	// vt10x (#438). Only consume touches it, under mu.
+	// vt10x (#438). Only feed touches it, under mu.
 	sanitize streamSanitizer
 	w        io.Writer
+	// graphics is set when the step emulates a kitty-graphics terminal. It
+	// answers the graphics query and records images, and its presence turns on
+	// the cell-size reply.
+	graphics *kittyGraphics
 }
 
 func newTerminalQueries(p *spec.PTY, w io.Writer) *terminalQueries {
@@ -59,11 +64,20 @@ func newTerminalQueries(p *spec.PTY, w io.Writer) *terminalQueries {
 		term: vt10x.New(
 			vt10x.WithSize(cols, rows),
 			// vt10x already emits DSR/CPR and OSC color replies from the live
-			// terminal state; we add only the DA1 gap alongside it.
+			// terminal state; we add the DA1 reply (and, with graphics, the
+			// cell-size reply) alongside it.
 			vt10x.WithWriter(w),
 		),
-		w: w,
+		w:        w,
+		graphics: graphicsFor(p),
 	}
+}
+
+func graphicsFor(p *spec.PTY) *kittyGraphics {
+	if !p.KittyGraphics() {
+		return nil
+	}
+	return newKittyGraphics()
 }
 
 // resize keeps the query emulator the same size as the real terminal (#379).
@@ -75,22 +89,74 @@ func (t *terminalQueries) resize(rows, cols int) {
 	t.term.Resize(cols, rows)
 }
 
+// consume feeds one chunk of program output to the emulator and answers the
+// probes in it. Answers go out in the order the probes were asked, the way a
+// real terminal answers: the emulator is fed only up to each probe before that
+// probe's own reply is written. Feeding the whole chunk first would let the
+// emulator's replies (a DSR status report, a cursor position) overtake the
+// replies written here, and a program that reads up to the DSR report as its
+// end-of-answers marker would never see a DA1 or graphics reply sent after it.
 func (t *terminalQueries) consume(chunk []byte) {
+	start := 0
+	for i, b := range chunk {
+		q, probed := t.probes.step(b)
+		graphicsDone := t.graphics != nil && t.graphics.step(b)
+		if !probed && !graphicsDone {
+			continue
+		}
+		t.feed(chunk[start : i+1])
+		start = i + 1
+		if graphicsDone {
+			for _, r := range t.graphics.takeReplies() {
+				_, _ = t.w.Write(r)
+			}
+		}
+		if probed {
+			t.answer(q)
+		}
+	}
+	t.feed(chunk[start:])
+}
+
+// feed writes bytes to the emulator. The emulator sees the sanitized stream
+// (counts clamped, malformed and split sequences bounded); the scanners see the
+// raw bytes because they must still recognize a well-formed probe wherever it
+// lands.
+func (t *terminalQueries) feed(b []byte) {
+	if len(b) == 0 {
+		return
+	}
 	t.mu.Lock()
-	// The emulator sees the sanitized stream (counts clamped, malformed and split
-	// sequences bounded); the DA1 scanner below sees the raw chunk because it must
-	// still recognize a well-formed DA1/DECID request wherever it lands.
-	writeQueryTerminal(t.term, t.sanitize.feed(chunk))
+	writeQueryTerminal(t.term, t.sanitize.feed(b))
 	t.mu.Unlock()
-	for range t.da1.consume(chunk) {
+}
+
+func (t *terminalQueries) answer(q queryKind) {
+	switch q {
+	case queryDA1:
 		_, _ = t.w.Write([]byte(vt102DA1))
+	case queryCellSize:
+		if t.graphics != nil {
+			_, _ = fmt.Fprintf(t.w, "\x1b[6;%d;%dt", graphicsCellHeight, graphicsCellWidth)
+		}
 	}
 }
 
-// da1Scanner incrementally recognizes the two legacy identify-terminal probes:
-// ESC Z (DECID) and CSI c / CSI 0 c (DA1). It keeps state across read chunks
-// because pty reads may split an escape sequence arbitrarily.
-type da1Scanner struct {
+// queryKind is a terminal probe the scanner recognized.
+type queryKind uint8
+
+const (
+	// queryDA1 is ESC Z (DECID) or CSI c / CSI 0 c.
+	queryDA1 queryKind = iota
+	// queryCellSize is CSI 16 t, "report the cell size in pixels".
+	queryCellSize
+)
+
+// probeScanner incrementally recognizes the two legacy identify-terminal probes,
+// ESC Z (DECID) and CSI c / CSI 0 c (DA1), and the cell-size probe CSI 16 t. It
+// keeps state across read chunks because pty reads may split an escape sequence
+// arbitrarily.
+type probeScanner struct {
 	state  da1State
 	csiBuf []byte
 }
@@ -103,53 +169,67 @@ const (
 	da1CSI
 )
 
-func (s *da1Scanner) consume(chunk []byte) []struct{} {
-	var matched []struct{}
+// consume scans a whole chunk and returns every probe in it, in order.
+func (s *probeScanner) consume(chunk []byte) []queryKind {
+	var matched []queryKind
 	for _, b := range chunk {
-		switch s.state {
-		case da1Normal:
-			if b == 0x1b {
-				s.state = da1ESC
-			}
-		case da1ESC:
-			switch b {
-			case '[':
-				s.state = da1CSI
-				s.csiBuf = s.csiBuf[:0]
-			case 'Z':
-				matched = append(matched, struct{}{})
-				s.state = da1Normal
-			case 0x1b:
-				// A new ESC restarts escape parsing.
-				s.state = da1ESC
-			default:
-				s.state = da1Normal
-			}
-		case da1CSI:
-			switch {
-			case b == 0x1b:
-				s.state = da1ESC
-			case b < 0x20 || b == 0x7f:
-				// Control bytes inside a half-read probe abort it for our narrow
-				// DA1 detection; the live emulator still sees the original bytes.
-				s.state = da1Normal
-			case b >= 0x40 && b <= 0x7e:
-				if b == 'c' && isDA1Request(s.csiBuf) {
-					matched = append(matched, struct{}{})
-				}
-				s.state = da1Normal
-				s.csiBuf = s.csiBuf[:0]
-			default:
-				if len(s.csiBuf) < 32 {
-					s.csiBuf = append(s.csiBuf, b)
-				} else {
-					s.state = da1Normal
-					s.csiBuf = s.csiBuf[:0]
-				}
-			}
+		if q, ok := s.step(b); ok {
+			matched = append(matched, q)
 		}
 	}
 	return matched
+}
+
+// step advances the scanner by one byte and reports a probe that byte
+// completed.
+func (s *probeScanner) step(b byte) (queryKind, bool) {
+	switch s.state {
+	case da1Normal:
+		if b == 0x1b {
+			s.state = da1ESC
+		}
+	case da1ESC:
+		switch b {
+		case '[':
+			s.state = da1CSI
+			s.csiBuf = s.csiBuf[:0]
+		case 'Z':
+			s.state = da1Normal
+			return queryDA1, true
+		case 0x1b:
+			// A new ESC restarts escape parsing.
+			s.state = da1ESC
+		default:
+			s.state = da1Normal
+		}
+	case da1CSI:
+		switch {
+		case b == 0x1b:
+			s.state = da1ESC
+		case b < 0x20 || b == 0x7f:
+			// Control bytes inside a half-read probe abort it for our narrow
+			// detection; the live emulator still sees the original bytes.
+			s.state = da1Normal
+		case b >= 0x40 && b <= 0x7e:
+			body := string(s.csiBuf)
+			s.state = da1Normal
+			s.csiBuf = s.csiBuf[:0]
+			if b == 'c' && isDA1Request([]byte(body)) {
+				return queryDA1, true
+			}
+			if b == 't' && body == "16" {
+				return queryCellSize, true
+			}
+		default:
+			if len(s.csiBuf) < 32 {
+				s.csiBuf = append(s.csiBuf, b)
+			} else {
+				s.state = da1Normal
+				s.csiBuf = s.csiBuf[:0]
+			}
+		}
+	}
+	return 0, false
 }
 
 func isDA1Request(body []byte) bool {

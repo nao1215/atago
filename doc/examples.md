@@ -20,6 +20,7 @@
 | [Drive a TUI with the chords it binds](cookbook.md#drive-a-tui-with-the-chords-it-binds) | `shift-tab`, `alt-*`, and modified arrows as named keys |
 | [Paste into a REPL](cookbook.md#paste-into-a-repl) | `send: {paste:}` takes the program's paste path, not its typing path |
 | [Assert colors on the TUI screen](cookbook.md#assert-colors-on-the-tui-screen) | `screen.attrs` for colors, bold, and reverse-video |
+| [Test a TUI that draws images](cookbook.md#test-a-tui-that-draws-images) | `pty.graphics: kitty` + `screen.images` |
 | [Click and scroll in a TUI](cookbook.md#click-and-scroll-in-a-tui) | `send: {mouse:}` SGR reports for clicks and scrolling |
 | [Test a TUI that reacts to external change](cookbook.md#test-a-tui-that-reacts-to-external-change) | `exec:` changes the world mid-session so the watcher path is reachable |
 | [Prove a TUI survives a window resize](cookbook.md#prove-a-tui-survives-a-window-resize) | `resize:` delivers a real size change mid-session |

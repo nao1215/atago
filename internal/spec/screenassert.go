@@ -15,6 +15,101 @@ type ScreenAssert struct {
 	// row is reverse-video, `--no-color` really did leave the frame uncolored.
 	// Every entry must hold.
 	Attrs []ScreenAttr `yaml:"attrs,omitempty"`
+
+	// Images checks the images the program drew. They are recorded only by a
+	// pty step with `graphics: kitty`, which is also what lets a program that
+	// requires image support start at all.
+	Images *ScreenImages `yaml:"images,omitempty"`
+}
+
+// ScreenImages checks the images a pty step drew, in arrival order. Every set
+// field must hold.
+type ScreenImages struct {
+	// Count is the exact number of images drawn.
+	Count *int `yaml:"count,omitempty"`
+	// MinCount is the minimum number of images drawn.
+	MinCount *int `yaml:"min_count,omitempty"`
+	// Contains lists images that must be among those drawn: an entry holds when
+	// at least one drawn image meets every constraint the entry sets. Matching
+	// is by content rather than position because a program that loads images
+	// concurrently draws them in no fixed order.
+	Contains []ScreenImage `yaml:"contains,omitempty"`
+}
+
+// ScreenImage is one `screen.images.contains` entry: the pixel constraints of
+// the `image:` assertion, applied to a drawn image instead of a file.
+type ScreenImage struct {
+	Width     *int     `yaml:"width,omitempty"`
+	Height    *int     `yaml:"height,omitempty"`
+	MinWidth  *int     `yaml:"min_width,omitempty"`
+	MaxWidth  *int     `yaml:"max_width,omitempty"`
+	MinHeight *int     `yaml:"min_height,omitempty"`
+	MaxHeight *int     `yaml:"max_height,omitempty"`
+	Alpha     *bool    `yaml:"alpha,omitempty"`
+	SimilarTo string   `yaml:"similar_to,omitempty"`
+	MaxDiff   *float64 `yaml:"max_diff,omitempty"`
+}
+
+// ImageAssert expresses the entry as the `image:` assertion it borrows its
+// constraints from, naming the checked image `label`.
+func (si *ScreenImage) ImageAssert(label string) *ImageAssert {
+	return &ImageAssert{
+		Path:      label,
+		Width:     si.Width,
+		Height:    si.Height,
+		MinWidth:  si.MinWidth,
+		MaxWidth:  si.MaxWidth,
+		MinHeight: si.MinHeight,
+		MaxHeight: si.MaxHeight,
+		Alpha:     si.Alpha,
+		SimilarTo: si.SimilarTo,
+		MaxDiff:   si.MaxDiff,
+	}
+}
+
+// Describe renders the images check as a phrase for explain and doc.
+func (si *ScreenImages) Describe() string {
+	var parts []string
+	if si.Count != nil {
+		parts = append(parts, "exactly "+itoa(*si.Count)+" image(s)")
+	}
+	if si.MinCount != nil {
+		parts = append(parts, "at least "+itoa(*si.MinCount)+" image(s)")
+	}
+	for i := range si.Contains {
+		parts = append(parts, "an image "+si.Contains[i].Describe())
+	}
+	if len(parts) == 0 {
+		return "images"
+	}
+	return "draws " + strings.Join(parts, " and ")
+}
+
+// Describe renders the entry's constraints as a phrase.
+func (si *ScreenImage) Describe() string {
+	var parts []string
+	dim := func(name string, v *int) {
+		if v != nil {
+			parts = append(parts, name+" "+itoa(*v)+"px")
+		}
+	}
+	dim("width", si.Width)
+	dim("height", si.Height)
+	dim("width >=", si.MinWidth)
+	dim("width <=", si.MaxWidth)
+	dim("height >=", si.MinHeight)
+	dim("height <=", si.MaxHeight)
+	if si.Alpha != nil {
+		if *si.Alpha {
+			parts = append(parts, "with transparency")
+		} else {
+			parts = append(parts, "without transparency")
+		}
+	}
+	if si.SimilarTo != "" {
+		parts = append(parts, "like "+si.SimilarTo)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // ScreenAttr is one "this text is drawn like this" claim (#382).

@@ -80,6 +80,10 @@ type Result struct {
 	// the `attrs:` matchers (#382). Screen is derived from it, so the two can
 	// never disagree about what is on which row.
 	ScreenCells [][]ScreenCell
+	// Images holds the images the program drew through the kitty graphics
+	// protocol, in arrival order, for the `screen.images` matchers. Only a pty
+	// step with `graphics: kitty` records them.
+	Images []TerminalImage
 
 	// Browser fields, set only by the browser/CDP runner. CDPValue is the value
 	// captured by the last text/eval action (the document the `value` assertion
@@ -101,4 +105,11 @@ type Result struct {
 // is a successful Run with Result.ExitCode set.
 type Runner interface {
 	Run(ctx context.Context, run *spec.Run, workdir string) (*Result, error)
+}
+
+// TerminalImage is one image a program drew on the emulated terminal, decoded
+// and re-encoded as PNG so every assertion reads one format.
+type TerminalImage struct {
+	Width, Height int
+	PNG           []byte
 }

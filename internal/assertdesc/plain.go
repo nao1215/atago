@@ -113,6 +113,9 @@ func DescribeScreen(s *spec.ScreenAssert) string {
 	for i := range s.Attrs {
 		parts = append(parts, "shows "+s.Attrs[i].Describe())
 	}
+	if s.Images != nil {
+		parts = append(parts, s.Images.Describe())
+	}
 	return strings.Join(parts, " and ")
 }
 

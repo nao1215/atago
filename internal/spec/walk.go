@@ -236,6 +236,15 @@ func WalkAssertStrings(a *Assert, visit func(string) string) *Assert {
 				sc.Attrs[i] = ac
 			}
 		}
+		if a.Screen.Images != nil {
+			ic := *a.Screen.Images
+			ic.Contains = make([]ScreenImage, len(a.Screen.Images.Contains))
+			for i, im := range a.Screen.Images.Contains {
+				im.SimilarTo = visit(im.SimilarTo)
+				ic.Contains[i] = im
+			}
+			sc.Images = &ic
+		}
 		c.Screen = &sc
 	}
 	if a.Dir != nil {

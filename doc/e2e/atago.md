@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-85 suites · 698 scenarios
+86 suites · 705 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -541,6 +541,14 @@
   - [an expect does not match the echo of its own send](#scenario-an-expect-does-not-match-the-echo-of-its-own-send)
   - [a program's own copy of the input still satisfies an expect](#scenario-a-programs-own-copy-of-the-input-still-satisfies-an-expect)
   - [a signaled child reports 128+signal from both runners](#scenario-a-signaled-child-reports-128signal-from-both-runners)
+- [atago self-hosting / pty graphics](#atago-self-hosting--pty-graphics) — 7 scenarios
+  - [a kitty terminal acknowledges the graphics query and reports its cell size](#scenario-a-kitty-terminal-acknowledges-the-graphics-query-and-reports-its-cell-size)
+  - [without graphics the terminal answers only DA1](#scenario-without-graphics-the-terminal-answers-only-da1)
+  - [a status report does not overtake an earlier device-attributes reply](#scenario-a-status-report-does-not-overtake-an-earlier-device-attributes-reply)
+  - [drawn images are recorded whether sent as PNG or as chunked raw pixels](#scenario-drawn-images-are-recorded-whether-sent-as-png-or-as-chunked-raw-pixels)
+  - [a session waits for an image to arrive](#scenario-a-session-waits-for-an-image-to-arrive)
+  - [an image that was not drawn fails and lists what was](#scenario-an-image-that-was-not-drawn-fails-and-lists-what-was)
+  - [graphics and images mistakes are load-time errors](#scenario-graphics-and-images-mistakes-are-load-time-errors)
 - [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 10 scenarios
   - [a pty step starts a command, captures its output, and reports exit 0](#scenario-a-pty-step-starts-a-command-captures-its-output-and-reports-exit-0)
   - [a pty step surfaces a command's non-zero exit code](#scenario-a-pty-step-surfaces-a-commands-non-zero-exit-code)
@@ -12049,6 +12057,149 @@ kill -TERM $$
   - exit code is `143`
 - after `interactive (pty): sh -c 'kill -INT $$'`:
   - exit code is `130`
+
+## atago self-hosting / pty graphics
+Source: `test/e2e/atago/pty_graphics.atago.yaml`
+### Scenario: a kitty terminal acknowledges the graphics query and reports its cell size
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): stty raw -echo; printf '\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[c'; r=$(dd bs=1 count=27 2>/dev/null); stty sane; printf '%s\n' "$r" | tr '\033' E
+```
+#### Then
+- exit code is `0`
+- rendered screen equals an exact value
+
+### Scenario: without graphics the terminal answers only DA1
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): stty raw -echo; printf '\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[16t\033[c'; r=$(dd bs=1 count=5 2>/dev/null); stty sane; printf '%s\n' "$r" | tr '\033' E
+```
+#### Then
+- exit code is `0`
+- rendered screen equals an exact value
+
+### Scenario: a status report does not overtake an earlier device-attributes reply
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): stty raw -echo; printf '\033[c\033[5n'; r=$(dd bs=1 count=9 2>/dev/null); stty sane; printf '%s\n' "$r" | tr '\033' E
+```
+#### Then
+- exit code is `0`
+- rendered screen equals an exact value
+
+### Scenario: drawn images are recorded whether sent as PNG or as chunked raw pixels
+_skipped on Windows_
+#### Given
+- Fixture file `expected.png` is created.
+
+#### When
+```shell
+# interactive (pty): printf '\033_Ga=T,q=2,f=100;iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAFUlEQVR4nGP4z8DwHwwZ/oMBA7oAADT7E+1KaAUsAAAAAElFTkSuQmCC\033\\'; printf '\033_Ga=T,q=2,f=32,s=4,v=2,m=1;/wAA/wD/AP8AAP////////8A\033\\'; printf '\033_Gm=0;AP8A/wD/AAD///////8=\033\\'; printf 'drawn\r\n'
+```
+#### Then
+- exit code is `0`
+- rendered screen contains `drawn` and draws exactly 2 image(s) and an image width 4px, height 2px, without transparency and an image like expected.png
+- rendered screen is checked and draws an image width 4px, height 2px, like expected.png
+
+### Scenario: a session waits for an image to arrive
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): sleep 0.3; printf '\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\033\\'; read -r line
+```
+#### Then
+- exit code is `0`
+- rendered screen is checked and draws exactly 1 image(s) and an image width 1px, height 1px
+
+### Scenario: an image that was not drawn fails and lists what was
+_skipped on Windows_
+#### Given
+- Fixture file `missing.atago.yaml` is created.
+- Fixture file `nographics.atago.yaml` is created.
+
+#### Inputs
+_Fixture `missing.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: wrong size
+    steps:
+      - pty:
+          shell: true
+          graphics: kitty
+          command: "printf '\\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\\033\\\\'"
+      - assert:
+          screen:
+            images:
+              contains:
+                - { width: 40 }
+```
+_Fixture `nographics.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: forgot graphics
+    steps:
+      - pty:
+          shell: true
+          command: "printf '\\033_Ga=T,q=2,f=32,s=1,v=1;/wAA/w==\\033\\\\'"
+      - assert:
+          screen:
+            images: { count: 1 }
+```
+#### When
+```shell
+${atago} run missing.atago.yaml
+${atago} run nographics.atago.yaml
+```
+#### Then
+- after `${atago} run missing.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `assert screen draws an image width 40px`, `1 image(s) drawn (1: 1x1)`
+- after `${atago} run nographics.atago.yaml`:
+  - exit code is `1`
+  - stdout contains `no images drawn`, `images are recorded only by a pty step with graphics: kitty`
+
+### Scenario: graphics and images mistakes are load-time errors
+_skipped on Windows_
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: bad
+scenarios:
+  - name: bad
+    steps:
+      - pty:
+          command: "true"
+          graphics: sixel
+          session:
+            - expect_screen:
+                images:
+                  contains:
+                    - { similar_to: a.png }
+      - assert:
+          screen:
+            images: {}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `graphics "sixel" is not supported`, `similar_to is not supported in expect_screen`, `images needs at least one of count/min_count/contains`
 
 ## atago self-hosting / pty (portable)
 Source: `test/e2e/atago/pty_portable.atago.yaml`

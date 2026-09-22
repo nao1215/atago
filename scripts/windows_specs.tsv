@@ -88,6 +88,7 @@
 ./test/e2e/atago/pdf.atago.yaml	cmd
 ./test/e2e/atago/project_manifest.atago.yaml	bash
 ./test/e2e/atago/pty.atago.yaml	bash
+./test/e2e/atago/pty_graphics.atago.yaml	bash
 ./test/e2e/atago/pty_portable.atago.yaml	cmd
 ./test/e2e/atago/record.atago.yaml	cmd
 ./test/e2e/atago/report_formats.atago.yaml	bash

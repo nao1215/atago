@@ -18,6 +18,9 @@ func validatePTY(add addFunc, where string, p *spec.PTY) {
 	positiveDuration(add, where+".pty.timeout", p.Timeout, "30s", "30s")
 	workdirRelativeDir(add, where+".pty.cwd", p.Cwd)
 	validateHermeticEnv(add, where+".pty", p.ClearEnv, p.PassEnv)
+	if p.Graphics != "" && p.Graphics != spec.PTYGraphicsKitty {
+		add(diag.NotAllowedValue, "%s.pty.graphics %q is not supported (the only value is %q)", where, p.Graphics, spec.PTYGraphicsKitty)
+	}
 	// A pty size is a uint16 on the wire; reject values the terminal cannot
 	// represent instead of silently truncating.
 	if p.Rows < 0 || p.Cols < 0 || p.Rows > 65535 || p.Cols > 65535 {
@@ -118,6 +121,15 @@ func validatePTYExpectScreen(add addFunc, where string, es *spec.PTYExpectScreen
 	}
 	if es.Trim != nil {
 		add(diag.KeyNotHere, "%s.trim is not supported in expect_screen", where)
+	}
+	if es.Images != nil {
+		// A baseline resolves against the spec directory, which a mid-session
+		// wait does not have; comparing pixels belongs to the post-step assert.
+		for i := range es.Images.Contains {
+			if es.Images.Contains[i].SimilarTo != "" {
+				add(diag.KeyNotHere, "%s.images.contains[%d].similar_to is not supported in expect_screen; wait for the image by size or count here and compare pixels in a post-step assert screen", where, i)
+			}
+		}
 	}
 	positiveDuration(add, where+".timeout", es.Timeout, "", "")
 	positiveDuration(add, where+".stable_for", es.StableFor, "", "")

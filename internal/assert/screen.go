@@ -18,14 +18,18 @@ func checkScreen(sa *spec.ScreenAssert, res *runner.Result, env Env) *CheckResul
 	if res == nil || !res.IsPTY {
 		return &CheckResult{Desc: "assert screen", Hint: "no pty step has run in this scenario yet (screen asserts render a pty step's terminal)"}
 	}
-	// An assert may be attributes ALONE ("the error line is red"), in which case
-	// there is no stream matcher to run.
+	// An assert may be attributes or images ALONE ("the error line is red"), in
+	// which case there is no stream matcher to run.
 	cr := &CheckResult{OK: true, Desc: "assert screen"}
 	if len(sa.SetMatchers()) > 0 {
 		cr = checkStream("screen", &sa.StreamAssert, res.Screen, true, env)
 	}
 	if cr.OK && len(sa.Attrs) > 0 {
 		cr = checkScreenAttrs(sa.Attrs, res)
+	}
+	if cr.OK && sa.Images != nil {
+		// The images failure explains itself; the text frame would bury it.
+		return checkScreenImages(sa.Images, res.Images, env)
 	}
 	if cr.OK {
 		return cr

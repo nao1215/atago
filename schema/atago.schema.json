@@ -1827,6 +1827,17 @@
           "type": "boolean",
           "description": "Point the pty child's home and per-OS config/cache/data/state dirs at ${workdir}/.atago-home so a CLI touching ~/.config, ~/.cache, or %APPDATA% runs hermetically (#71)."
         },
+        "graphics": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "enum": [
+            "kitty"
+          ],
+          "description": "Makes the terminal answer like one that draws images with the kitty graphics protocol: the capability query is acknowledged, the cell-size query (CSI 16 t) reports 10x20-pixel cells, and every image the program transmits directly (t=d) is recorded for `screen.images`. Unset, neither query is answered, as on a terminal without image support, so a program that requires images can be tested both ways."
+        },
         "session": {
           "type": "array",
           "minItems": 1,
@@ -2156,6 +2167,80 @@
                         ]
                       }
                     ]
+                  },
+                  {
+                    "comment": "A wait on images or attrs alone, with no text matcher, is a complete claim.",
+                    "anyOf": [
+                      {
+                        "required": [
+                          "images"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "attrs"
+                        ]
+                      }
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "empty"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "equals"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "not_equals"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "permutation_of"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "subset_of"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "json"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "yaml"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "contains"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "not_contains"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "matches"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "not_matches"
+                          ]
+                        }
+                      ]
+                    }
                   }
                 ],
                 "properties": {
@@ -2314,6 +2399,84 @@
                         "blink": {
                           "type": "boolean",
                           "description": "Whether the text blinks."
+                        }
+                      }
+                    }
+                  },
+                  "images": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "minProperties": 1,
+                    "description": "Checks the images the program drew through the kitty graphics protocol, recorded only by a pty step with `graphics: kitty`. Every set field must hold. `similar_to` belongs to the post-step assert: a mid-session wait has no spec directory to resolve a baseline against.",
+                    "properties": {
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Exact number of images drawn."
+                      },
+                      "min_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Minimum number of images drawn."
+                      },
+                      "contains": {
+                        "type": "array",
+                        "minItems": 1,
+                        "description": "Images that must be among those drawn. An entry holds when at least one drawn image meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "minProperties": 1,
+                          "properties": {
+                            "width": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Exact pixel width."
+                            },
+                            "height": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Exact pixel height."
+                            },
+                            "min_width": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Lower bound on the pixel width."
+                            },
+                            "max_width": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Upper bound on the pixel width."
+                            },
+                            "min_height": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Lower bound on the pixel height."
+                            },
+                            "max_height": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Upper bound on the pixel height."
+                            },
+                            "alpha": {
+                              "type": "boolean",
+                              "description": "Whether the image carries transparency (any non-opaque pixel)."
+                            },
+                            "similar_to": {
+                              "type": [
+                                "string",
+                                "number",
+                                "boolean"
+                              ],
+                              "description": "Not supported in a mid-session wait (the loader refuses it): there is no spec directory to resolve a baseline against. Compare pixels in a post-step `assert: screen:`."
+                            },
+                            "max_diff": {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1,
+                              "description": "Not supported in a mid-session wait, like `similar_to`."
+                            }
+                          }
                         }
                       }
                     }
@@ -3482,6 +3645,85 @@
               "blink": {
                 "type": "boolean",
                 "description": "Whether the text blinks."
+              }
+            }
+          }
+        },
+        "images": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "description": "Checks the images the program drew through the kitty graphics protocol, recorded only by a pty step with `graphics: kitty`. Every set field must hold.",
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Exact number of images drawn."
+            },
+            "min_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum number of images drawn."
+            },
+            "contains": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Images that must be among those drawn. An entry holds when at least one drawn image meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "width": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Exact pixel width."
+                  },
+                  "height": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Exact pixel height."
+                  },
+                  "min_width": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Lower bound on the pixel width."
+                  },
+                  "max_width": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Upper bound on the pixel width."
+                  },
+                  "min_height": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Lower bound on the pixel height."
+                  },
+                  "max_height": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Upper bound on the pixel height."
+                  },
+                  "alpha": {
+                    "type": "boolean",
+                    "description": "Whether the image carries transparency (any non-opaque pixel)."
+                  },
+                  "similar_to": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ],
+                    "minLength": 1,
+                    "description": "Baseline image the drawn pixels are compared with, resolved like `image.similar_to`: next to the spec, then in the workdir. Same dimensions required."
+                  },
+                  "max_diff": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Largest normalized mean per-pixel difference for `similar_to` (default 0, an exact match)."
+                  }
+                }
               }
             }
           }

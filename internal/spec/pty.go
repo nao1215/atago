@@ -12,6 +12,12 @@ const DefaultPTYSessionTimeout = 30 * time.Second
 // ClearEnvEnabled reports whether the pty step opts into a cleared environment (#16).
 func (p *PTY) ClearEnvEnabled() bool { return p.ClearEnv != nil && *p.ClearEnv }
 
+// PTYGraphicsKitty is the one `graphics:` value.
+const PTYGraphicsKitty = "kitty"
+
+// KittyGraphics reports whether the pty emulates a kitty-graphics terminal.
+func (p *PTY) KittyGraphics() bool { return p.Graphics == PTYGraphicsKitty }
+
 // ShellEnabled reports whether the pty command runs through the shell, matching
 // run.shell semantics.
 func (p *PTY) ShellEnabled() bool { return p.Shell != nil && *p.Shell }
@@ -45,6 +51,12 @@ type PTY struct {
 	// SandboxHome isolates the pty child's home and per-OS config/cache/data/
 	// state directories under `${workdir}/.atago-home`, mirroring run.sandbox_home.
 	SandboxHome *bool `yaml:"sandbox_home,omitempty"`
+	// Graphics makes the terminal answer as one that draws images. The only
+	// value is "kitty": the kitty graphics capability query is acknowledged, the
+	// cell-size query (CSI 16 t) reports 10x20-pixel cells, and every image the
+	// program transmits directly (t=d) is recorded for `screen.images`. Unset, the terminal
+	// answers neither query, like a terminal without image support.
+	Graphics string `yaml:"graphics,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one
 	// of Expect (wait until the accumulated transcript matches the regexp),
 	// Send (write the string to the terminal; an empty send transmits EOF,

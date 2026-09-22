@@ -21,11 +21,41 @@ func validateScreen(add addFunc, where string, sa *spec.ScreenAssert) {
 	// A count bound also belongs to the stream half, so an attrs-only assert that
 	// carries one must still be checked — otherwise the bound is silently
 	// ignored, which is worse than rejecting it.
-	if len(sa.SetMatchers()) > 0 || sa.HasCount() || len(sa.Attrs) == 0 {
+	if len(sa.SetMatchers()) > 0 || sa.HasCount() || (len(sa.Attrs) == 0 && sa.Images == nil) {
 		validateStream(add, where, &sa.StreamAssert)
 	}
 	for i := range sa.Attrs {
 		validateScreenAttr(add, fmt.Sprintf("%s.attrs[%d]", where, i), &sa.Attrs[i])
+	}
+	if sa.Images != nil {
+		validateScreenImages(add, where+".images", sa.Images)
+	}
+}
+
+func validateScreenImages(add addFunc, where string, si *spec.ScreenImages) {
+	if si.Count == nil && si.MinCount == nil && len(si.Contains) == 0 {
+		add(diag.ChooseAtLeastOne, "%s needs at least one of count/min_count/contains", where)
+	}
+	for _, c := range []struct {
+		name string
+		v    *int
+	}{{"count", si.Count}, {"min_count", si.MinCount}} {
+		if c.v != nil && *c.v < 0 {
+			add(diag.NegativeValue, "%s.%s must be >= 0 (got %d)", where, c.name, *c.v)
+		}
+	}
+	if si.Count != nil && si.MinCount != nil {
+		add(diag.ExclusiveKeys, "%s: set count or min_count, not both", where)
+	}
+	for i := range si.Contains {
+		ew := fmt.Sprintf("%s.contains[%d]", where, i)
+		im := si.Contains[i].ImageAssert(ew)
+		if im.Width == nil && im.Height == nil && im.MinWidth == nil && im.MaxWidth == nil &&
+			im.MinHeight == nil && im.MaxHeight == nil && im.Alpha == nil && im.SimilarTo == "" {
+			add(diag.ChooseAtLeastOne, "%s must set at least one of width/height/min_width/max_width/min_height/max_height/alpha/similar_to", ew)
+			continue
+		}
+		validateImage(add, ew, im)
 	}
 }
 
