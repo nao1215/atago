@@ -58,6 +58,7 @@ _only when `minio --version` succeeds_
 _only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18122`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 - Fixture file `upload.txt` is created.
 
 #### Inputs
@@ -67,6 +68,7 @@ hello object storage
 ```
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_lifecycle
 mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key
 mc mb lifecycle/atago-bucket
 mc cp upload.txt lifecycle/atago-bucket/
@@ -77,6 +79,8 @@ mc rm lifecycle/atago-bucket/upload.txt
 mc ls lifecycle/atago-bucket
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
 - after `mc alias set lifecycle http://127.0.0.1:18122 atago atago-secret-key`:
   - exit code is `0`
 - after `mc mb lifecycle/atago-bucket`:
@@ -105,15 +109,23 @@ mc ls lifecycle/atago-bucket
 _only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18123`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_versioned
 mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key
 mc mb versioned/versioned
 mc version enable versioned/versioned
 mc version info --json versioned/versioned
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
+- after `mc alias set versioned http://127.0.0.1:18123 atago atago-secret-key`:
+  - exit code is `0`
+- after `mc mb versioned/versioned`:
+  - exit code is `0`
 - after `mc version enable versioned/versioned`:
   - exit code is `0`
   - stdout contains `versioning is enabled`
@@ -125,6 +137,7 @@ mc version info --json versioned/versioned
 _only when `minio --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18124`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 - Fixture file `page.txt` is created.
 
 #### Inputs
@@ -134,6 +147,7 @@ published via bucket policy
 ```
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_public
 mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key
 mc mb publichost/public-bucket
 mc cp page.txt publichost/public-bucket/
@@ -143,6 +157,14 @@ mc anonymous set download publichost/public-bucket
 # HTTP PUT /public-bucket/forbidden.txt via s3_public
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
+- after `mc alias set publichost http://127.0.0.1:18124 atago atago-secret-key`:
+  - exit code is `0`
+- after `mc mb publichost/public-bucket`:
+  - exit code is `0`
+- after `mc cp page.txt publichost/public-bucket/`:
+  - exit code is `0`
 - after `HTTP GET /public-bucket/page.txt`:
   - HTTP status is `403`
 - after `mc anonymous set download publichost/public-bucket`:

@@ -23,11 +23,13 @@ This is the answer to "how do I test a cloud CLI in CI?": swap the endpoint,
 keep the CLI.
 
 Source: `test/e2e/thirdparty/awscli/awscli.atago.yaml`
+Network policy: egress is allowed only to `127.0.0.1`.
 Secrets declared: `AWS_SECRET_ACCESS_KEY`.
 ### Scenario: bucket and object lifecycle round-trips byte-identically
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18530`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 - Fixture file `payload.txt` is created.
 
 #### Inputs
@@ -37,6 +39,7 @@ hello from atago via the aws cli
 ```
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_0
 aws --endpoint-url http://127.0.0.1:18530 s3 mb s3://mybucket
 aws --endpoint-url http://127.0.0.1:18530 s3 cp payload.txt s3://mybucket/key.txt
 aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
@@ -45,6 +48,8 @@ aws --endpoint-url http://127.0.0.1:18530 s3 rm s3://mybucket/key.txt
 aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
 - after `aws --endpoint-url http://127.0.0.1:18530 s3 mb s3://mybucket`:
   - exit code is `0`
   - stdout contains `make_bucket: mybucket`
@@ -66,6 +71,7 @@ aws --endpoint-url http://127.0.0.1:18530 s3 ls s3://mybucket/
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18531`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 - Fixture file `obj.txt` is created.
 
 #### Inputs
@@ -75,12 +81,15 @@ twelve bytes
 ```
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_1
 aws --endpoint-url http://127.0.0.1:18531 s3 mb s3://jsonbucket
 aws --endpoint-url http://127.0.0.1:18531 s3 cp obj.txt s3://jsonbucket/obj.txt
 aws --endpoint-url http://127.0.0.1:18531 s3api head-object --bucket jsonbucket --key obj.txt --output json
 aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
 - after `aws --endpoint-url http://127.0.0.1:18531 s3 mb s3://jsonbucket`:
   - exit code is `0`
 - after `aws --endpoint-url http://127.0.0.1:18531 s3 cp obj.txt s3://jsonbucket/obj.txt`:
@@ -97,6 +106,7 @@ aws --endpoint-url http://127.0.0.1:18531 s3 ls s3://jsonbucket/
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18532`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 - Fixture file `signed.txt` is created.
 
 #### Inputs
@@ -106,6 +116,7 @@ presigned body content
 ```
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_2
 aws --endpoint-url http://127.0.0.1:18532 s3 mb s3://signbucket
 aws --endpoint-url http://127.0.0.1:18532 s3 cp signed.txt s3://signbucket/signed.txt
 aws --endpoint-url http://127.0.0.1:18532 s3 presign s3://signbucket/signed.txt
@@ -113,6 +124,8 @@ aws --endpoint-url http://127.0.0.1:18532 s3 presign s3://signbucket/signed.txt
 curl -s "${url}"
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
 - after `aws --endpoint-url http://127.0.0.1:18532 s3 mb s3://signbucket`:
   - exit code is `0`
 - after `aws --endpoint-url http://127.0.0.1:18532 s3 cp signed.txt s3://signbucket/signed.txt`:
@@ -125,13 +138,17 @@ curl -s "${url}"
 _only when `aws --version` succeeds_
 #### Given
 - Background service `minio` is started: `minio server data --address 127.0.0.1:18533`.
+- The step is retried up to 120 times every 250ms until HTTP status is `200`.
 
 #### When
 ```shell
+# HTTP GET /minio/health/cluster via s3_3
 aws --endpoint-url http://127.0.0.1:18533 s3 mb s3://errbucket
 aws --endpoint-url http://127.0.0.1:18533 s3api head-object --bucket errbucket --key nope.txt
 ```
 #### Then
+- after `HTTP GET /minio/health/cluster`:
+  - HTTP status is `200`
 - after `aws --endpoint-url http://127.0.0.1:18533 s3 mb s3://errbucket`:
   - exit code is `0`
 - after `aws --endpoint-url http://127.0.0.1:18533 s3api head-object --bucket errbucket --key nope.txt`:
