@@ -304,8 +304,12 @@ func describeScreen(s *spec.ScreenAssert) string {
 		return ""
 	}
 	parts := []string{}
-	if desc := describeStream(&s.StreamAssert); desc != "" {
-		parts = append(parts, desc)
+	// An assert made of attrs or images alone has no text matcher, and its
+	// phrase must not open with one that is not there.
+	if len(s.SetMatchers()) > 0 || s.HasCount() {
+		if desc := describeStream(&s.StreamAssert); desc != "" {
+			parts = append(parts, desc)
+		}
 	}
 	for i := range s.Attrs {
 		parts = append(parts, "shows "+s.Attrs[i].Describe())

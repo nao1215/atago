@@ -11839,7 +11839,7 @@ ${atago} run badflag.atago.yaml
 - after `interactive (pty): printf '\033[1;31mERROR\033[0m plain\r\n\033[7mSELECTED\033[0m\r\n'`:
   - rendered screen contains `ERROR` and shows "ERROR" in bold red and shows "plain" in not bold default and shows "SELECTED" in reverse on row 2
 - after `interactive (pty): printf '\033[3mITAL\033[0m \033[4mUNDER\033[0m \033[5mBLINK\033[0m \033[41mONRED\033[0m\r\n'`:
-  - rendered screen is checked and shows "ITAL" in italic and shows "UNDER" in underlined and shows "BLINK" in blinking and shows "ONRED" in on red and shows "ITAL" in not underlined not blinking on default
+  - rendered screen shows "ITAL" in italic and shows "UNDER" in underlined and shows "BLINK" in blinking and shows "ONRED" in on red and shows "ITAL" in not underlined not blinking on default
 - after `${atago} run badattrs.atago.yaml`:
   - exit code is `1`
   - stdout contains `fg=red (wanted green)`
@@ -12102,7 +12102,7 @@ _skipped on Windows_
 #### Then
 - exit code is `0`
 - rendered screen contains `drawn` and draws exactly 2 image(s) and an image width 4px, height 2px, without transparency and an image like expected.png
-- rendered screen is checked and draws an image width 4px, height 2px, like expected.png
+- rendered screen draws an image width 4px, height 2px, like expected.png
 
 ### Scenario: a session waits for an image to arrive
 _skipped on Windows_
@@ -12112,7 +12112,7 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
-- rendered screen is checked and draws exactly 1 image(s) and an image width 1px, height 1px
+- rendered screen draws exactly 1 image(s) and an image width 1px, height 1px
 
 ### Scenario: an image that was not drawn fails and lists what was
 _skipped on Windows_

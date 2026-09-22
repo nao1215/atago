@@ -441,7 +441,7 @@ End
 ```
 #### Then
 - after `interactive (pty): shellspec`:
-  - rendered screen is checked and shows "1 example, 0 failures" in green
+  - rendered screen shows "1 example, 0 failures" in green
 - after `interactive (pty): shellspec`:
   - rendered screen contains `1 example, 0 failures` and shows "1 example, 0 failures" in default
 
