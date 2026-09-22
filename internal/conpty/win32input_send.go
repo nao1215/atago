@@ -43,14 +43,21 @@ type win32Key struct {
 	state uint32
 }
 
-func (k win32Key) appendTo(out []byte) []byte {
-	out = append(out, "\x1b["...)
-	out = strconv.AppendUint(out, uint64(k.vk), 10)
-	out = append(out, ";0;"...)
-	out = strconv.AppendUint(out, uint64(k.char), 10)
-	out = append(out, ";1;"...)
-	out = strconv.AppendUint(out, uint64(k.state), 10)
-	return append(out, ";1_"...)
+// press appends the key going down and coming back up, as a keyboard does. The
+// release is not decoration: the host folds identical key-down records that
+// follow each other into one, so three Esc presses without releases between
+// them reached the program as two.
+func (k win32Key) press(out []byte) []byte {
+	for _, down := range []byte{'1', '0'} {
+		out = append(out, "\x1b["...)
+		out = strconv.AppendUint(out, uint64(k.vk), 10)
+		out = append(out, ";0;"...)
+		out = strconv.AppendUint(out, uint64(k.char), 10)
+		out = append(out, ';', down, ';')
+		out = strconv.AppendUint(out, uint64(k.state), 10)
+		out = append(out, ";1_"...)
+	}
+	return out
 }
 
 // Win32InputSend encodes what a terminal user types, given as the bytes an
@@ -74,8 +81,7 @@ func (k win32Key) appendTo(out []byte) []byte {
 //
 // Any other escape sequence (a bracketed-paste marker, a mouse report, a focus
 // event) goes out unchanged, for the host to parse as it would from a terminal.
-// Only key presses are sent, no releases: a reader that acts on releases too
-// would otherwise see every key twice.
+// Each key goes down and comes back up, as it does from Windows Terminal.
 func Win32InputSend(p []byte) []byte {
 	out := make([]byte, 0, len(p)*20)
 	s := string(p)
@@ -83,14 +89,14 @@ func Win32InputSend(p []byte) []byte {
 		if s[i] != 0x1b {
 			r, size := utf8.DecodeRuneInString(s[i:])
 			for _, u := range utf16.Encode([]rune{r}) {
-				out = keyForUnit(u).appendTo(out)
+				out = keyForUnit(u).press(out)
 			}
 			i += size
 			continue
 		}
 		n, keys, raw := escapeAt(s[i:])
 		for _, k := range keys {
-			out = k.appendTo(out)
+			out = k.press(out)
 		}
 		out = append(out, raw...)
 		i += n
