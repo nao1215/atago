@@ -206,6 +206,22 @@ func TestRunner_Do_NetworkPolicyDenies(t *testing.T) {
 	}
 }
 
+// TestNew_DoesNotShareTheDefaultTransport pins that the runner keeps its own
+// connection pool. httptest.Server.Close closes the idle connections of
+// http.DefaultTransport, and so can any library in the process, which broke a
+// request another scenario was about to send on a reused connection
+// ("CloseIdleConnections called").
+func TestNew_DoesNotShareTheDefaultTransport(t *testing.T) {
+	t.Parallel()
+	r := New(Config{})
+	if r.client.Transport == nil || r.client.Transport == http.DefaultTransport {
+		t.Fatal("the runner uses http.DefaultTransport, whose idle connections anything in the process may close")
+	}
+	if r.client.Transport != New(Config{}).client.Transport {
+		t.Error("each runner has its own transport; they should share one pool so connections are reused across steps")
+	}
+}
+
 func TestRunner_Do_NetworkPolicyAllowsListedHost(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
