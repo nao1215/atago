@@ -51,10 +51,24 @@ type Runner struct {
 	workdir string
 }
 
+// transport is the connection pool every HTTP step shares. It is a copy of
+// http.DefaultTransport rather than that value itself, because anything in the
+// process may close the default transport's idle connections (httptest does on
+// every Server.Close), and a request about to reuse one then fails with
+// "CloseIdleConnections called" in a scenario that did nothing wrong.
+var transport = newTransport()
+
+func newTransport() http.RoundTripper {
+	if t, ok := http.DefaultTransport.(*http.Transport); ok {
+		return t.Clone()
+	}
+	return &http.Transport{Proxy: http.ProxyFromEnvironment}
+}
+
 // New returns an HTTP runner for the given configuration.
 func New(cfg Config) *Runner {
 	return &Runner{
-		client:  &http.Client{Timeout: cfg.Timeout},
+		client:  &http.Client{Timeout: cfg.Timeout, Transport: transport},
 		baseURL: cfg.BaseURL,
 		allow:   cfg.Allow,
 		workdir: cfg.Workdir,
