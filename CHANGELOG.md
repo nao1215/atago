@@ -16,6 +16,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The "did you mean" hint for an unknown spec key could name a different field on every run. A typo equally close to several fields (for example `zz`, two edits from `bg`, `fg`, `lt` and `os`) was resolved in map order, so the same spec printed a different hint from one run to the next, `--ci` included, which promises deterministic output. The tie now goes to the alphabetically first field.
 - `atago explain` and `atago doc` described a `screen:` assert with only `attrs:` (and now `images:`) as "is checked and ..." (or "(no matcher) and ..."), naming a text check the assert does not make. The phrase now opens with the claims the assert does make: `rendered screen shows "OK" in green`.
 - A pty answered terminal probes out of order. The emulator answers a status report (`CSI 5 n`) or a cursor-position request as soon as it reads one, but atago wrote its own device-attributes reply (DA1) only after the emulator had processed the whole read chunk, so a program that sent DA1 and then DSR received the DSR reply first. Libraries that probe the terminal read up to the DSR reply as the end of the answers and never saw the DA1 reply behind it. Replies now go out in the order the probes were asked.
 
