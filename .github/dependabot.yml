@@ -6,6 +6,11 @@ updates:
       interval: daily
       time: "20:00"
     open-pull-requests-limit: 10
+    ignore:
+      # GHSA-2v4p-qf9q-27wj (GO-2026-6443): no 1.84 release carries the fix,
+      # which is only on the 1.85 development line. Let a later release through.
+      - dependency-name: google.golang.org/grpc
+        versions: ["1.84.0"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
