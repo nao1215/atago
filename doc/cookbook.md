@@ -594,8 +594,10 @@ scenarios:
 A `contains` entry holds when at least one drawn image meets every constraint it sets, by size,
 transparency, or pixels (`similar_to` with `max_diff`, like the `image:` assertion). Matching is
 by content rather than order, because a program that downloads images concurrently draws them in
-no fixed order. `screen.images` is what is on screen now: an image the program deletes (`a=d`)
-leaves it, so a step that turns pictures off can assert `images: { count: 0 }`. Only directly
+no fixed order. `screen.images` is what is on screen now: an image the program deletes (`a=d`) by id, number, id
+range, or all of them leaves it, so a step that turns pictures off can assert `images: { count: 0 }`.
+A delete by screen position, z-index, or animation frame is not followed, because the transcript
+does not record where an image was placed. Only directly
 transmitted images (`t=d`) are recorded; without `graphics: kitty` none are, and the capability and
 cell-size queries go unanswered.
 

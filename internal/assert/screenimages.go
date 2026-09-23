@@ -80,5 +80,5 @@ func noImagesHint(images []runner.TerminalImage) string {
 	if len(images) > 0 {
 		return ""
 	}
-	return "images are recorded only by a pty step with graphics: kitty, only when the program transmits them directly (t=d), and only until it deletes them (a=d)"
+	return "images are recorded only by a pty step with graphics: kitty, only when the program transmits them directly (t=d), and only until it deletes them by id, number, id range, or all (a=d)"
 }

@@ -2407,7 +2407,7 @@
                     "type": "object",
                     "additionalProperties": false,
                     "minProperties": 1,
-                    "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off (a hidden one is back after `a=p`). Every set field must hold. `similar_to` belongs to the post-step assert: a mid-session wait has no spec directory to resolve a baseline against.",
+                    "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off by id, number, id range or all (a hidden one is back after `a=p`). Deletes by screen position, z-index or animation frame are not followed and leave the set as it is. Every set field must hold. `similar_to` belongs to the post-step assert: a mid-session wait has no spec directory to resolve a baseline against.",
                     "properties": {
                       "count": {
                         "type": "integer",
@@ -3657,7 +3657,7 @@
           "type": "object",
           "additionalProperties": false,
           "minProperties": 1,
-          "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off (a hidden one is back after `a=p`). Every set field must hold.",
+          "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off by id, number, id range or all (a hidden one is back after `a=p`). Deletes by screen position, z-index or animation frame are not followed and leave the set as it is. Every set field must hold.",
           "properties": {
             "count": {
               "type": "integer",

@@ -19,7 +19,9 @@ type ScreenAssert struct {
 	// Images checks the images on screen now. They are recorded only by a pty
 	// step with `graphics: kitty`, which is also what lets a program that
 	// requires image support start at all. An image counts from when it is
-	// transmitted until a delete command takes it off the screen.
+	// transmitted until a delete command takes it off the screen by id,
+	// number, id range, or all; a delete by screen position, z-index, or
+	// animation frame is not followed.
 	Images *ScreenImages `yaml:"images,omitempty"`
 }
 

@@ -37,7 +37,8 @@ import (
 // the screen: a lower-case target only hides them, so a later a=p shows them
 // again, and an upper-case target frees them. The targets followed are all
 // (a, the default), image id (i, with or without a placement id), image
-// number (n), and id range (r). The others name a screen position, a
+// number (n, the newest image with it, as numbers may repeat), and id range
+// (r). The others name a screen position, a
 // z-index, or animation frames, which a transcript does not track, so they
 // change nothing.
 const (
@@ -294,19 +295,46 @@ func (g *kittyGraphics) indexByID(id string) int {
 	return slices.IndexFunc(g.images, func(im kittyImage) bool { return im.id == id })
 }
 
+// indexByNumber returns the index of the newest image with the given number,
+// or -1. Numbers, unlike ids, may repeat, and kitty resolves one to the newest
+// image that carries it. The caller holds g.mu.
+func (g *kittyGraphics) indexByNumber(number string) int {
+	if number == "" {
+		return -1
+	}
+	for i := len(g.images) - 1; i >= 0; i-- {
+		if g.images[i].number == number {
+			return i
+		}
+	}
+	return -1
+}
+
 // delete handles a=d: the images the target names leave the screen.
 func (g *kittyGraphics) delete(keys map[string]string) {
 	target := keys["d"]
 	if target == "" {
 		target = "a"
 	}
+	free := target != strings.ToLower(target)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if strings.ToLower(target) == "n" {
+		// A number names one image, the newest with it.
+		i := g.indexByNumber(namedID(keys, "I"))
+		switch {
+		case i < 0:
+		case free:
+			g.images = slices.Delete(g.images, i, i+1)
+		default:
+			g.images[i].hidden = true
+		}
+		return
+	}
 	match := deleteMatcher(strings.ToLower(target), keys)
 	if match == nil {
 		return
 	}
-	free := target != strings.ToLower(target)
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	if free {
 		g.images = slices.DeleteFunc(g.images, match)
 		return
@@ -319,7 +347,8 @@ func (g *kittyGraphics) delete(keys map[string]string) {
 }
 
 // deleteMatcher returns which images a lower-cased delete target names, or nil
-// for a target a transcript cannot follow.
+// for a target a transcript cannot follow. The number target (n) names a
+// single image and is resolved by delete itself.
 func deleteMatcher(target string, keys map[string]string) func(kittyImage) bool {
 	switch target {
 	case "a":
@@ -327,9 +356,6 @@ func deleteMatcher(target string, keys map[string]string) func(kittyImage) bool 
 	case "i":
 		id := namedID(keys, "i")
 		return func(im kittyImage) bool { return id != "" && im.id == id }
-	case "n":
-		number := namedID(keys, "I")
-		return func(im kittyImage) bool { return number != "" && im.number == number }
 	case "r":
 		lo, loErr := strconv.Atoi(keys["x"])
 		hi, hiErr := strconv.Atoi(keys["y"])
@@ -352,9 +378,7 @@ func (g *kittyGraphics) place(keys map[string]string) {
 	g.mu.Lock()
 	i := g.indexByID(namedID(keys, "i"))
 	if i < 0 {
-		if number := namedID(keys, "I"); number != "" {
-			i = slices.IndexFunc(g.images, func(im kittyImage) bool { return im.number == number })
-		}
+		i = g.indexByNumber(namedID(keys, "I"))
 	}
 	if i >= 0 {
 		g.images[i].hidden = false

@@ -79,7 +79,8 @@ scenarios:
 
   # `graphics: kitty` makes the pty answer like a terminal that draws images
   # (the kitty graphics protocol), and records every image the program sends
-  # until it deletes it. `screen.images` asserts what is on screen: how many,
+  # until it deletes it (by id, number, id range, or all; a delete by screen
+  # position is not followed). `screen.images` asserts what is on screen: how many,
   # and which, by size or pixels. The
   # program here sends one 1x1 red pixel as raw RGBA (f=32, s=1, v=1).
   - name: an image-drawing program sees a kitty terminal
