@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-23
+
 ### Added
 
 - Third-party suite for rsync, 31 scenarios over local copies judged by the tree they leave behind. `changes:` pins the trailing-slash rule, a second run being a no-op, `--dry-run` announcing exactly what the real run then does, `--delete` removing only what the source lacks, and the quick check skipping a same-size, same-mtime file with different bytes until `--checksum` is given, alongside `--update`, `--ignore-existing`, `--backup` and `--remove-source-files`. Filter rules are fixed by the tree they produce, and the exit codes 0, 1, 11, 23 and 25 are each checked together with stderr, stdout, and what was left on disk. Two hazards are pinned as rsync behaves: a forgotten destination turns `rsync -a --delete src/` into a listing that exits 0, and a bare `-r` skips a symlink with a notice on stdout and exit 0.
