@@ -16,7 +16,7 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 ```text
 .
 
-PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (4ms)
 ```
 
 Open `demo.atago.yaml`: `record` captured the exit code, the version line on stdout, and an empty stderr — a tool that writes a diagnostic there gets that first line anchored instead — so you have a real test to tighten rather than YAML written from scratch. Swap `git --version` for any command you have (`go version`, `jq --version`, `ls -la`). Then [install atago](/install/) and point it at your own tool.
@@ -27,7 +27,7 @@ You don't write the first spec — your tool does. `atago record -- <command>` r
 
 ```shell
 $ atago record --out mytool.atago.yaml -- mytool convert input.txt
-recorded: exit 0, 2 stdout line(s), 1 file(s) created
+recorded: exit 0, 2 lines of stdout, 1 file created
 wrote mytool.atago.yaml
 $ atago run mytool.atago.yaml
 .
@@ -67,9 +67,9 @@ scenarios:
 
 ```shell
 $ atago run ./specs
-.....................................................................................................
+............
 
-PASSED  160 scenarios: 160 passed, 0 failed, 0 errored, 0 skipped (20.5s)
+PASSED  12 scenarios: 12 passed, 0 failed, 0 errored, 0 skipped (1.4s)
 ```
 
 Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
@@ -77,10 +77,13 @@ Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU co
 When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
 
 ```text
-FAILED: demo / greeting matches its golden
+FAILED: demo / greeting matches its golden  (demo.atago.yaml)
 
 Step:
   assert stdout snapshot
+
+Command:
+  mytool greet
 
 Diff (-expected +actual):
   --- snapshot (golden)
@@ -93,6 +96,8 @@ Diff (-expected +actual):
 
 Hint:
   stdout did not match snapshot "snaps/greeting.txt" (update with --update-snapshots if intended)
+
+FAILED  1 scenario: 0 passed, 1 failed, 0 errored, 0 skipped (3ms)
 ```
 
 ## 2. Check generated files and snapshots
@@ -136,6 +141,7 @@ See [count_and_size](https://github.com/nao1215/atago/blob/main/examples/count_a
 `deterministic: {}` on a `run` step re-runs the command and requires the declared observables to come back byte-identical — the same-input-same-output property that catches iteration order leaking into output (a column order from a map, an unsorted listing, a JSON object whose keys move). Every loose matcher passes such output on every run, so `--repeat` sees no instability; comparing one run's bytes against the next's is the only cheap oracle. A mismatch fails the step with a unified diff between the runs. It is meaningful for an effectively read-only command; when a rerun changes the workdir, the failure says so rather than blaming a bug you do not have.
 
 See [deterministic](https://github.com/nao1215/atago/blob/main/examples/deterministic.atago.yaml) and the cookbook recipe for [proving determinism](/cookbook/#prove-the-same-input-gives-the-same-output).
+
 `suite.env` values may reference variables `suite.setup` captured — a `store` step's value, or the ephemeral address a suite-wide service published through `ready: {store:}` — so a stub registry or proxy can be handed to every scenario as an environment variable without a shell wrapper around `atago run`. A value that cannot resolve is never passed on as the literal text `${name}`: a child process does not fail on that, it uses it, and the resulting error arrives from the tool under test rather than from the spec. A scenario whose env references an undefined name fails before it starts, naming the key, the reference, and the names that are defined.
 
 See [suite_env_from_setup](https://github.com/nao1215/atago/blob/main/examples/suite_env_from_setup.atago.yaml) and the cookbook recipe for [handing a service address to every scenario](/cookbook/#hand-a-suite-wide-services-address-to-every-scenario).
@@ -201,6 +207,8 @@ http      call an HTTP API; assert status and JSON body (edit base_url first)
 mock      stub an HTTP API offline and assert what the client sent (needs curl on PATH)
 services  test against a background server: readiness, retry, teardown (runs as-is)
 ssh       run a command on a remote host over SSH (edit host/user first)
+
+Scaffold one with: atago init --template <name>
 ```
 
 ## Next

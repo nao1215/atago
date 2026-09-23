@@ -35,10 +35,13 @@ jobs:
 ```
 
 On GitLab CI (or any CI that starts from a container image), use the published
-GHCR image:
+GHCR image. Its entrypoint is `atago` itself, so clear it for the CI runner to start
+its shell:
 
 ```yaml
-image: ghcr.io/nao1215/atago:latest
+image:
+  name: ghcr.io/nao1215/atago:latest
+  entrypoint: [""]
 
 stages: [test]
 

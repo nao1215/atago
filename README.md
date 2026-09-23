@@ -34,7 +34,7 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 ```text
 .
 
-PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (4ms)
 ```
 
 `record` runs `git --version` once and writes a spec from what it observed — the
@@ -153,9 +153,9 @@ scenarios:
 
 ```shell
 $ atago run ./specs
-.....................................................................................................
+............
 
-PASSED  160 scenarios: 160 passed, 0 failed, 0 errored, 0 skipped (20.5s)
+PASSED  12 scenarios: 12 passed, 0 failed, 0 errored, 0 skipped (1.4s)
 ```
 
 Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
@@ -163,10 +163,13 @@ Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU co
 When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
 
 ```text
-FAILED: demo / greeting matches its golden
+FAILED: demo / greeting matches its golden  (demo.atago.yaml)
 
 Step:
   assert stdout snapshot
+
+Command:
+  mytool greet
 
 Diff (-expected +actual):
   --- snapshot (golden)
@@ -179,6 +182,8 @@ Diff (-expected +actual):
 
 Hint:
   stdout did not match snapshot "snaps/greeting.txt" (update with --update-snapshots if intended)
+
+FAILED  1 scenario: 0 passed, 1 failed, 0 errored, 0 skipped (3ms)
 ```
 
 ### 2. Check generated files and snapshots
@@ -264,6 +269,8 @@ http      call an HTTP API; assert status and JSON body (edit base_url first)
 mock      stub an HTTP API offline and assert what the client sent (needs curl on PATH)
 services  test against a background server: readiness, retry, teardown (runs as-is)
 ssh       run a command on a remote host over SSH (edit host/user first)
+
+Scaffold one with: atago init --template <name>
 ```
 
 ## Examples
@@ -297,10 +304,13 @@ jobs:
 ```
 
 On GitLab CI (or any CI that starts from a container image), use the published
-GHCR image:
+GHCR image. Its entrypoint is `atago` itself, so clear it for the CI runner to start
+its shell:
 
 ```yaml
-image: ghcr.io/nao1215/atago:latest
+image:
+  name: ghcr.io/nao1215/atago:latest
+  entrypoint: [""]
 
 stages: [test]
 
