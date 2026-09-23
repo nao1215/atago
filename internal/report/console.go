@@ -15,7 +15,8 @@ import (
 
 // writeSummary prints the final tally line. The uppercase status word
 // (PASSED/FAILED) anchors the line and is part of the stable output contract.
-func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, loadFailures int, allowFlaky, allowXPass bool, snapsUpdated int) {
+func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d time.Duration, hardFail bool, o *renderOptions) {
+	loadFailures, allowFlaky, allowXPass, snapsUpdated := len(o.loadFailures), o.allowFlaky, o.allowXPass, o.snapshotsUpdated
 	status, code := "PASSED", cGreen
 	// hardFail covers a suite that errored before producing any scenario row (#7):
 	// the counts are all zero, but the verdict must still read FAILED to match the
@@ -28,7 +29,8 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	// ", N flaky" tail names it either way.
 	// An XPASS follows the same rule as a flake: it fails the run, so the
 	// headline has to say FAILED or it contradicts the exit code.
-	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 ||
+	// A selection --ci refused ran nothing and exits 3, so it is not a pass.
+	if c.Failed > 0 || c.Errored > 0 || hardFail || loadFailures > 0 || o.emptySelection != "" ||
 		(c.Flaky > 0 && !allowFlaky) || (c.XPass > 0 && !allowXPass) {
 		status, code = "FAILED", cRed
 	}
@@ -42,7 +44,7 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 	// like an ordinary green run.
 	fmt.Fprintf(b, "\n%s  %d %s: %d passed, %d failed, %d errored, %d skipped%s%s%s (%s)\n",
 		colorize(color, code+cBold, status), total, plural,
-		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail,
+		c.Passed, c.Failed, c.Errored, c.Skipped, flakySuffix(c)+expectFailSuffix(c), loadFail+emptySelectionSuffix(o.emptySelection),
 		snapshotSuffix(snapsUpdated), d.Round(time.Millisecond))
 }
 

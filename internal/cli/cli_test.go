@@ -1729,6 +1729,11 @@ func TestRunCmd_CIEmptySelectionFails(t *testing.T) {
 		if !strings.Contains(s, "atago list") {
 			t.Errorf("stderr = %q, want a hint on how to list scenarios", s)
 		}
+		// The summary agrees with the exit code: a refused selection is not a
+		// green run of zero scenarios.
+		if o := out.String(); !strings.Contains(o, "FAILED  0 scenarios") || strings.Contains(o, "PASSED") {
+			t.Errorf("stdout = %q, want a FAILED summary to match exit 3", o)
+		}
 	})
 
 	t.Run("filter empty under --ci fails", func(t *testing.T) {

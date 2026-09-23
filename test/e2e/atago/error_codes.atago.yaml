@@ -780,6 +780,14 @@ scenarios:
       - assert:
           exit_code: 3
           stderr: {contains: "ATG3203"}
+          # The summary agrees with the exit code instead of reading PASSED.
+          stdout: {contains: "FAILED  0 scenarios: 0 passed, 0 failed, 0 errored, 0 skipped, the selection matched nothing"}
+      - run: {command: "${atago} run --ci --report json --tag no-such-tag ok.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stdout:
+            json:
+              - {path: "$.empty_selection", matches: "^ATG3203: no scenarios matched --tag"}
 
   - name: ATG3204 is a rerun whose recorded failures no longer exist
     steps:

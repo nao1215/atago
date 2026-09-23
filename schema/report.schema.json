@@ -24,6 +24,10 @@
     "snapshots_updated": {
       "description": "Number of snapshots this run WROTE (--update-snapshots) instead of comparing against, so a consumer can tell a run that rewrote the committed expected results from one that verified them. Omitted when zero.",
       "type": "integer"
+    },
+    "empty_selection": {
+      "description": "Set when --ci refused the run because its --filter/--tag/--skip-tag selection matched no scenario (exit 3): the diagnostic printed on stderr. The suites then hold no scenario, and this field is what tells a consumer the run was refused rather than clean. Omitted otherwise.",
+      "type": "string"
     }
   },
   "$defs": {

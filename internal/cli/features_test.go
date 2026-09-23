@@ -1413,6 +1413,29 @@ func TestSnapshot_HelpFlag(t *testing.T) {
 	}
 }
 
+// TestSnapshotUpdate_HelpNamesItself pins that `atago snapshot update --help`
+// describes the command that was typed. It delegates to run's flag set, which
+// printed "Usage: atago run ..." and listed --update-snapshots, a flag the
+// command already implies. The flag placeholders are named too: --profile
+// takes a NAME, not a "profile".
+func TestSnapshotUpdate_HelpNamesItself(t *testing.T) {
+	t.Parallel()
+	var out, errb bytes.Buffer
+	if got := Main([]string{"snapshot", "update", "--help"}, &out, &errb); got != ExitOK {
+		t.Fatalf("exit = %d, want %d (stderr=%s)", got, ExitOK, errb.String())
+	}
+	help := out.String() + errb.String()
+	if !strings.Contains(help, "Usage: atago snapshot update [") || strings.Contains(help, "Usage: atago run") {
+		t.Errorf("help = %q, want the usage of atago snapshot update", help)
+	}
+	if strings.Contains(help, "[--update-snapshots]") {
+		t.Errorf("help = %q, want no [--update-snapshots]: the command always writes snapshots", help)
+	}
+	if !strings.Contains(help, "\n  -profile NAME\n") {
+		t.Errorf("help = %q, want the --profile placeholder to read NAME", help)
+	}
+}
+
 // tagSelectSpec has one smoke-tagged scenario that FAILS and one slow-tagged
 // scenario that passes, so tag selection is observable through the exit code.
 const tagSelectSpec = `version: "1"

@@ -14,9 +14,12 @@ import (
 // `ok`/`not ok` line per scenario across every suite, numbered from 1; failures
 // and errors carry a YAML diagnostic block, and skips use the `# SKIP` directive.
 // Rendered by Render (FormatTAP).
-func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure, snapsUpdated int) error {
+func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFailure, snapsUpdated int, emptySelection string) error {
 	var b strings.Builder
 	total := len(loadFailures)
+	if emptySelection != "" {
+		total++
+	}
 	for _, res := range results {
 		total += len(res.Scenarios)
 		// A suite that errored before any scenario ran (#7) still contributes a
@@ -29,6 +32,13 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 	fmt.Fprintf(&b, "1..%d\n", total)
 
 	n := 0
+	// A refused selection is a failing point of its own, so a run --ci exits 3
+	// for never reads as a clean "1..0".
+	if emptySelection != "" {
+		n++
+		fmt.Fprintf(&b, "not ok %d - selection\n", n)
+		writeTAPDiagnostic(&b, "the selection matched nothing", emptySelection)
+	}
 	// The unreadable specs lead the stream: they are what the run could not even
 	// begin.
 	for _, lf := range loadFailures {

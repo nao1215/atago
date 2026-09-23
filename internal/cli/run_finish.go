@@ -38,9 +38,10 @@ func finishRun(ctx context.Context, opts *runOptions, suiteResults []*engine.Sui
 		return exit
 	}
 
-	exit = worseExit(exit, emptySelectionExit(ctx, opts, results))
+	selExit, refused := emptySelectionExit(ctx, opts, results)
+	exit = worseExit(exit, selExit)
 
-	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures...), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass), report.WithSnapshotsUpdated(opts.snapshotsUpdated)); err != nil {
+	if err := report.Render(opts.stdout, opts.format, results, report.WithLoadFailures(loadFailures...), report.WithElapsed(elapsed), report.WithAllowFlaky(opts.allowFlaky), report.WithAllowXPass(opts.allowXPass), report.WithSnapshotsUpdated(opts.snapshotsUpdated), report.WithEmptySelection(refused)); err != nil {
 		fmt.Fprintf(opts.stderr, opts.label+": failed to write report: %v\n", err)
 		return worseExit(exit, ExitInternal)
 	}
@@ -162,10 +163,12 @@ func settleRerunLedger(ctx context.Context, opts *runOptions, results []*engine.
 // emptySelectionExit handles a selection that matches nothing: interactively
 // this still exits 0 (nothing ran, nothing failed) but stays loud; under --ci
 // it is a hard config error so a typo'd --filter/--tag/--skip-tag cannot
-// silently disable the whole suite in a pipeline forever.
-func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) int {
+// silently disable the whole suite in a pipeline forever. When --ci refuses,
+// the second result is the diagnostic, which the report carries so its
+// summary reads FAILED like the exit code.
+func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine.SuiteResult) (int, string) {
 	if !opts.selectionActive() {
-		return ExitOK
+		return ExitOK, ""
 	}
 	total := 0
 	for _, r := range results {
@@ -177,7 +180,7 @@ func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine
 	// res.Scenarios. So this is precisely the "selectors filtered everything"
 	// case the task must fail on, not "the specs had nothing to run".
 	if total > 0 || ctx.Err() != nil {
-		return ExitOK
+		return ExitOK, ""
 	}
 	var sel []string
 	if len(opts.filter) > 0 {
@@ -196,15 +199,16 @@ func emptySelectionExit(ctx context.Context, opts *runOptions, results []*engine
 	// users fixing the wrong thing, so name each selector's real rule.
 	note := selectorNoMatchNote(len(opts.filter) > 0, tagActive)
 	if opts.ci {
-		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, diag.EmptySelection.Annotate(fmt.Sprintf("no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.", strings.Join(sel, " "), note)))
-		return ExitConfig
+		msg := diag.EmptySelection.Annotate(fmt.Sprintf("no scenarios matched %s under --ci; refusing to exit 0 (an empty selection would silently disable the suite). %s. Run `atago list` to see available scenarios and tags.", strings.Join(sel, " "), note))
+		fmt.Fprintf(opts.stderr, "%s: %s\n", opts.label, msg)
+		return ExitConfig, msg
 	}
 	hint := note
 	if tagActive {
 		hint += "; run `atago list` to see the available tags"
 	}
 	fmt.Fprintf(opts.stderr, opts.label+": warning: no scenarios matched %s (%s)\n", strings.Join(sel, " "), hint)
-	return ExitOK
+	return ExitOK, ""
 }
 
 func shiftSlice[T any](values []T) (T, []T, bool) {
