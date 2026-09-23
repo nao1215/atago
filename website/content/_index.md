@@ -18,7 +18,7 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 ```text
 .
 
-PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped
+PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (4ms)
 ```
 
 `record` runs `git --version` once and writes a spec from what it observed — the exit code, the version line on stdout, an empty stderr. `run` replays it. Open `demo.atago.yaml` and you have a real test you can tighten, not YAML you wrote from scratch. (Swap `git --version` for any command you have: `go version`, `jq --version`, `ls -la`.)

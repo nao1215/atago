@@ -57,7 +57,7 @@ type Assert struct {
 	Mock *MockAssert `yaml:"mock,omitempty"`
 
 	// Screen is the rendered-terminal assertion target (#27), valid after a
-	// pty step: the transcript replayed through a vt10x emulator sized by the
+	// pty step: the transcript replayed through a terminal emulator sized by the
 	// step's rows/cols, asserted as plain text with the stream matchers
 	// (line.n addresses screen rows 1-based). The raw transcript stays on
 	// stdout.

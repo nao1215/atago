@@ -15,7 +15,7 @@ release pages (linked under [Sources](#sources)) on 2026-08-14, and TUI Test on
 
 | Tool | Release compared | Released |
 |------|------------------|----------|
-| [atago](https://github.com/nao1215/atago) | v0.22.0 | 2026-09-12 |
+| [atago](https://github.com/nao1215/atago) | v0.23.0 | 2026-09-21 |
 | [Bats-core](https://github.com/bats-core/bats-core) | v1.14.0 | 2026-07-21 |
 | [ShellSpec](https://github.com/shellspec/shellspec) | 0.28.1 | 2021-01-11 |
 | [commander](https://github.com/commander-cli/commander) | v2.5.0 | 2023-03-28 |
@@ -55,7 +55,7 @@ test, they are the better choice:
 
 Bats, ShellSpec, and commander overlap with atago directly: all four run a
 command and assert on what happened. The tables compare that shared job.
-Columns are atago v0.22.0, Bats-core v1.14.0, ShellSpec 0.28.1, and
+Columns are atago v0.23.0, Bats-core v1.14.0, ShellSpec 0.28.1, and
 commander v2.5.0.
 
 ### Writing and running tests
@@ -82,7 +82,7 @@ commander v2.5.0.
 | JSON output | JSONPath matchers built in | via `jq` | via `jq` | GJSON paths built in |
 | YAML output | built in | — | — | — |
 | XML output | — | — | — | XPath built in |
-| Files the command created | `file:` / `dir:` incl. recursive trees, permissions | via [bats-file](https://github.com/bats-core/bats-file) | file/path matchers built in | — (`file` compares output against a file) |
+| Files the command created | `file:` / `dir:` incl. recursive trees and the executable bit; `changes:` for permission changes | via [bats-file](https://github.com/bats-core/bats-file) | file/path matchers built in | — (`file` compares output against a file) |
 | Exact set of files a run touched | `changes:` workdir diff | — | — | — |
 | Image / PDF content | format, dimensions, similarity / pages, text | — | — | — |
 | Wall-clock duration bounds | `duration:` | — (`--timing` reports only) | — | `timeout` limit only |
@@ -111,7 +111,7 @@ commander v2.5.0.
 | | atago | Bats | ShellSpec | commander |
 |---|---|---|---|---|
 | Parameterized tests | `matrix:` | — (per-case, or `bats_test_function`) | `Parameters` | — |
-| Generated inputs (property-based) | `forall:` seeded generators, one instance per row | — | — | — |
+| Generated inputs (property-based) | `forall:` seeded generators with pinned `examples:`, one instance per row | — | — | — |
 | Retry / polling | `retry:` re-runs the command until an assert passes | `$BATS_TEST_RETRIES` re-runs the whole test | — | `retries` + `interval` |
 | Tags and filtering | `tags:`, `--tag` / `--skip-tag` / `--filter` | `# bats test_tags=`, `--filter-tags` (v1.8+) | `--tag`, focus (`fIt`), patterns | test-name filter |
 | Parallel execution | `--parallel`, built in | `--jobs` (needs GNU parallel or rush) | built in | — |
@@ -122,13 +122,13 @@ commander v2.5.0.
 
 ## The terminal layer: TUI applications
 
-[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.22.0 and TUI Test 0.0.4, which is still the latest stable release; the [0.1.0 betas](https://github.com/microsoft/tui-test/releases) — beta.3 as of 2026-09-12 — are a Rust rewrite with a different shape, so read their README too.
+[TUI Test](https://github.com/microsoft/tui-test) from Microsoft is the closest tool to atago at driving a real terminal. Columns are atago v0.23.0 and TUI Test 0.0.4, which is still the latest stable release; the [0.1.0 betas](https://github.com/microsoft/tui-test/releases) — beta.3 as of 2026-09-12 — are a Rust rewrite with a different shape, so read their README too.
 
-| | atago v0.22.0 | TUI Test 0.0.4 |
+| | atago v0.23.0 | TUI Test 0.0.4 |
 |---|---|---|
 | Tests are written in | YAML | TypeScript / JavaScript |
 | Ships as | single binary | npm package (Node 16.6+, or Bun on macOS/Linux) |
-| Terminal emulation | vt10x, in-process | [xterm.js](https://xtermjs.org/) |
+| Terminal emulation | [charmbracelet/x/vt](https://github.com/charmbracelet/x), in-process | [xterm.js](https://xtermjs.org/) |
 | Isolation | fresh workdir and PTY per scenario | fresh terminal context (terminal + PTY) per test |
 | Named keys, typing, submit | `send:` with a named-key vocabulary | `keyPress` and per-key helpers, `submit`, `write` |
 | Mouse | clicks, drags, wheel, as SGR 1006 reports | `mouseDown` / `mousePress` / `mouseTo` / `mouseUp` |
@@ -136,7 +136,7 @@ commander v2.5.0.
 | Assert on visible text | `expect_screen:` / `screen:` | `getByText(...)` with `toBeVisible` |
 | Assert on colors and styling | `attrs:` — fg, bg, bold, italic, underline, reverse, blink | `toHaveFgColor` / `toHaveBgColor` |
 | Screen snapshots | `snapshot:` with normalization and `atago snapshot update` | `toMatchSnapshot` |
-| Retry / flake handling | `retry:`, `--repeat`, `--retry-failed`, flake reported | `retries`, auto-wait before assertions |
+| Retry / flake handling | `expect:` / `expect_screen:` wait until the output or screen matches; `--repeat`, `--retry-failed`, flake reported | `retries`, auto-wait before assertions |
 | Parallel execution | `--parallel` | `workers` |
 | What a failure leaves behind | `--artifacts-dir` writes the actual and expected payloads | traces record everything the terminal received, replayed with `show-trace` |
 | Replaying the session itself | — | traces, via `show-trace` |

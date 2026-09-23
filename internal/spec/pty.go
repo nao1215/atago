@@ -95,7 +95,7 @@ type PTYAction struct {
 	// being fixed at whatever the step started with.
 	Resize *PTYResize `yaml:"resize,omitempty"`
 	// ExpectScreen waits until the CURRENT rendered screen (the transcript
-	// replayed through the same vt10x emulator as a top-level `screen:` assert)
+	// replayed through the same terminal emulator as a top-level `screen:` assert)
 	// satisfies the matcher. `stable_for` requires the matcher to stay true
 	// continuously for that long; `timeout` optionally bounds only this wait,
 	// within the pty step's wider session timeout.

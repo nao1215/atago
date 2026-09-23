@@ -49,6 +49,53 @@ func TestDocs_NoStaleLintReferences(t *testing.T) {
 	}
 }
 
+// TestDocs_CodeFencesPair pins that every Markdown document closes each code
+// block it opens. A fence lost in a merge does not fail any renderer: the
+// block just runs on, and every heading and recipe after it is shown as code
+// on GitHub and on the website. The telltale is a fence with an info string
+// (```yaml) where a block should close, so that is what is refused, along with
+// a block still open at the end of the file.
+func TestDocs_CodeFencesPair(t *testing.T) {
+	t.Parallel()
+	var paths []string
+	for _, pattern := range []string{"*.md", "doc/*.md", "doc/e2e/*.md", "website/content/*.md"} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, matches...)
+	}
+	if len(paths) == 0 {
+		t.Fatal("no Markdown documents found")
+	}
+	fence := regexp.MustCompile("^ *(`{3,}|~{3,})(.*)$")
+	for _, path := range paths {
+		var open string // the fence that opened the current block, "" outside one
+		openedAt := 0
+		for i, line := range strings.Split(readDoc(t, path), "\n") {
+			m := fence.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			marker, info := m[1], strings.TrimSpace(m[2])
+			if open == "" {
+				open, openedAt = marker, i+1
+				continue
+			}
+			if marker[0] != open[0] || len(marker) < len(open) {
+				continue // a shorter or different fence is content of the block
+			}
+			if info != "" {
+				t.Errorf("%s:%d: a fence with %q opens a block inside the one opened at line %d; a closing fence is missing above it", path, i+1, info, openedAt)
+			}
+			open = ""
+		}
+		if open != "" {
+			t.Errorf("%s:%d: the code block opened here is never closed", path, openedAt)
+		}
+	}
+}
+
 // TestDocs_FixtureSourceKeyNamed guards #157: the README prose that introduces
 // fixtures must name the real inline-source key `content:` — not just the word
 // "text" — so a reader who skims the prose cannot guess a non-existent `text:`

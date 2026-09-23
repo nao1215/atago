@@ -16,6 +16,13 @@ description = "atago tests real CLI behavior from plain YAML: exit codes, output
 [markup.highlight]
 noClasses = false
 
+# A CLI's documentation is made of flags and literal text: the typographer
+# would print `--help` outside a code span as an en dash ("–help"), which
+# breaks copy and paste and the heading anchors doc/e2e links to, and would
+# curl the straight quotes of a shell example. Keep the text as written.
+[markup.goldmark.extensions.typographer]
+disable = true
+
 [markup.tableOfContents]
 startLevel = 2
 endLevel = 3

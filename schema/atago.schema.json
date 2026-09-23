@@ -1759,7 +1759,7 @@
         "command"
       ],
       "additionalProperties": false,
-      "description": "Runs one command inside a real pseudo-terminal and drives it with a declarative expect/send session (#8) — for CLIs that branch on TTY-ness or present interactive prompts. POSIX-only at runtime; Windows reports a clear execution error.",
+      "description": "Runs one command inside a real pseudo-terminal and drives it with a declarative expect/send session (#8) — for CLIs that branch on TTY-ness or present interactive prompts. Runs on Linux, macOS, and Windows (a ConPTY).",
       "properties": {
         "command": {
           "type": [
@@ -3488,7 +3488,7 @@
     "screenAssert": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a vt10x emulator, asserted as plain text (`line.n` = screen row) and, with `attrs`, as colors and styling (#382). A screen assert may carry text matchers, attribute entries, or both — both must hold.",
+      "description": "The rendered terminal screen of the preceding pty step (#27): the transcript replayed through a terminal emulator, asserted as plain text (`line.n` = screen row) and, with `attrs`, as colors and styling (#382). A screen assert may carry text matchers, attribute entries, or both — both must hold.",
       "properties": {
         "line": {
           "type": "integer",

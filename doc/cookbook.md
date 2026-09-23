@@ -1079,6 +1079,7 @@ profiles:
   cover:                             # atago run --profile cover
     build:
       command: "go build -cover -covermode=atomic -coverpkg=./... -o ${artifact} ."
+      cwd: ".."                      # a profile replaces the whole build block
     env:
       GOCOVERDIR: "${env:GOCOVERDIR}"
 ```
@@ -1216,8 +1217,6 @@ Full spec: [suite_setup](../examples/suite_setup.atago.yaml)
 
 ## Hand a suite-wide service's address to every scenario
 
-## Track a known bug with an expected-failure spec
-
 ```yaml
 version: "1"
 suite:
@@ -1260,6 +1259,11 @@ receive an entry yet whose value the running step is still producing. Write
 
 Full spec: [suite_env_from_setup](../examples/suite_env_from_setup.atago.yaml)
 
+## Track a known bug with an expected-failure spec
+
+```yaml
+version: "1"
+suite:
   name: known bugs
 
 scenarios:
