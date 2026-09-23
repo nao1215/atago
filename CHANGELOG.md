@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The website's Since column showed the keys a release added as "unreleased" after the release was out. The release PR stamps its new keys with the upcoming version, but the site is rebuilt when that PR merges, before the tag exists, and the generator turned the stamp back into "unreleased". The deployment the tag then triggered was of the same commit, and GitHub Pages kept the one it already had, so v0.24.0's 28 new keys stayed "unreleased" on the site. The generator now keeps a stamp that names a version newer than every tag.
+
 ## [0.24.0] - 2026-09-23
 
 ### Added

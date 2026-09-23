@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -347,5 +348,23 @@ func TestSpecSchema_SpecKeysComplete(t *testing.T) {
 		if !schemaP[k] {
 			t.Errorf("website/data/spec_keys.json lists %q, which is no longer a schema property; regenerate it with `python3 website/tools/gen-spec-keys.py`", k)
 		}
+	}
+}
+
+// TestSpecKeysGenerator_Since runs the unit tests of the generator that
+// resolves the website's Since column. The rule they pin is the one that kept
+// a released key reading "unreleased": a release PR stamps its new keys with
+// the upcoming version, the site is built from the merge before the tag
+// exists, and GitHub Pages does not replace that deployment when the tag's
+// build of the same commit runs. The generator has to keep the stamp, and only
+// the stamp of a version newer than every tag.
+func TestSpecKeysGenerator_Since(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 is not on PATH; the website workflow runs the generator itself")
+	}
+	out, err := exec.CommandContext(t.Context(), python, "-m", "unittest", "website/tools/test_gen_spec_keys.py").CombinedOutput()
+	if err != nil {
+		t.Fatalf("generator unit tests failed: %v\n%s", err, out)
 	}
 }
