@@ -396,15 +396,15 @@ func TestDescribeScreen_Images(t *testing.T) {
 		s    *spec.ScreenAssert
 		want string
 	}{
-		{"count alone", &spec.ScreenAssert{Images: &spec.ScreenImages{Count: &one}}, "draws exactly 1 image(s)"},
+		{"count alone", &spec.ScreenAssert{Images: &spec.ScreenImages{Count: &one}}, "shows exactly 1 image(s)"},
 		{"min count and an entry", &spec.ScreenAssert{Images: &spec.ScreenImages{
 			MinCount: &one,
 			Contains: []spec.ScreenImage{{Width: &w, MaxHeight: &h, Alpha: &opaque, SimilarTo: "a.png"}},
-		}}, "draws at least 1 image(s) and an image width 40px, height <= 20px, without transparency, like a.png"},
+		}}, "shows at least 1 image(s) and an image width 40px, height <= 20px, without transparency, like a.png"},
 		{"with text", &spec.ScreenAssert{
 			StreamAssert: spec.StreamAssert{Contains: spec.StringList{"caption"}},
 			Images:       &spec.ScreenImages{Count: &one},
-		}, `contains "caption" and draws exactly 1 image(s)`},
+		}, `contains "caption" and shows exactly 1 image(s)`},
 		{"nil", nil, ""},
 	}
 	for _, tt := range tests {

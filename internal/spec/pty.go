@@ -54,7 +54,7 @@ type PTY struct {
 	// Graphics makes the terminal answer as one that draws images. The only
 	// value is "kitty": the kitty graphics capability query is acknowledged, the
 	// cell-size query (CSI 16 t) reports 10x20-pixel cells, and every image the
-	// program transmits directly (t=d) is recorded for `screen.images`. Unset, the terminal
+	// program transmits directly (t=d) is recorded for `screen.images` until the program deletes it. Unset, the terminal
 	// answers neither query, like a terminal without image support.
 	Graphics string `yaml:"graphics,omitempty"`
 	// Session is the ordered expect/send script. Each entry sets exactly one

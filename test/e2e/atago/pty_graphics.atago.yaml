@@ -133,6 +133,44 @@ scenarios:
               contains:
                 - { width: 1, height: 1 }
 
+  - name: images the program deletes leave the screen and a hidden one can come back
+    skip:
+      os: windows
+    steps:
+      # i=1 is 1x1 and i=2 is 4x2. d=i hides image 1 (its data stays), a=p
+      # places it again, and d=A frees everything, after which placing image 1
+      # finds nothing to show.
+      - pty:
+          shell: true
+          graphics: kitty
+          command: >-
+            printf '\033_Gi=1,a=T,q=2,f=32,s=1,v=1;/wAA/w==\033\\';
+            printf '\033_Gi=2,a=T,q=2,f=100;iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAFUlEQVR4nGP4z8DwHwwZ/oMBA7oAADT7E+1KaAUsAAAAAElFTkSuQmCC\033\\';
+            read -r line;
+            printf '\033_Ga=d,d=i,i=1,q=2\033\\';
+            read -r line;
+            printf '\033_Ga=p,i=1,q=2\033\\';
+            read -r line;
+            printf '\033_Ga=d,d=A,q=2\033\\\033_Ga=p,i=1,q=2\033\\';
+            printf 'cleared\r\n'
+          timeout: 10s
+          session:
+            - expect_screen: { images: { count: 2 } }
+            - send: "hide\r"
+            - expect_screen:
+                images:
+                  count: 1
+                  contains:
+                    - { width: 4, height: 2 }
+            - send: "show\r"
+            - expect_screen: { images: { count: 2 } }
+            - send: "clear\r"
+      - assert:
+          exit_code: 0
+          screen:
+            contains: cleared
+            images: { count: 0 }
+
   - name: an image that was not drawn fails and lists what was
     skip:
       os: windows
@@ -161,8 +199,8 @@ scenarios:
           exit_code: 1
           stdout:
             contains:
-              - "assert screen draws an image width 40px"
-              - "1 image(s) drawn (1: 1x1)"
+              - "assert screen shows an image width 40px"
+              - "1 image(s) on screen (1: 1x1)"
       - fixture:
           file: nographics.atago.yaml
           content: |
@@ -184,7 +222,7 @@ scenarios:
           exit_code: 1
           stdout:
             contains:
-              - "no images drawn"
+              - "no images on screen"
               - "images are recorded only by a pty step with graphics: kitty"
 
   - name: graphics and images mistakes are load-time errors

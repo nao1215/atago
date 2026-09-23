@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 707 scenarios
+86 suites · 708 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -543,12 +543,13 @@
   - [an expect does not match the echo of its own send](#scenario-an-expect-does-not-match-the-echo-of-its-own-send)
   - [a program's own copy of the input still satisfies an expect](#scenario-a-programs-own-copy-of-the-input-still-satisfies-an-expect)
   - [a signaled child reports 128+signal from both runners](#scenario-a-signaled-child-reports-128signal-from-both-runners)
-- [atago self-hosting / pty graphics](#atago-self-hosting--pty-graphics) — 7 scenarios
+- [atago self-hosting / pty graphics](#atago-self-hosting--pty-graphics) — 8 scenarios
   - [a kitty terminal acknowledges the graphics query and reports its cell size](#scenario-a-kitty-terminal-acknowledges-the-graphics-query-and-reports-its-cell-size)
   - [without graphics the terminal answers only DA1](#scenario-without-graphics-the-terminal-answers-only-da1)
   - [a status report does not overtake an earlier device-attributes reply](#scenario-a-status-report-does-not-overtake-an-earlier-device-attributes-reply)
   - [drawn images are recorded whether sent as PNG or as chunked raw pixels](#scenario-drawn-images-are-recorded-whether-sent-as-png-or-as-chunked-raw-pixels)
   - [a session waits for an image to arrive](#scenario-a-session-waits-for-an-image-to-arrive)
+  - [images the program deletes leave the screen and a hidden one can come back](#scenario-images-the-program-deletes-leave-the-screen-and-a-hidden-one-can-come-back)
   - [an image that was not drawn fails and lists what was](#scenario-an-image-that-was-not-drawn-fails-and-lists-what-was)
   - [graphics and images mistakes are load-time errors](#scenario-graphics-and-images-mistakes-are-load-time-errors)
 - [atago self-hosting / pty (portable)](#atago-self-hosting--pty-portable) — 10 scenarios
@@ -12171,8 +12172,8 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
-- rendered screen contains `drawn` and draws exactly 2 image(s) and an image width 4px, height 2px, without transparency and an image like expected.png
-- rendered screen draws an image width 4px, height 2px, like expected.png
+- rendered screen contains `drawn` and shows exactly 2 image(s) and an image width 4px, height 2px, without transparency and an image like expected.png
+- rendered screen shows an image width 4px, height 2px, like expected.png
 
 ### Scenario: a session waits for an image to arrive
 _skipped on Windows_
@@ -12182,7 +12183,17 @@ _skipped on Windows_
 ```
 #### Then
 - exit code is `0`
-- rendered screen draws exactly 1 image(s) and an image width 1px, height 1px
+- rendered screen shows exactly 1 image(s) and an image width 1px, height 1px
+
+### Scenario: images the program deletes leave the screen and a hidden one can come back
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): printf '\033_Gi=1,a=T,q=2,f=32,s=1,v=1;/wAA/w==\033\\'; printf '\033_Gi=2,a=T,q=2,f=100;iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAFUlEQVR4nGP4z8DwHwwZ/oMBA7oAADT7E+1KaAUsAAAAAElFTkSuQmCC\033\\'; read -r line; printf '\033_Ga=d,d=i,i=1,q=2\033\\'; read -r line; printf '\033_Ga=p,i=1,q=2\033\\'; read -r line; printf '\033_Ga=d,d=A,q=2\033\\\033_Ga=p,i=1,q=2\033\\'; printf 'cleared\r\n'
+```
+#### Then
+- exit code is `0`
+- rendered screen contains `cleared` and shows exactly 0 image(s)
 
 ### Scenario: an image that was not drawn fails and lists what was
 _skipped on Windows_
@@ -12232,10 +12243,10 @@ ${atago} run nographics.atago.yaml
 #### Then
 - after `${atago} run missing.atago.yaml`:
   - exit code is `1`
-  - stdout contains `assert screen draws an image width 40px`, `1 image(s) drawn (1: 1x1)`
+  - stdout contains `assert screen shows an image width 40px`, `1 image(s) on screen (1: 1x1)`
 - after `${atago} run nographics.atago.yaml`:
   - exit code is `1`
-  - stdout contains `no images drawn`, `images are recorded only by a pty step with graphics: kitty`
+  - stdout contains `no images on screen`, `images are recorded only by a pty step with graphics: kitty`
 
 ### Scenario: graphics and images mistakes are load-time errors
 _skipped on Windows_
