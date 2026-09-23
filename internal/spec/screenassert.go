@@ -16,21 +16,24 @@ type ScreenAssert struct {
 	// Every entry must hold.
 	Attrs []ScreenAttr `yaml:"attrs,omitempty"`
 
-	// Images checks the images the program drew. They are recorded only by a
-	// pty step with `graphics: kitty`, which is also what lets a program that
-	// requires image support start at all.
+	// Images checks the images on screen now. They are recorded only by a pty
+	// step with `graphics: kitty`, which is also what lets a program that
+	// requires image support start at all. An image counts from when it is
+	// transmitted until a delete command takes it off the screen by id,
+	// number, id range, or all; a delete by screen position, z-index, or
+	// animation frame is not followed.
 	Images *ScreenImages `yaml:"images,omitempty"`
 }
 
-// ScreenImages checks the images a pty step drew, in arrival order. Every set
-// field must hold.
+// ScreenImages checks the images on a pty step's screen, in the order they
+// were sent. Every set field must hold.
 type ScreenImages struct {
-	// Count is the exact number of images drawn.
+	// Count is the exact number of images on screen.
 	Count *int `yaml:"count,omitempty"`
-	// MinCount is the minimum number of images drawn.
+	// MinCount is the minimum number of images on screen.
 	MinCount *int `yaml:"min_count,omitempty"`
-	// Contains lists images that must be among those drawn: an entry holds when
-	// at least one drawn image meets every constraint the entry sets. Matching
+	// Contains lists images that must be among those on screen: an entry holds
+	// when at least one of them meets every constraint the entry sets. Matching
 	// is by content rather than position because a program that loads images
 	// concurrently draws them in no fixed order.
 	Contains []ScreenImage `yaml:"contains,omitempty"`
@@ -82,7 +85,7 @@ func (si *ScreenImages) Describe() string {
 	if len(parts) == 0 {
 		return "images"
 	}
-	return "draws " + strings.Join(parts, " and ")
+	return "shows " + strings.Join(parts, " and ")
 }
 
 // Describe renders the entry's constraints as a phrase.

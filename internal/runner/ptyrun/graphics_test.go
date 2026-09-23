@@ -9,6 +9,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -180,6 +182,62 @@ func TestKittyGraphics_OversizedCommandIsSkipped(t *testing.T) {
 	g.consume([]byte(apc("a=T,f=32,s=1,v=1;" + b64([]byte{1, 1, 1, 1}))))
 	if len(g.snapshot()) != 1 {
 		t.Fatal("the scanner did not recover after an oversized command")
+	}
+}
+
+// shownWidths lists the widths of the images on screen, in arrival order. The
+// deletion tests give every image a distinct width, so the list says which
+// ones are left.
+func shownWidths(g *kittyGraphics) []int {
+	var out []int
+	for _, im := range g.snapshot() {
+		out = append(out, im.Width)
+	}
+	return out
+}
+
+// transmit is an a=T command for a 1-pixel-high picture of the given width,
+// with the extra control keys in front (for example "i=1").
+func transmit(keys string, width int) string {
+	return apc(keys + ",a=T,f=32,s=" + strconv.Itoa(width) + ",v=1;" + b64(bytes.Repeat([]byte{1, 2, 3, 255}, width)))
+}
+
+// TestKittyGraphics_DeletionsTakeImagesOffScreen pins that the recorded set is
+// what is on screen now: a delete command takes the images it names away, a
+// lower-case target only hides them (the data stays and a=p shows them again),
+// an upper-case one frees them, and a transmission that reuses an id replaces
+// the image. Targets that name a screen position cannot be followed from the
+// transcript and change nothing.
+func TestKittyGraphics_DeletionsTakeImagesOffScreen(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		stream string
+		want   []int
+	}{
+		{"nothing deleted", transmit("i=1", 1) + transmit("i=2", 2), []int{1, 2}},
+		{"by id hides one", transmit("i=1", 1) + transmit("i=2", 2) + apc("a=d,d=i,i=1"), []int{2}},
+		{"by id frees one", transmit("i=1", 1) + transmit("i=2", 2) + apc("a=d,d=I,i=2"), []int{1}},
+		{"all", transmit("i=1", 1) + transmit("", 2) + apc("a=d,d=A"), nil},
+		{"all is the default target", transmit("i=1", 1) + transmit("", 2) + apc("a=d"), nil},
+		{"a hidden image placed again is back in order", transmit("i=1", 1) + transmit("i=2", 2) + apc("a=d,d=a") + apc("a=p,i=1"), []int{1}},
+		{"a freed image cannot be placed again", transmit("i=1", 1) + apc("a=d,d=A") + apc("a=p,i=1"), nil},
+		{"by number", transmit("I=7", 1) + transmit("I=8", 2) + apc("a=d,d=N,I=7"), []int{2}},
+		{"by number takes only the newest with it", transmit("I=7", 1) + transmit("I=7", 2) + apc("a=d,d=n,I=7"), []int{1}},
+		{"placing by number shows the newest with it", transmit("I=7", 1) + transmit("I=7", 2) + apc("a=d,d=a") + apc("a=p,I=7"), []int{2}},
+		{"by id range", transmit("i=1", 1) + transmit("i=5", 2) + transmit("i=9", 3) + apc("a=d,d=R,x=2,y=9"), []int{1}},
+		{"same id replaces", transmit("i=1", 1) + transmit("i=2", 2) + transmit("i=1", 3), []int{3, 2}},
+		{"a position target changes nothing", transmit("i=1", 1) + apc("a=d,d=p,x=1,y=1"), []int{1}},
+		{"an unknown id changes nothing", transmit("i=1", 1) + apc("a=d,d=I,i=4"), []int{1}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := newKittyGraphics()
+			g.consume([]byte(tc.stream))
+			if got := shownWidths(g); !slices.Equal(got, tc.want) {
+				t.Fatalf("shown widths = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

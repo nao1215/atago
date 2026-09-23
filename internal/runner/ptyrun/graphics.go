@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,10 +29,18 @@ import (
 // transmits is decoded and kept for the `screen.images` assertion.
 //
 // Only direct transmission (t=d) is decoded; file and shared-memory media
-// cannot be read from a transcript. An image is recorded when it is
-// transmitted (a=t or a=T), so placement and deletion commands are accepted
-// and ignored: whether the program displays it at once (a=T) or later (a=p,
-// or a unicode placeholder with U=1), the image it sent is the same.
+// cannot be read from a transcript. The recorded set is what is on screen
+// now. An image joins it when it is transmitted (a=t or a=T): whether the
+// program displays it at once (a=T) or later (a=p, or a unicode placeholder
+// with U=1), the image it sent is the same. A transmission that reuses an id
+// replaces that image. A delete command (a=d) takes the images it names off
+// the screen: a lower-case target only hides them, so a later a=p shows them
+// again, and an upper-case target frees them. The targets followed are all
+// (a, the default), image id (i, with or without a placement id), image
+// number (n, the newest image with it, as numbers may repeat), and id range
+// (r). The others name a screen position, a
+// z-index, or animation frames, which a transcript does not track, so they
+// change nothing.
 const (
 	// graphicsCellWidth / graphicsCellHeight are the pixel size of one cell the
 	// emulated terminal reports.
@@ -62,7 +71,16 @@ type kittyGraphics struct {
 	replies [][]byte
 
 	mu     sync.Mutex
-	images []runner.TerminalImage
+	images []kittyImage
+}
+
+// kittyImage is one recorded image with the names a program can later delete
+// or place it by.
+type kittyImage struct {
+	id     string // i=, "" when the program named none
+	number string // I=, "" when the program named none
+	img    runner.TerminalImage
+	hidden bool // deleted with a lower-case target: off screen, data kept
 }
 
 type apcState uint8
@@ -196,6 +214,10 @@ func (g *kittyGraphics) command(body []byte) {
 	switch action(keys) {
 	case "q":
 		g.reply(keys, "OK")
+	case "d":
+		g.delete(keys)
+	case "p":
+		g.place(keys)
 	case "t", "T":
 		t := &kittyTransfer{keys: keys}
 		t.add(payload)
@@ -241,12 +263,127 @@ func (g *kittyGraphics) finish(t *kittyTransfer) {
 		return
 	}
 	b := img.Bounds()
+	rec := kittyImage{
+		id:     namedID(t.keys, "i"),
+		number: namedID(t.keys, "I"),
+		img:    runner.TerminalImage{Width: b.Dx(), Height: b.Dy(), PNG: encoded.Bytes()},
+	}
 	g.mu.Lock()
-	if len(g.images) < maxGraphicsImages {
-		g.images = append(g.images, runner.TerminalImage{Width: b.Dx(), Height: b.Dy(), PNG: encoded.Bytes()})
+	if i := g.indexByID(rec.id); i >= 0 {
+		g.images[i] = rec
+	} else if len(g.images) < maxGraphicsImages {
+		g.images = append(g.images, rec)
 	}
 	g.mu.Unlock()
 	g.reply(t.keys, "OK")
+}
+
+// namedID returns the id-like key k (i= or I=). 0 is the protocol's "none".
+func namedID(keys map[string]string, k string) string {
+	if v := keys[k]; v != "0" {
+		return v
+	}
+	return ""
+}
+
+// indexByID returns the index of the image with the given id, or -1. The
+// caller holds g.mu.
+func (g *kittyGraphics) indexByID(id string) int {
+	if id == "" {
+		return -1
+	}
+	return slices.IndexFunc(g.images, func(im kittyImage) bool { return im.id == id })
+}
+
+// indexByNumber returns the index of the newest image with the given number,
+// or -1. Numbers, unlike ids, may repeat, and kitty resolves one to the newest
+// image that carries it. The caller holds g.mu.
+func (g *kittyGraphics) indexByNumber(number string) int {
+	if number == "" {
+		return -1
+	}
+	for i := len(g.images) - 1; i >= 0; i-- {
+		if g.images[i].number == number {
+			return i
+		}
+	}
+	return -1
+}
+
+// delete handles a=d: the images the target names leave the screen.
+func (g *kittyGraphics) delete(keys map[string]string) {
+	target := keys["d"]
+	if target == "" {
+		target = "a"
+	}
+	free := target != strings.ToLower(target)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if strings.ToLower(target) == "n" {
+		// A number names one image, the newest with it.
+		i := g.indexByNumber(namedID(keys, "I"))
+		switch {
+		case i < 0:
+		case free:
+			g.images = slices.Delete(g.images, i, i+1)
+		default:
+			g.images[i].hidden = true
+		}
+		return
+	}
+	match := deleteMatcher(strings.ToLower(target), keys)
+	if match == nil {
+		return
+	}
+	if free {
+		g.images = slices.DeleteFunc(g.images, match)
+		return
+	}
+	for i := range g.images {
+		if match(g.images[i]) {
+			g.images[i].hidden = true
+		}
+	}
+}
+
+// deleteMatcher returns which images a lower-cased delete target names, or nil
+// for a target a transcript cannot follow. The number target (n) names a
+// single image and is resolved by delete itself.
+func deleteMatcher(target string, keys map[string]string) func(kittyImage) bool {
+	switch target {
+	case "a":
+		return func(kittyImage) bool { return true }
+	case "i":
+		id := namedID(keys, "i")
+		return func(im kittyImage) bool { return id != "" && im.id == id }
+	case "r":
+		lo, loErr := strconv.Atoi(keys["x"])
+		hi, hiErr := strconv.Atoi(keys["y"])
+		if loErr != nil || hiErr != nil {
+			return nil
+		}
+		return func(im kittyImage) bool {
+			id, err := strconv.Atoi(im.id)
+			return err == nil && id >= lo && id <= hi
+		}
+	}
+	return nil
+}
+
+// place handles a=p: an image hidden by a lower-case delete is shown again.
+// It sends no reply, as before placements were followed: an image atago could
+// not record (a file medium, say) is one a real terminal would place, so an
+// ENOENT here would change what the program under test sees.
+func (g *kittyGraphics) place(keys map[string]string) {
+	g.mu.Lock()
+	i := g.indexByID(namedID(keys, "i"))
+	if i < 0 {
+		i = g.indexByNumber(namedID(keys, "I"))
+	}
+	if i >= 0 {
+		g.images[i].hidden = false
+	}
+	g.mu.Unlock()
 }
 
 // reply answers a command the way kitty does: only when the program named an
@@ -264,14 +401,20 @@ func (g *kittyGraphics) reply(keys map[string]string, msg string) {
 	g.replies = append(g.replies, fmt.Appendf(nil, "\x1b_Gi=%s;%s\x1b\\", id, msg))
 }
 
-// snapshot returns the images recorded so far.
+// snapshot returns the images on screen now, in the order they were sent.
 func (g *kittyGraphics) snapshot() []runner.TerminalImage {
 	if g == nil {
 		return nil
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return append([]runner.TerminalImage(nil), g.images...)
+	var out []runner.TerminalImage
+	for _, im := range g.images {
+		if !im.hidden {
+			out = append(out, im.img)
+		}
+	}
+	return out
 }
 
 func parseKittyKeys(control string) map[string]string {

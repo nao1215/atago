@@ -42,7 +42,7 @@ func TestCheckScreenImages_Counts(t *testing.T) {
 			if got.OK != tc.ok {
 				t.Fatalf("OK = %v, want %v (%s / %s)", got.OK, tc.ok, got.Actual, got.Hint)
 			}
-			if !got.OK && got.Actual != "2 image(s) drawn (1: 4x2, 2: 8x8)" {
+			if !got.OK && got.Actual != "2 image(s) on screen (1: 4x2, 2: 8x8)" {
 				t.Fatalf("Actual = %q", got.Actual)
 			}
 		})
@@ -94,7 +94,7 @@ func TestCheckScreenImages_SimilarToUsesTheImageBaseline(t *testing.T) {
 func TestCheckScreenImages_NoImagesExplainsGraphics(t *testing.T) {
 	t.Parallel()
 	got := checkImages(&spec.ScreenImages{MinCount: intp(1)}, nil, Env{})
-	if got.OK || got.Actual != "no images drawn" || !strings.Contains(got.Hint, "graphics: kitty") {
+	if got.OK || got.Actual != "no images on screen" || !strings.Contains(got.Hint, "graphics: kitty") {
 		t.Fatalf("got OK=%v actual=%q hint=%q", got.OK, got.Actual, got.Hint)
 	}
 }

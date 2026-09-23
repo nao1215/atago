@@ -2407,22 +2407,22 @@
                     "type": "object",
                     "additionalProperties": false,
                     "minProperties": 1,
-                    "description": "Checks the images the program drew through the kitty graphics protocol, recorded only by a pty step with `graphics: kitty`. Every set field must hold. `similar_to` belongs to the post-step assert: a mid-session wait has no spec directory to resolve a baseline against.",
+                    "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off by id, number, id range or all (a hidden one is back after `a=p`). Deletes by screen position, z-index or animation frame are not followed and leave the set as it is. Every set field must hold. `similar_to` belongs to the post-step assert: a mid-session wait has no spec directory to resolve a baseline against.",
                     "properties": {
                       "count": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Exact number of images drawn."
+                        "description": "Exact number of images on screen."
                       },
                       "min_count": {
                         "type": "integer",
                         "minimum": 0,
-                        "description": "Minimum number of images drawn."
+                        "description": "Minimum number of images on screen."
                       },
                       "contains": {
                         "type": "array",
                         "minItems": 1,
-                        "description": "Images that must be among those drawn. An entry holds when at least one drawn image meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
+                        "description": "Images that must be among those on screen. An entry holds when at least one of them meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
                         "items": {
                           "type": "object",
                           "additionalProperties": false,
@@ -3657,22 +3657,22 @@
           "type": "object",
           "additionalProperties": false,
           "minProperties": 1,
-          "description": "Checks the images the program drew through the kitty graphics protocol, recorded only by a pty step with `graphics: kitty`. Every set field must hold.",
+          "description": "Checks the images on screen now, drawn through the kitty graphics protocol and recorded only by a pty step with `graphics: kitty`. An image counts from when it is transmitted until a delete command takes it off by id, number, id range or all (a hidden one is back after `a=p`). Deletes by screen position, z-index or animation frame are not followed and leave the set as it is. Every set field must hold.",
           "properties": {
             "count": {
               "type": "integer",
               "minimum": 0,
-              "description": "Exact number of images drawn."
+              "description": "Exact number of images on screen."
             },
             "min_count": {
               "type": "integer",
               "minimum": 0,
-              "description": "Minimum number of images drawn."
+              "description": "Minimum number of images on screen."
             },
             "contains": {
               "type": "array",
               "minItems": 1,
-              "description": "Images that must be among those drawn. An entry holds when at least one drawn image meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
+              "description": "Images that must be among those on screen. An entry holds when at least one of them meets every constraint it sets; matching is by content, not position, because a program that loads images concurrently draws them in no fixed order.",
               "items": {
                 "type": "object",
                 "additionalProperties": false,
