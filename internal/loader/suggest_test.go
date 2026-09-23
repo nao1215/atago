@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -206,6 +207,36 @@ func TestClosestField(t *testing.T) {
 	// A token that exactly matches an existing field must not suggest itself.
 	if got, ok := closestField("command"); ok && got == "command" {
 		t.Errorf("closestField(exact field) suggested itself: %q", got)
+	}
+}
+
+// TestClosestField_TieIsDeterministic pins that a typo equally close to
+// several fields gets the same hint in every process. The vocabulary is
+// collected into a map, and a hint picked in map order changed from run to
+// run ("lt", then "fg", then "gt" for the same spec), which `--ci` promises
+// not to do. A tie now goes to the alphabetically first field.
+func TestClosestField_TieIsDeterministic(t *testing.T) {
+	t.Parallel()
+	vocab := fieldVocabulary()
+	if !slices.IsSorted(vocab) {
+		t.Fatal("the field vocabulary is not sorted, so a tie is resolved in map order")
+	}
+	const typo = "zz"
+	best, want := 3, ""
+	ties := 0
+	for _, name := range vocab {
+		switch d := editDistance(typo, name); {
+		case d < best:
+			best, want, ties = d, name, 1
+		case d == best:
+			ties++
+		}
+	}
+	if ties < 2 {
+		t.Fatalf("%q is not a tie (%d candidate at distance %d); pick a typo several fields are equally close to", typo, ties, best)
+	}
+	if got, _ := closestField(typo); got != want {
+		t.Errorf("closestField(%q) = %q, want the alphabetically first of the %d tied fields, %q", typo, got, ties, want)
 	}
 }
 

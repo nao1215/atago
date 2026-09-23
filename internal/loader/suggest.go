@@ -217,6 +217,9 @@ func fieldVocabulary() []string {
 		for name := range seen {
 			vocab = append(vocab, name)
 		}
+		// Sorted, so a typo equally close to several fields gets the same
+		// hint in every process instead of whichever map order came first.
+		slices.Sort(vocab)
 	})
 	return vocab
 }
