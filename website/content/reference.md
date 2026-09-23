@@ -17,6 +17,8 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 | `atago manifest` | emit a stable JSON summary of specs for tooling |
 | `atago list` | show scenarios, tags, and artifacts |
 | `atago completion` | print a shell completion script |
+| `atago version` | print the atago version |
+| `atago help` | print usage (`atago <command> --help` for one command's flags) |
 
 `explain`, `doc`, `manifest`, and `list` all load and validate the spec first — exit code 2 on a schema error — so any of them doubles as a lint step in CI.
 
@@ -83,11 +85,12 @@ profiles:
   cover:
     build:
       command: "go build -cover -covermode=atomic -coverpkg=./... -o ${artifact} ."
+      cwd: ".."
     env:
       GOCOVERDIR: "${env:GOCOVERDIR}"
 ```
 
-`atago run` builds it once per invocation, before any scenario, and prepends the artifact's directory to `PATH`. `--profile NAME` swaps in that profile's build command (whole-command replacement) and layers its `env`. A failing build — or one that exits 0 without writing `${artifact}` — is a run-level error and no scenario executes.
+`atago run` builds it once per invocation, before any scenario, and prepends the artifact's directory to `PATH`. `--profile NAME` swaps in that profile's whole `build` block, `cwd` included, and layers its `env`. A failing build — or one that exits 0 without writing `${artifact}` — is a run-level error and no scenario executes.
 
 It is discovered by walking up from a spec to the nearest one, so `atago run ./e2e` and `atago run ./e2e/one.atago.yaml` resolve the same configuration. Precedence is host < project < suite < scenario < step for `env`, and a spec file's own `defaults:` beat the manifest's. `fixtures_dir` resolves against the manifest's directory and must exist at load time. `atago explain` prints the manifest that applied and the resolved fixtures directory. Its own schema is [atago.project.schema.json](https://github.com/nao1215/atago/blob/main/schema/atago.project.schema.json).
 
@@ -145,7 +148,7 @@ One consequence on Windows: a double-quoted path ending in a backslash (`"C:\dir
 ATAGO_SHELL='C:\Program Files\Git\bin\bash.exe' atago run ./e2e
 ```
 
-`ATAGO_SHELL` takes an absolute path on either platform. atago picks the calling convention from the name: `/S /C` for `cmd.exe`, `-c` for anything else, which covers the bash that ships with Git for Windows and MSYS2 as well as PowerShell. One caveat when pairing a POSIX shell with Windows paths: `${workdir}`, `${specdir}`, and `${atago}` expand to backslash paths, and a POSIX shell reads a backslash as an escape — so interpolate them into argv-form commands (`shell: false`) rather than into shell commands.
+`ATAGO_SHELL` takes an absolute path, or a name found on `PATH`, on either platform. atago picks the calling convention from the name: `/S /C` for `cmd.exe`, `-c` for anything else, which covers the bash that ships with Git for Windows and MSYS2 as well as PowerShell. One caveat when pairing a POSIX shell with Windows paths: `${workdir}`, `${specdir}`, and `${atago}` expand to backslash paths, and a POSIX shell reads a backslash as an escape — so interpolate them into argv-form commands (`shell: false`) rather than into shell commands.
 
 ## Shell completion
 

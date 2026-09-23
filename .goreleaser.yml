@@ -97,7 +97,7 @@ release:
     and interactive terminals.
 
     Every artifact is signed and ships with an SBOM and build provenance — see
-    [Verifying release integrity](https://github.com/nao1215/atago#verifying-release-integrity).
+    [Verifying release integrity](https://nao1215.github.io/atago/install/#verifying-release-integrity).
   footer: |
     **Full changelog**: https://github.com/nao1215/atago/compare/{{ .PreviousTag }}...{{ .Tag }}
 changelog:
