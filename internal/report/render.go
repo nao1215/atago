@@ -103,6 +103,27 @@ type renderOptions struct {
 	// snapshotsUpdated is how many golden files the run rewrote under
 	// --update-snapshots, as counted by the engine's write recorder.
 	snapshotsUpdated int
+	// emptySelection is the diagnostic of a selection --ci refused because it
+	// matched nothing; empty when there was none. The run exits 3 with zero
+	// scenarios, so without it every format would report a clean pass.
+	emptySelection string
+}
+
+// WithEmptySelection records that --ci refused the run because its
+// --filter/--tag/--skip-tag selection matched no scenario, so every format
+// reports the refusal the exit code already carries instead of a green run of
+// zero scenarios. msg is the diagnostic printed on stderr.
+func WithEmptySelection(msg string) Option {
+	return func(o *renderOptions) { o.emptySelection = msg }
+}
+
+// emptySelectionSuffix names a refused selection in a summary line, in the
+// shape of the load-failure and snapshot tails.
+func emptySelectionSuffix(msg string) string {
+	if msg == "" {
+		return ""
+	}
+	return ", the selection matched nothing"
 }
 
 // LoadFailure is one spec file the run was given and could not read: the path
@@ -216,11 +237,11 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		if o.hasElapsed {
 			dur = o.elapsed
 		}
-		writeSummary(&b, color, agg, total, dur, hardFail, len(o.loadFailures), o.allowFlaky, o.allowXPass, o.snapshotsUpdated)
+		writeSummary(&b, color, agg, total, dur, hardFail, &o)
 		_, err := io.WriteString(w, b.String())
 		return err
 	case FormatJSON:
-		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: o.snapshotsUpdated}
+		doc := jsonDocument{SchemaVersion: jsonSchemaVersion, Suites: make([]jsonReport, 0, len(results)), SnapshotsUpdated: o.snapshotsUpdated, EmptySelection: o.emptySelection}
 		for _, res := range results {
 			doc.Suites = append(doc.Suites, buildJSON(res, o.allowXPass))
 		}
@@ -233,11 +254,11 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 		enc.SetIndent("", "  ")
 		return enc.Encode(doc)
 	case FormatJUnit:
-		return writeJUnit(w, buildJUnit(results, o.allowXPass, o.loadFailures))
+		return writeJUnit(w, buildJUnit(results, o.allowXPass, o.loadFailures, o.emptySelection))
 	case FormatGHA:
-		return writeGHA(w, results, o.allowXPass, o.loadFailures, o.snapshotsUpdated)
+		return writeGHA(w, results, o.allowXPass, o.loadFailures, o.snapshotsUpdated, o.emptySelection)
 	case FormatTAP:
-		return writeTAP(w, results, o.loadFailures, o.snapshotsUpdated)
+		return writeTAP(w, results, o.loadFailures, o.snapshotsUpdated, o.emptySelection)
 	default:
 		return fmt.Errorf("unknown report format %q", f)
 	}

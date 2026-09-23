@@ -217,12 +217,18 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	rerunFailed := fs.Bool("rerun-failed", false, "run only the scenarios that failed on the previous run (recorded in .atago/last-failed.json)")
 	repeat := fs.Int("repeat", 0, "run each selected scenario N times to surface flakiness; any failing iteration fails the run")
 	retryFailed := fs.Int("retry-failed", 0, "retry failed scenarios up to N times; a recovered scenario is reported as flaky and still fails the run unless --allow-flaky")
-	profile := fs.String("profile", "", "build the subject with the named `profile` from the directory manifest (e.g. a coverage-instrumented build)")
+	profile := fs.String("profile", "", "build the subject with profile `NAME` from the directory manifest (e.g. a coverage-instrumented build)")
 	allowFlaky := fs.Bool("allow-flaky", false, "exit 0 when the only problem is flakiness; for a suite whose instability is known and accepted")
 	allowXPass := fs.Bool("allow-xpass", false, "exit 0 when an expect_fail scenario passed (XPASS); by default a fixed known bug fails the run so the spec gets promoted")
 	verbose := fs.Bool("verbose", false, "trace every scenario as it finishes: commands, exit codes, captured output, and per-assertion verdicts — for passing scenarios too")
+	// `atago snapshot update` reuses this flag set and always writes snapshots,
+	// so its usage names itself and leaves out the flag it implies.
+	updateFlag := "[--update-snapshots] "
+	if label != "atago run" {
+		updateFlag = ""
+	}
 	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), "Usage: atago run [--report "+formatAlternatives()+"] [--update-snapshots] [--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
+		fmt.Fprint(fs.Output(), "Usage: "+label+" [--report "+formatAlternatives()+"] "+updateFlag+"[--parallel N] [--fail-fast] [--filter S] [--tag T] [--skip-tag T] [--rerun-failed] [--repeat N] [--retry-failed N] [--allow-flaky] [--allow-xpass] [--profile NAME] [--artifacts-dir DIR] [--verbose] [--ci] <path | dir>...\n  (directories are searched recursively)\n")
 		fs.PrintDefaults()
 	}
 	operands, err := parseFlagsAnywhere(fs, args)

@@ -29,6 +29,10 @@ type jsonDocument struct {
 	// the one passing outcome a consumer has to be able to notice; omitted when
 	// zero, so an ordinary verify run's document is unchanged.
 	SnapshotsUpdated int `json:"snapshots_updated,omitempty"`
+	// EmptySelection is the diagnostic of a selection --ci refused because it
+	// matched nothing. The suites then hold no scenario, and this is what tells
+	// a consumer the run was refused rather than clean. Omitted otherwise.
+	EmptySelection string `json:"empty_selection,omitempty"`
 }
 
 // jsonLoadFailure names one unreadable spec and why it could not be read.

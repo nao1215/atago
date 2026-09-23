@@ -14,8 +14,11 @@ import (
 // failures surface inline in the Actions UI. One `::error::` line per failed or
 // errored scenario, plus a final `::notice::` summary. Rendered by Render
 // (FormatGHA).
-func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure, snapsUpdated int) error {
+func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure, snapsUpdated int, emptySelection string) error {
 	var b strings.Builder
+	if emptySelection != "" {
+		fmt.Fprintf(&b, "::error title=atago::%s\n", ghaEscapeData(oneLine(emptySelection)))
+	}
 	var agg engine.Counts
 	var total int
 	// A spec that never parsed produced no scenario to annotate, so annotate the
@@ -118,7 +121,7 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
 		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s%s",
 		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
-		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures)),
+		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures))+emptySelectionSuffix(emptySelection),
 		snapshotSuffix(snapsUpdated))))
 	_, err := io.WriteString(w, b.String())
 	return err

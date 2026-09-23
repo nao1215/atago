@@ -5111,10 +5111,16 @@ scenarios: [{name: a, steps: [{run: {command: echo}}]}]
 #### When
 ```shell
 ${atago} run --ci --tag no-such-tag ok.atago.yaml
+${atago} run --ci --report json --tag no-such-tag ok.atago.yaml
 ```
 #### Then
-- exit code is `3`
-- stderr contains `ATG3203`
+- after `${atago} run --ci --tag no-such-tag ok.atago.yaml`:
+  - exit code is `3`
+  - stdout contains `FAILED  0 scenarios: 0 passed, 0 failed, 0 errored, 0 skipped, the selection matched nothing`
+  - stderr contains `ATG3203`
+- after `${atago} run --ci --report json --tag no-such-tag ok.atago.yaml`:
+  - exit code is `3`
+  - stdout at `$.empty_selection` matches `/^ATG3203: no scenarios matched --tag/`
 
 ### Scenario: ATG3204 is a rerun whose recorded failures no longer exist
 #### Given

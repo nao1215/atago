@@ -73,8 +73,22 @@ type junitSkipped struct {
 	Message string `xml:"message,attr"`
 }
 
-func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure) junitTestsuites {
+func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []LoadFailure, emptySelection string) junitTestsuites {
 	root := junitTestsuites{}
+	// A selection --ci refused ran nothing; like a load failure it belongs to no
+	// suite, so it gets one errored testcase of its own instead of an empty,
+	// green document.
+	if emptySelection != "" {
+		root.Suites = append(root.Suites, junitTestsuite{
+			Name: "selection", Tests: 1, Errors: 1,
+			Testcases: []junitTestcase{{
+				Name:  "select",
+				Error: &junitMessage{Message: "the selection matched nothing", Body: emptySelection},
+			}},
+		})
+		root.Tests++
+		root.Errors++
+	}
 	// A spec that never parsed belongs to no suite, so it gets one of its own
 	// carrying a single errored testcase — the shape a collection error takes in
 	// every other tool that produces JUnit XML.

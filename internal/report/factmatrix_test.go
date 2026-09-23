@@ -229,6 +229,18 @@ func factCatalog() map[string]reportFact {
 				FormatGHA:     {contains: "spec failed to load"},
 			},
 		},
+		"a selection --ci refused because it matched nothing": {
+			results:      []*engine.SuiteResult{{Suite: "matrix", SpecPath: "matrix.atago.yaml", Status: engine.StatusPassed}},
+			optionAnchor: []string{"emptySelection"},
+			opts:         []Option{WithEmptySelection(`no scenarios matched --tag "SELMSG-MARKER"`)},
+			proofs: map[Format]factProof{
+				FormatConsole: {contains: "FAILED  0 scenarios: 0 passed, 0 failed, 0 errored, 0 skipped, the selection matched nothing"},
+				FormatJSON:    {contains: `"empty_selection": "no scenarios matched --tag \"SELMSG-MARKER\""`},
+				FormatJUnit:   {contains: "SELMSG-MARKER"},
+				FormatTAP:     {contains: "not ok 1 - selection"},
+				FormatGHA:     {contains: "::error title=atago::no scenarios matched --tag"},
+			},
+		},
 		"rewritten snapshot goldens": {
 			results: passed, optionAnchor: []string{"snapshotsUpdated"},
 			opts: []Option{WithSnapshotsUpdated(3)},
