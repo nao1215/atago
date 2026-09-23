@@ -363,7 +363,7 @@ func TestSpecKeysGenerator_Since(t *testing.T) {
 	if err != nil {
 		t.Skip("python3 is not on PATH; the website workflow runs the generator itself")
 	}
-	out, err := exec.CommandContext(t.Context(), python, "-m", "unittest", "website/tools/test_gen_spec_keys.py").CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), python, "-B", "-m", "unittest", "website/tools/test_gen_spec_keys.py").CombinedOutput()
 	if err != nil {
 		t.Fatalf("generator unit tests failed: %v\n%s", err, out)
 	}
