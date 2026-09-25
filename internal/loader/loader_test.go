@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/yaml"
 
 	"github.com/nao1215/atago/internal/store"
 )
@@ -874,9 +874,9 @@ func TestLoadBytes_Errors(t *testing.T) {
 }
 
 // TestLoadBytes_MalformedYAMLDoesNotPanic pins the loader's no-panic contract on
-// untrusted input: some malformed YAML makes the underlying goccy/go-yaml decoder
-// nil-panic (found by FuzzLoadBytes). LoadBytes must recover and return a clean
-// parse error instead of crashing the process.
+// untrusted input. These inputs made the previous third-party decoder
+// nil-panic (found by FuzzLoadBytes); LoadBytes must return a clean parse error
+// instead of crashing the process.
 func TestLoadBytes_MalformedYAMLDoesNotPanic(t *testing.T) {
 	t.Parallel()
 	// Reduced from the fuzz crasher testdata/fuzz/FuzzLoadBytes/230de42ba4751bda.
@@ -899,12 +899,9 @@ func TestLoadBytes_MalformedYAMLDoesNotPanic(t *testing.T) {
 	}
 }
 
-// TestLoadBytes_ExplicitTagRejected pins the tag rejection that keeps the
-// decoder's nil-panic path unreachable. Every input here reaches
-// ast.TagNode.ArrayRange -> nil *ArrayNodeIter -> decodeSlice panic in
-// goccy/go-yaml v1.19.2 when it is allowed through, so each must now be
-// rejected before decoding, with a message that names the tag and its position
-// instead of the opaque "malformed YAML" the recover path produces.
+// TestLoadBytes_ExplicitTagRejected pins the rejection of explicit tags, with a
+// message that names the tag and its position. Every input here once panicked
+// the previous third-party decoder, so they stay as regression inputs.
 func TestLoadBytes_ExplicitTagRejected(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

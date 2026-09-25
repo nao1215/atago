@@ -11,9 +11,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/goccy/go-yaml"
 	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
 )
@@ -447,8 +447,8 @@ func sliceValuesEqual(n []any, want any) bool {
 
 // isNumericKind reports whether v is a genuine number (not an arbitrary numeric
 // string). It gates valuesEqual's numeric coercion so string-vs-string equality
-// stays byte-exact. Unsigned kinds are included because goccy/go-yaml decodes a
-// large integer that overflows int64 as uint64, and json.Number because oj
+// stays byte-exact. Unsigned kinds are included because the YAML reader decodes
+// a large integer that overflows int64 as uint64, and json.Number because oj
 // decodes an integer beyond int64/uint64 as one — both are real numbers from a
 // parsed document, so an `equals` against a numeric spec value must compare them
 // numerically (via toBigInt/toFloat), not lexically.

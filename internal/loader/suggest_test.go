@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // TestLoadBytes_UnknownFieldSuggestion proves the first-five-minutes typo gets
@@ -126,17 +128,35 @@ func TestLoadBytes_CollectionShapeHint(t *testing.T) {
 	}
 }
 
-// TestSuggestCollectionShape_Passthrough proves the hint is attached only to
-// the error it explains: an unrelated message, and one whose excerpt carries no
-// readable key, come back untouched rather than gaining a guess.
-func TestSuggestCollectionShape_Passthrough(t *testing.T) {
+// TestSuggestShape_Passthrough proves the hint is attached only to the error
+// it explains: an error at a list index or at the document, and a scalar of
+// the wrong kind, come back untouched rather than gaining a guess.
+func TestSuggestShape_Passthrough(t *testing.T) {
 	t.Parallel()
-	for _, msg := range []string{
-		"some other decode failure",
-		"cannot unmarshal []interface {} into Go struct field Spec.Scenarios of type string",
+	for _, e := range []*yaml.Error{
+		{Msg: "m", Path: "", Want: "a string", Got: yaml.SequenceNode},
+		{Msg: "m", Path: "scenarios[0]", Want: "a string", Got: yaml.SequenceNode},
+		{Msg: "m", Path: "suite.timeout", Want: "a string", Got: yaml.ScalarNode},
+		{Msg: "m", Path: "suite.name", Want: "a list", Got: yaml.MappingNode},
 	} {
-		if got := suggestCollectionShape(msg); got != msg {
-			t.Errorf("suggestCollectionShape(%q) = %q, want it unchanged", msg, got)
+		if got := suggestShape("msg", e); got != "msg" {
+			t.Errorf("suggestShape(%+v) = %q, want it unchanged", e, got)
+		}
+	}
+}
+
+// TestLastKey pins how the key a hint names is read off an error path.
+func TestLastKey(t *testing.T) {
+	t.Parallel()
+	for path, want := range map[string]string{
+		"":                                  "",
+		"suite":                             "suite",
+		"scenarios[0].steps[1].run.command": "command",
+		"scenarios[0]":                      "",
+		`env."A.B"`:                         "A.B",
+	} {
+		if got := lastKey(path); got != want {
+			t.Errorf("lastKey(%q) = %q, want %q", path, got, want)
 		}
 	}
 }
@@ -240,67 +260,40 @@ func TestClosestField_TieIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestSuggestScalarMatcher_Passthrough proves the hint helpers leave unrelated
-// messages untouched — a spurious hint is worse than none.
-func TestSuggestScalarMatcher_Passthrough(t *testing.T) {
-	t.Parallel()
-	// No "used where mapping is expected" phrase: returned verbatim.
-	if got := suggestScalarMatcher("some unrelated error"); got != "some unrelated error" {
-		t.Errorf("suggestScalarMatcher passthrough = %q", got)
-	}
-	// The phrase is present but no stream target on the marked line: no hint.
-	msg := "string was used where mapping is expected\n>  3 | foo: bar"
-	if got := suggestScalarMatcher(msg); got != msg {
-		t.Errorf("suggestScalarMatcher with no stream target added a hint: %q", got)
-	}
-	// A real stream target on the marked line gets the shape hint.
-	msg2 := "string was used where mapping is expected\n>  9 |     stdout: hi"
-	if got := suggestScalarMatcher(msg2); got == msg2 {
-		t.Errorf("suggestScalarMatcher missed a stream target: %q", got)
-	}
-}
-
-// TestSuggestUnknownField_Passthrough covers the non-field-name branch.
+// TestSuggestUnknownField_Passthrough proves a distant unknown field yields no
+// "did you mean" guess.
 func TestSuggestUnknownField_Passthrough(t *testing.T) {
 	t.Parallel()
-	if got := suggestUnknownField("no field marker here"); got != "no field marker here" {
-		t.Errorf("suggestUnknownField passthrough = %q", got)
-	}
-	// A distant unknown field yields no "did you mean" guess.
-	if got := suggestUnknownField(`unknown field "zzqqxxww"`); got != `unknown field "zzqqxxww"` {
+	if got := suggestUnknownField(`unknown field "zzqqxxww"`, "zzqqxxww"); got != `unknown field "zzqqxxww"` {
 		t.Errorf("suggestUnknownField added a wild guess: %q", got)
 	}
 }
 
-// TestSourcePos_UnknownAndNil exercises Source.pos's defensive branches: a nil
-// receiver, a source built from unparseable bytes, a malformed path expression,
-// and a path that resolves to no node — all must report the zero Position.
+// TestSourcePos_UnknownAndNil exercises the locator's defensive branches: a nil
+// receiver, a source built from unparseable bytes, and lookups that name no
+// node all report the zero position.
 func TestSourcePos_UnknownAndNil(t *testing.T) {
 	t.Parallel()
-
-	// nil receiver / nil file.
 	var nilSrc *Source
-	if p := nilSrc.pos("$.suite"); p.Line != 0 {
-		t.Errorf("nil source pos = %+v, want zero", p)
+	if l, c := nilSrc.SuitePos(); l != 0 || c != 0 {
+		t.Errorf("nil source SuitePos = %d:%d, want zero", l, c)
 	}
-
-	// Unparseable YAML: newSource yields a fileless Source that answers unknown.
 	broken := newSource([]byte("a: b: c: ["))
 	if broken == nil {
 		t.Fatal("newSource returned nil")
 	}
-	if p := broken.pos("$.suite"); p.Line != 0 {
-		t.Errorf("broken-source pos = %+v, want zero", p)
+	if l, _ := broken.SuitePos(); l != 0 {
+		t.Errorf("broken-source SuitePos line = %d, want zero", l)
 	}
-
 	valid := newSource([]byte("suite:\n  name: x\n"))
-	// A malformed path string resolves to unknown rather than erroring out.
-	if p := valid.pos("$.["); p.Line != 0 {
-		t.Errorf("malformed path pos = %+v, want zero", p)
+	if l, _ := valid.RunnerPos("nope"); l != 0 {
+		t.Errorf("missing runner line = %d, want zero", l)
 	}
-	// A path that names no node resolves to unknown.
-	if p := valid.pos("$.nope.deeper"); p.Line != 0 {
-		t.Errorf("missing-node pos = %+v, want zero", p)
+	if l, _ := valid.ScenarioPos(3); l != 0 {
+		t.Errorf("missing scenario line = %d, want zero", l)
+	}
+	if l, _ := valid.StepPos(0, 0); l != 0 {
+		t.Errorf("missing step line = %d, want zero", l)
 	}
 }
 
@@ -308,9 +301,8 @@ func TestSourcePos_UnknownAndNil(t *testing.T) {
 // the suite has no name key (the primary `$.suite.name` lookup misses).
 func TestSuitePos_Fallback(t *testing.T) {
 	t.Parallel()
-	// suite has no name — $.suite.name misses, fallback to $.suite, which (like
-	// every mapping-node lookup here) resolves to the mapping's first field value
-	// token: the `timeout: 1s` line (line 3).
+	// suite has no name, so the lookup falls back to the suite mapping, which
+	// starts at its first key: the `timeout: 1s` line (line 3).
 	src := newSource([]byte("version: \"1\"\nsuite:\n  timeout: 1s\n"))
 	line, _ := src.SuitePos()
 	if line == 0 {

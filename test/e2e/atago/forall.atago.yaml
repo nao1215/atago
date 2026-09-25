@@ -112,6 +112,37 @@ scenarios:
               - 'name="accepts json"'
               - 'name="accepts yaml"'
 
+  - name: choices that look like numbers are the text written
+    steps:
+      # A choice is text substituted into a command, so `1.20` is the four
+      # characters written, not the float 1.2, `007` keeps its zeros and `1e3`
+      # is not 1000.
+      - fixture:
+          file: numbers.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: numbers
+            scenarios:
+              - name: "version ${v}"
+                forall:
+                  vars:
+                    v: {one_of: [1.20, 007, 1e3]}
+                steps:
+                  - run:
+                      shell: true
+                      command: echo ${v}
+      - run:
+          command: ${atago} run --report junit numbers.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'tests="3"'
+              - 'name="version 1.20"'
+              - 'name="version 007"'
+              - 'name="version 1e3"'
+
   - name: the examples an author names are the first instances
     steps:
       # `examples:` are the values that must be tried however the draw goes —

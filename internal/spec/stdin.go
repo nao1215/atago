@@ -1,10 +1,7 @@
 package spec
 
 import (
-	"fmt"
-
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Stdin is a run step's standard-input source (#18). It accepts either the
@@ -37,25 +34,20 @@ func (s Stdin) IsMapping() bool { return s.mapped }
 
 // UnmarshalYAML decodes stdin as a scalar string or a {file}/{base64} mapping.
 // It decodes from the AST node so escapes like "\x1b" in the inline form stay
-// resolved by goccy's parser AND every shape error carries the offending
+// resolved by the parser AND every shape error carries the offending
 // value's [line:col] for the loader's excerpt-and-caret formatter. Unknown
 // mapping keys are rejected here (a custom unmarshaler bypasses the loader's
 // strict-decode), with the accepted shapes spelled out.
-func (s *Stdin) UnmarshalYAML(node ast.Node) error {
-	fail := func(format string, args ...any) error {
-		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
+func (s *Stdin) UnmarshalYAML(node *yaml.Node) error {
+	fail := failf
+	if node.Kind == yaml.ScalarNode {
+		return yaml.Decode(node, &s.Inline, true)
 	}
-	var one string
-	if err := yaml.NodeToValue(node, &one); err == nil {
-		s.Inline = one
-		return nil
-	}
-	var raw map[string]any
-	if err := yaml.NodeToValue(node, &raw); err != nil {
+	if node.Kind != yaml.MappingNode {
 		return fail("stdin must be a string, {file: path}, or {base64: data}")
 	}
 	s.mapped = true
-	for k, v := range raw {
+	return eachEntry(node, func(k string, v any) error {
 		str, ok := v.(string)
 		if !ok {
 			return fail("stdin.%s must be a string", k)
@@ -68,8 +60,8 @@ func (s *Stdin) UnmarshalYAML(node ast.Node) error {
 		default:
 			return fail("stdin: unknown key %q (accepted: file, base64)", k)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // MarshalYAML emits the scalar inline form or the {file}/{base64} mapping the

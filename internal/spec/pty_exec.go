@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // PTYExec is one host command run mid-session (#380). It accepts either a
@@ -49,21 +48,16 @@ const DefaultPTYExecTimeout = 10 * time.Second
 // unknown mapping keys (a custom unmarshaler bypasses the loader's strict
 // decode). It decodes from the AST node so every shape error carries the
 // offending value's [line:col].
-func (e *PTYExec) UnmarshalYAML(node ast.Node) error {
-	fail := func(format string, args ...any) error {
-		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
+func (e *PTYExec) UnmarshalYAML(node *yaml.Node) error {
+	fail := failf
+	if node.Kind == yaml.ScalarNode {
+		return yaml.Decode(node, &e.Command, true)
 	}
-	var one string
-	if err := yaml.NodeToValue(node, &one); err == nil {
-		e.Command = one
-		return nil
-	}
-	var raw map[string]any
-	if err := yaml.NodeToValue(node, &raw); err != nil {
+	if node.Kind != yaml.MappingNode {
 		return fail("exec must be a string or {command: ..., shell: bool, timeout: duration}")
 	}
 	e.mapped = true
-	for k, v := range raw {
+	return eachEntry(node, func(k string, v any) error {
 		switch k {
 		case "command":
 			str, ok := v.(string)
@@ -86,8 +80,8 @@ func (e *PTYExec) UnmarshalYAML(node ast.Node) error {
 		default:
 			return fail("exec: unknown key %q (accepted: command, shell, timeout)", k)
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // MarshalYAML emits the shape UnmarshalYAML accepts, so a loaded exec

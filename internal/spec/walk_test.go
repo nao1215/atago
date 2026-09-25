@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 func TestVarRefs(t *testing.T) {
@@ -812,8 +812,8 @@ func TestCollectServiceVars_EnvAndNoReady(t *testing.T) {
 
 func TestWalkJSONValueStrings_MapAnyAny(t *testing.T) {
 	t.Parallel()
-	// goccy can decode a YAML mapping into map[any]any; the walker must handle
-	// that shape as well as map[string]any.
+	// A mapping built in Go may be a map[any]any; the walker must handle that
+	// shape as well as map[string]any.
 	in := map[any]any{"k": "${x}", 1: "${y}"}
 	out, ok := WalkJSONValueStrings(in, func(s string) string { return s + "!" }).(map[any]any)
 	if !ok {

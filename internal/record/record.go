@@ -10,10 +10,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/goccy/go-yaml"
 	"github.com/nao1215/atago/internal/buildinfo"
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/store"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // maxFileAsserts caps the generated file.exists asserts so a command that
@@ -208,57 +208,18 @@ func firstLine(stream []byte) string {
 	return ""
 }
 
-// yamlScalar renders an arbitrary string as one safe inline YAML scalar,
-// delegating quoting decisions to the YAML library so recorded commands and
-// output can never break the document structure.
-//
-// yaml.Marshal is trusted for punctuation-heavy scalars (`#`, `:`, `*`, a
-// leading space, …), but NOT for control bytes: it leaves a raw tab in a plain
-// scalar — which YAML re-parsing then silently strips, so a recorded
-// tab-separated line would no longer match the real output — and it renders any
-// multi-line string as a block scalar that cannot be spliced inline after
-// `contains: ` / `command: ` (producing an invalid document that aborts
-// `atago record`). For a value carrying any control byte, emit an explicit
-// single-line double-quoted scalar that escapes it, so the value round-trips
-// exactly. A value carrying invalid UTF-8 (binary output, or Latin-1 /
-// Shift-JIS text) cannot survive any string scalar at all — see yamlBinary —
-// so it takes the !!binary path first.
+// yamlScalar renders an arbitrary string as one safe inline YAML scalar, so
+// recorded commands and output can never break the document structure: bare
+// when that reads back as the same string, double-quoted with escapes
+// otherwise, and never a block scalar, which could not be spliced inline after
+// `contains: ` or `command: `. A value carrying invalid UTF-8 (binary output,
+// or Latin-1 / Shift-JIS text) cannot survive any string scalar at all — see
+// yamlBinary — so it takes the !!binary path.
 func yamlScalar(s string) string {
 	if !utf8.ValidString(s) {
 		return yamlBinary(s)
 	}
-	if hasControlByte(s) {
-		return yamlDoubleQuoted(s)
-	}
-	out, err := yaml.Marshal(s)
-	if err != nil {
-		return fmt.Sprintf("%q", s)
-	}
-	scalar := strings.TrimRight(string(out), "\n")
-	// yaml.Marshal leaves a value that begins with the explicit-key indicator
-	// "?" unquoted (e.g. a recorded stdout line of just "?"), which reparses as a
-	// mapping-key start rather than a scalar and makes the generated spec invalid.
-	// Force double-quoting when the marshaled scalar came back bare but the value
-	// starts with a YAML indicator that cannot open a plain scalar.
-	if len(scalar) > 0 && scalar[0] != '"' && scalar[0] != '\'' && startsWithYAMLIndicator(s) {
-		return yamlDoubleQuoted(s)
-	}
-	return scalar
-}
-
-// startsWithYAMLIndicator reports whether s begins with a character that cannot
-// open a plain (unquoted) YAML scalar. Most are already quoted by yaml.Marshal,
-// but "?" is not, so this backstops the scalar emitter against an unquoted
-// indicator slipping into the generated spec.
-func startsWithYAMLIndicator(s string) bool {
-	if s == "" {
-		return false
-	}
-	switch s[0] {
-	case '?', ':', '-', ',', '[', ']', '{', '}', '#', '&', '*', '!', '|', '>', '\'', '"', '%', '@', '`', ' ', '\t':
-		return true
-	}
-	return false
+	return yaml.Quote(s)
 }
 
 // yamlBinary renders s as a YAML `!!binary` (base64) scalar so a value carrying
@@ -276,16 +237,4 @@ func yamlBinary(s string) string {
 	// Quote the base64 payload so a digit-only encoding (for example "1803")
 	// still lexes as a string scalar under !!binary rather than a plain integer.
 	return `!!binary "` + base64.StdEncoding.EncodeToString([]byte(s)) + `"`
-}
-
-// hasControlByte reports whether s contains a C0 control character (tab,
-// newline, CR, …) — the bytes yaml.Marshal cannot safely inline and that
-// yamlDoubleQuoted escapes.
-func hasControlByte(s string) bool {
-	for _, r := range s {
-		if r < 0x20 {
-			return true
-		}
-	}
-	return false
 }

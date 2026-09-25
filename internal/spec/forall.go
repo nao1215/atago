@@ -1,10 +1,7 @@
 package spec
 
 import (
-	"fmt"
-
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Forall makes a scenario a template over GENERATED inputs (#656), the way
@@ -58,23 +55,58 @@ type Generator struct {
 // formatter, and so unknown keys are rejected here — a custom unmarshaler
 // bypasses the loader's strict decode, which is what would otherwise let a
 // misspelled `mins:` through in silence.
-func (g *Generator) UnmarshalYAML(node ast.Node) error {
-	fail := func(format string, args ...any) error {
-		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
+func (g *Generator) UnmarshalYAML(node *yaml.Node) error {
+	fail := failf
+	if node.Kind == yaml.ScalarNode {
+		return yaml.Decode(node, &g.Type, true)
 	}
-	var one string
-	if err := yaml.NodeToValue(node, &one); err == nil {
-		g.Type = one
-		return nil
-	}
-	var raw map[string]any
-	if err := yaml.NodeToValue(node, &raw); err != nil {
+	if node.Kind != yaml.MappingNode {
 		return fail("a forall variable must be a generator name or a mapping ({type: ..., min: ..., max: ...} or {one_of: [...]})")
 	}
-	for k, v := range raw {
+	for _, pair := range node.Pairs {
+		k := pair.Key.Value
+		if k == "one_of" || k == "examples" {
+			// The values are text, read as written: `one_of: [1.20]` offers
+			// the four characters 1.20, not the float they spell.
+			if err := g.setList(k, pair.Value, fail); err != nil {
+				return err
+			}
+			continue
+		}
+		v, err := yaml.Value(pair.Value)
+		if err != nil {
+			return err
+		}
 		if err := g.setKey(k, v, fail); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// setList assigns one_of or examples, which are lists of values.
+func (g *Generator) setList(k string, n *yaml.Node, fail func(string, ...any) error) error {
+	if n == nil || n.Kind != yaml.SequenceNode {
+		return fail("forall generator: %s must be a list of values", k)
+	}
+	// An authored empty list is kept as an empty (non-nil) slice so the loader
+	// can tell "chooses from nothing" — a generator that can produce no value —
+	// from a generator that never mentioned the key at all.
+	values := make([]string, 0, len(n.Items))
+	for _, item := range n.Items {
+		if item != nil && item.Kind != yaml.ScalarNode {
+			return fail("forall generator: %s must be a list of values", k)
+		}
+		var s string
+		if err := yaml.Decode(item, &s, true); err != nil {
+			return err
+		}
+		values = append(values, s)
+	}
+	if k == "examples" {
+		g.Examples = values
+	} else {
+		g.OneOf = values
 	}
 	return nil
 }
@@ -89,9 +121,9 @@ func (g *Generator) setKey(k string, v any, fail func(string, ...any) error) err
 		}
 		g.Type = s
 	case "min", "max":
-		// asInt (pty_send.go) reads every numeric shape goccy hands back: a
-		// non-negative bound arrives as uint64 and a negative one as int64, so
-		// `{type: int, min: -50}` has to go through the same reader as `times:`.
+		// asInt (pty_send.go) reads every numeric shape a generic decode
+		// hands back, so `{type: int, min: -50}` goes through the same reader
+		// as `times:`.
 		i, ok := asInt(v)
 		if !ok {
 			return fail("forall generator: %s must be an integer", k)
@@ -100,23 +132,6 @@ func (g *Generator) setKey(k string, v any, fail func(string, ...any) error) err
 			g.Min = &i
 		} else {
 			g.Max = &i
-		}
-	case "one_of", "examples":
-		list, ok := v.([]any)
-		if !ok {
-			return fail("forall generator: %s must be a list of values", k)
-		}
-		// An authored empty list is kept as an empty (non-nil) slice so the
-		// loader can tell "chooses from nothing" — a generator that can produce
-		// no value — from a generator that never mentioned the key at all.
-		values := make([]string, 0, len(list))
-		for _, item := range list {
-			values = append(values, fmt.Sprint(item))
-		}
-		if k == "examples" {
-			g.Examples = values
-		} else {
-			g.OneOf = values
 		}
 	default:
 		return fail("forall generator: unknown key %q (accepted: type, min, max, one_of, examples)", k)
