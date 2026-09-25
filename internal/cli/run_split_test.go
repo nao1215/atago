@@ -3,9 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -250,4 +252,22 @@ func TestFinishRun_ReportWriteFailureReturnsInternal(t *testing.T) {
 			t.Fatalf("stderr = %q, want the report write failure", errb.String())
 		}
 	})
+}
+
+// TestParseRunFlags_ParallelDefault pins the --parallel default at four
+// scenarios per CPU: a scenario mostly waits on the program it runs, and one
+// per CPU left CPUs idle.
+func TestParseRunFlags_ParallelDefault(t *testing.T) {
+	t.Parallel()
+	spec := filepath.Join(t.TempDir(), "x.atago.yaml")
+	if err := os.WriteFile(spec, []byte("version: \"1\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	opts, code, stop := parseRunFlags("run", []string{spec}, io.Discard, io.Discard)
+	if stop {
+		t.Fatalf("parseRunFlags stopped with %d", code)
+	}
+	if want := 4 * runtime.NumCPU(); opts.parallel != want {
+		t.Errorf("--parallel default = %d, want %d", opts.parallel, want)
+	}
 }

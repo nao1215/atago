@@ -158,7 +158,7 @@ $ atago run ./specs
 PASSED  12 scenarios: 12 passed, 0 failed, 0 errored, 0 skipped (1.4s)
 ```
 
-Scenarios run concurrently by default (`--parallel N`, defaulting to your CPU count; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
+Scenarios run concurrently by default (`--parallel N`, defaulting to four per CPU, since a scenario spends most of its time waiting on the program it runs; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
 
 When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
 
