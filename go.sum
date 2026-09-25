@@ -118,8 +118,8 @@ github.com/mattn/go-shellwords v1.0.15 h1:rx0n8+ZdM9JWZMlr2BMPAjtLU0rfluLNtwMC2F
 github.com/mattn/go-shellwords v1.0.15/go.mod h1:EZzvwXDESEeg03EKmM+RmDnNOPKG4lLtQsUlTZDWQ8Y=
 github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELUXHmA=
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
-github.com/nao1215/markdown v1.0.0 h1:zQBogWfxyORTloiJ1MYjXXAx17jFRM2eZgvOl04rv88=
-github.com/nao1215/markdown v1.0.0/go.mod h1:yJIlVDqSkxkFcQGXnaI6cpCgpGk8Ua+usXbE8+UBqQE=
+github.com/nao1215/markdown v1.1.0 h1:p98VA0SPFLM0i00NMw9Kq4RZcWd6MSRCQcW4+jGLwUM=
+github.com/nao1215/markdown v1.1.0/go.mod h1:djmRvXG8gjnCJ98sapWoY+hvH2y+LQdxr4YMYjtTmVA=
 github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/ohler55/ojg v1.28.6 h1:K3UiCbEfk62AMKwFcARSKyy/EtYXi8/QvCvMwwvGKL4=
@@ -150,8 +150,8 @@ github.com/tenntenn/golden v0.5.5 h1:3LPemp4rZUIYeh0MTgIn8nzbY8EKVu0Kyb7AOBM016g
 github.com/tenntenn/golden v0.5.5/go.mod h1:zPPkSkshkDGyYIFOIRkyydYQB4XErvg+Uufi0Q9H5qE=
 github.com/xo/terminfo v1.2.0 h1:d0ZTOCpuGE0lwSAOs0zcJjwz3jWQyqcRt9XbGJpCOl4=
 github.com/xo/terminfo v1.2.0/go.mod h1:lGzkSo8Fe7IRh/w+Gqz7n5mDog4FVXCj3gy/DYTBqio=
-github.com/yuin/goldmark v1.8.5 h1:r6N5afV5qj/5S4UTch8agZHJ8UxNCMwX7WjkkJam2NA=
-github.com/yuin/goldmark v1.8.5/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
+github.com/yuin/goldmark v1.8.6 h1:d0VcaP1sx9GkFVkoW+KtggpGi2KZ965i14b0+bDQST4=
+github.com/yuin/goldmark v1.8.6/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/otel v1.44.0 h1:JjwHmHpA4iZ3wBxluu2fbbE7j4kqlE8jXyAyPXH7HqU=
