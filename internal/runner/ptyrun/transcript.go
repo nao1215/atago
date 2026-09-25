@@ -21,8 +21,11 @@ type transcriptDrain struct {
 
 	writeMu sync.Mutex
 
-	mu          sync.Mutex
-	transcript  []byte
+	mu         sync.Mutex
+	transcript []byte
+	// grew is closed, and replaced, whenever the transcript grows, so a wait
+	// for output wakes when the output arrives instead of at its next poll.
+	grew        chan struct{}
 	readErr     error
 	readDone    chan struct{}
 	screenLen   int
@@ -51,6 +54,7 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 		p:         p,
 		rw:        rw,
 		readDone:  make(chan struct{}),
+		grew:      make(chan struct{}),
 		screenLen: -1,
 		modes:     map[int]bool{},
 	}
@@ -101,6 +105,8 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 				for _, m := range transitions {
 					t.modes[m.Param] = m.Enabled
 				}
+				close(t.grew)
+				t.grew = make(chan struct{})
 				t.mu.Unlock()
 				for _, r := range pending {
 					queries.resize(r.rows, r.cols)
@@ -154,6 +160,15 @@ func (t *transcriptDrain) typeInput(b []byte, times int) error {
 	}
 	_, err := t.write(b)
 	return err
+}
+
+// growth returns a channel that is closed when the transcript next grows. Take
+// it before reading the transcript, so output that lands in between still
+// wakes the wait.
+func (t *transcriptDrain) growth() <-chan struct{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.grew
 }
 
 func (t *transcriptDrain) snapshot() []byte {
