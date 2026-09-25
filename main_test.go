@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"math"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -51,5 +53,32 @@ func TestDogfood_SpecsLoad(t *testing.T) {
 		if _, err := loader.Load(p); err != nil {
 			t.Errorf("%s: failed to load: %v", p, err)
 		}
+	}
+}
+
+// TestTuneGC pins that atago's collector settings apply only where the user
+// left the variable unset.
+func TestTuneGC(t *testing.T) {
+	prevPercent := debug.SetGCPercent(100)
+	prevLimit := debug.SetMemoryLimit(math.MaxInt64)
+	t.Cleanup(func() {
+		debug.SetGCPercent(prevPercent)
+		debug.SetMemoryLimit(prevLimit)
+	})
+
+	tuneGC(func(string) string { return "" })
+	if got := debug.SetGCPercent(100); got != gcPercent {
+		t.Errorf("GC percent = %d, want %d", got, gcPercent)
+	}
+	if got := debug.SetMemoryLimit(math.MaxInt64); got != memoryLimit {
+		t.Errorf("memory limit = %d, want %d", got, memoryLimit)
+	}
+
+	tuneGC(func(k string) string { return map[string]string{"GOGC": "50", "GOMEMLIMIT": "1GiB"}[k] })
+	if got := debug.SetGCPercent(100); got != 100 {
+		t.Errorf("GC percent with GOGC set = %d, want it left alone", got)
+	}
+	if got := debug.SetMemoryLimit(math.MaxInt64); got != math.MaxInt64 {
+		t.Errorf("memory limit with GOMEMLIMIT set = %d, want it left alone", got)
 	}
 }
