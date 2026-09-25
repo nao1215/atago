@@ -1312,3 +1312,30 @@ scenarios:
 		t.Errorf("matrix commands are no longer expanded:\n%s", out)
 	}
 }
+
+// TestMDDoc_BlankLines pins where the Markdown writer puts a blank line: after
+// a list the next block is not an item of, and after a quote, which would
+// otherwise take the next line in; nowhere else, since the committed documents
+// were written with exactly these rules.
+func TestMDDoc_BlankLines(t *testing.T) {
+	t.Parallel()
+	md := &mdDoc{}
+	md.H1("T")
+	md.PlainText("para")
+	md.BulletList("a", "b")
+	md.H2("after list")
+	md.PlainText("> quote")
+	md.PlainText("after quote")
+	md.CodeBlocks("shell", "echo hi")
+	md.BulletList("c")
+	md.PlainText("1. one")
+	md.PlainText("<!-- c -->")
+	var b strings.Builder
+	if err := md.Build(&b); err != nil {
+		t.Fatal(err)
+	}
+	want := "# T\npara\n- a\n- b\n\n## after list\n> quote\n\nafter quote\n```shell\necho hi\n```\n- c\n\n1. one\n<!-- c -->\n"
+	if b.String() != want {
+		t.Errorf("Build =\n%q\nwant\n%q", b.String(), want)
+	}
+}

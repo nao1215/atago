@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/nao1215/markdown"
 )
 
 // SplitDoc is one generated per-spec Markdown document: the file name to write it
@@ -38,8 +36,8 @@ func GenerateSplit(sources []Source, outputDir string) (index []byte, docs []Spl
 	if err := generateIndex(&idx, sources, names); err != nil {
 		return nil, nil, err
 	}
-	// Normalize to LF (the Markdown writer emits CRLF on Windows) so split output
-	// is byte-identical across platforms, like Generate.
+	// Normalize to LF so a CRLF inside authored text cannot make split output
+	// differ across platforms, like Generate.
 	index = bytes.ReplaceAll(idx.Bytes(), []byte("\r\n"), []byte("\n"))
 	return index, docs, nil
 }
@@ -47,7 +45,7 @@ func GenerateSplit(sources []Source, outputDir string) (index []byte, docs []Spl
 // generateIndex renders the index page linking each per-spec document, with the
 // document-wide summary at the top.
 func generateIndex(w *bytes.Buffer, sources []Source, names []string) error {
-	md := markdown.NewMarkdown(w)
+	md := &mdDoc{}
 	md.H1("atago Behavior Specs — Index")
 
 	sum := computeSummary(sources)
@@ -63,7 +61,7 @@ func generateIndex(w *bytes.Buffer, sources []Source, names []string) error {
 			mdEscape(src.Spec.Suite.Name), names[i], pluralize(len(src.Spec.Scenarios), "scenario"))
 	}
 	md.PlainText(strings.TrimRight(b.String(), "\n"))
-	return md.Build()
+	return md.Build(w)
 }
 
 // splitFilenames derives a deterministic, collision-free .md file name for each

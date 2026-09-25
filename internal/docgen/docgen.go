@@ -1,5 +1,5 @@
 // Package docgen renders Markdown documentation from specs
-// using github.com/nao1215/markdown. Each spec becomes a section with
+// with a small Markdown writer of its own. Each spec becomes a section with
 // Given / When / Then subsections per scenario.
 package docgen
 
@@ -13,7 +13,6 @@ import (
 	"github.com/nao1215/atago/internal/plural"
 	"github.com/nao1215/atago/internal/spec"
 	"github.com/nao1215/atago/internal/store"
-	"github.com/nao1215/markdown"
 )
 
 // Source pairs a spec with the path it was loaded from.
@@ -40,18 +39,16 @@ func Generate(w io.Writer, sources []Source) error {
 // stdout or when relative links are not wanted; golden images then stay as text
 // references instead of embeds.
 func GenerateTo(w io.Writer, sources []Source, outputDir string) error {
-	var buf bytes.Buffer
-	md := markdown.NewMarkdown(&buf)
+	md := &mdDoc{}
 	md.H1("atago Behavior Specs")
 	writeHeader(md, sources)
 
 	for _, src := range sources {
 		writeSuite(md, src, outputDir)
 	}
-	if err := md.Build(); err != nil {
-		return err
-	}
-	normalized := bytes.ReplaceAll(buf.Bytes(), []byte("\r\n"), []byte("\n"))
+	// Authored text that carried CRLF must not make the output differ by
+	// platform.
+	normalized := bytes.ReplaceAll([]byte(md.String()), []byte("\r\n"), []byte("\n"))
 	// End the document with exactly one newline. A generated Markdown file is a
 	// POSIX text file, and manifest/list --json already terminate their output the
 	// same way; without it a shell prompt joins onto the last line and git reports
@@ -65,7 +62,7 @@ func GenerateTo(w io.Writer, sources []Source, outputDir string) error {
 // The summary reports suite/scenario counts and a tag breakdown; the TOC links
 // to every suite and scenario. It is deterministic so committed docs stay
 // byte-stable and reviewable.
-func writeHeader(md *markdown.Markdown, sources []Source) {
+func writeHeader(md *mdDoc, sources []Source) {
 	sum := computeSummary(sources)
 
 	md.H2("Summary")
@@ -79,7 +76,7 @@ func writeHeader(md *markdown.Markdown, sources []Source) {
 	md.PlainText(strings.TrimRight(toc, "\n"))
 }
 
-func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
+func writeSuite(md *mdDoc, src Source, outputDir string) {
 	s := src.Spec
 	md.H2f("%s", s.Suite.Name)
 	// The suite's own words about what it guarantees come before the mechanical
@@ -111,11 +108,11 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	noExpand := func(s string) string { return s }
 	if cmds := narrative(s.Suite.Setup, noExpand, s.Runners); len(cmds) > 0 {
 		md.H3("Suite setup (runs once before any scenario)")
-		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+		md.CodeBlocks("shell", strings.Join(cmds, "\n"))
 	}
 	if cmds := narrative(s.Suite.Teardown, noExpand, s.Runners); len(cmds) > 0 {
 		md.H3("Suite teardown (always runs after the last scenario)")
-		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+		md.CodeBlocks("shell", strings.Join(cmds, "\n"))
 	}
 
 	// Golden files (snapshots, image baselines) are resolved relative to the spec
@@ -127,7 +124,7 @@ func writeSuite(md *markdown.Markdown, src Source, outputDir string) {
 	}
 }
 
-func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir string, runners map[string]spec.Runner) {
+func writeScenario(md *mdDoc, sc *spec.Scenario, specDir, outputDir string, runners map[string]spec.Runner) {
 	md.H3f("Scenario: %s", sc.Name)
 	writeDescription(md, sc.Description)
 	if meta := scenarioMeta(sc); meta != "" {
@@ -155,7 +152,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 
 	if cmds := commands(sc.Steps, expand, runners); len(cmds) > 0 {
 		md.H4("When")
-		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(cmds, "\n"))
+		md.CodeBlocks("shell", strings.Join(cmds, "\n"))
 	}
 
 	writeThen(md, sc, expand)
@@ -164,7 +161,7 @@ func writeScenario(md *markdown.Markdown, sc *spec.Scenario, specDir, outputDir 
 	// cleanup a scenario performs against external systems.
 	if td := narrative(sc.Teardown, expand, runners); len(td) > 0 {
 		md.H4("Finally (teardown, always runs)")
-		md.CodeBlocks(markdown.SyntaxHighlightShell, strings.Join(td, "\n"))
+		md.CodeBlocks("shell", strings.Join(td, "\n"))
 	}
 
 	if exact := exactPreviews(sc, specDir, outputDir); len(exact) > 0 {
@@ -226,7 +223,7 @@ func matrixExpander(sc *spec.Scenario) func(string) string {
 // blocks. A block with an empty body (e.g. a snapshot reference) renders just its
 // label so the reader still sees that the payload is authored elsewhere. An image
 // block renders a Markdown image embed so a committed golden renders inline.
-func writePreviews(md *markdown.Markdown, blocks []previewBlock) {
+func writePreviews(md *mdDoc, blocks []previewBlock) {
 	for _, b := range blocks {
 		md.PlainTextf("_%s:_", b.label)
 		lang := b.lang
@@ -239,7 +236,7 @@ func writePreviews(md *markdown.Markdown, blocks []previewBlock) {
 		case b.image && b.body != "":
 			md.PlainTextf("![%s](%s)", b.label, b.body)
 		case b.body != "":
-			md.CodeBlocks(markdown.SyntaxHighlight(lang), b.body)
+			md.CodeBlocks(lang, b.body)
 		}
 	}
 }
@@ -260,7 +257,7 @@ func writePreviews(md *markdown.Markdown, blocks []previewBlock) {
 // here the next line ("Source: `...`", or a scenario's italic metadata) would
 // be swallowed into the description's last paragraph by Markdown's lazy
 // continuation rule.
-func writeDescription(md *markdown.Markdown, desc string) {
+func writeDescription(md *mdDoc, desc string) {
 	text := normalizeDescription(desc)
 	if text == "" {
 		return
@@ -655,7 +652,7 @@ func actionLabel(step *spec.Step, expand func(string) string) string {
 // the flat bullet list; with several, each group opens with "after
 // `<command>`:" so every assertion reads against its command — even when only
 // the last command is asserted on.
-func writeThen(md *markdown.Markdown, sc *spec.Scenario, expand func(string) string) {
+func writeThen(md *mdDoc, sc *spec.Scenario, expand func(string) string) {
 	groups := thenGroups(sc, expand)
 	if len(groups) == 0 {
 		return

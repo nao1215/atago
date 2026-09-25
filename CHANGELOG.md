@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `atago doc` writes Markdown with a small writer of its own instead of github.com/nao1215/markdown, which removes ten modules from the build, among them a table renderer atago never used. The table renderer allocated about 1.7MB when the process started, on every run of every command; atago now allocates 0.99MB before main instead of 1.74MB, and the binary is 1.1MB smaller. The generated documents are byte-identical.
+
 - The output of every step is read through a reused buffer. Reading a stream allocated a new 32KB buffer, two per step, which was a fifth of everything atago allocated on sqly's suite of 1028 scenarios; atago now allocates 21% less there, runs 20% fewer garbage collections and spends about 7% less CPU time.
 - Loading a spec parses its YAML once. The loader parsed the same bytes four times, for the tag check, the decoder, the repair of plain scalars in text fields and the source locator, and loading was a third of atago's own CPU time on sqly's suite of 1028 scenarios over 86 spec files. atago now spends about 15% less CPU time and allocates 20% less memory on that suite. What a spec loads to, the errors and the source positions are unchanged.
 
