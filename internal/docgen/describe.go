@@ -9,7 +9,6 @@ import (
 
 	"github.com/nao1215/atago/internal/assertdesc"
 	"github.com/nao1215/atago/internal/spec"
-	"github.com/nao1215/markdown"
 )
 
 // code renders a spec-supplied string as an inline-code span, writing a value
@@ -38,7 +37,7 @@ func code(s string) string {
 // exactly as authored.
 func inlineCode(s string) string {
 	if !strings.Contains(s, "`") {
-		return markdown.Code(s)
+		return "`" + s + "`"
 	}
 	longest, current := 0, 0
 	for _, r := range s {

@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- `atago doc` writes Markdown with a small writer of its own instead of github.com/nao1215/markdown, which removes ten modules from the build, among them a table renderer atago never used. The table renderer allocated about 1.7MB when the process started, on every run of every command; atago now allocates 0.99MB before main instead of 1.74MB, `atago version` peaks at about 17MB of memory instead of 18.7MB, and the binary is 1.1MB smaller. The generated documents are byte-identical.
+
 - The output of every step is read through a reused buffer. Reading a stream allocated a new 32KB buffer, two per step, which was a fifth of everything atago allocated on sqly's suite of 1028 scenarios; atago now allocates 21% less there, runs 20% fewer garbage collections and spends about 7% less CPU time.
 
 ### Fixed
