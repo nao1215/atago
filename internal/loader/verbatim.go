@@ -6,7 +6,6 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
-	"github.com/goccy/go-yaml/parser"
 	"github.com/nao1215/atago/internal/spec"
 )
 
@@ -31,12 +30,8 @@ import (
 // A document that no longer parses, or that never matched the model, simply
 // leaves the decoded values as they are: this pass improves fidelity and must
 // never be able to fail a load that would otherwise succeed.
-func applyVerbatimScalars(s *spec.Spec, data []byte) {
-	f, err := parser.ParseBytes(data, 0)
-	if err != nil || f == nil || len(f.Docs) == 0 || f.Docs[0] == nil {
-		return
-	}
-	repairValue(reflect.ValueOf(s), f.Docs[0].Body)
+func applyVerbatimScalars(s *spec.Spec, doc ast.Node) {
+	repairValue(reflect.ValueOf(s), doc)
 }
 
 // verbatimScalar returns the source text of a scalar node whose YAML type is
