@@ -165,15 +165,15 @@ func decodeSpec(doc ast.Node, s *spec.Spec) (err error) {
 	return yaml.NewDecoder(bytes.NewReader(nil), yaml.Strict()).DecodeFromNode(doc, s)
 }
 
-// specDocument returns the document Decode would read: the first one with a
-// body. A file of comments or `---` separators only has none, and yields nil.
+// specDocument returns the document a spec is read from: the first one. A
+// file whose first document is empty (comments or a bare `---`) is an empty
+// spec, as it was when the decoder read the bytes itself, even if a later
+// document has content.
 func specDocument(f *ast.File) ast.Node {
-	for _, doc := range f.Docs {
-		if doc != nil && doc.Body != nil {
-			return doc.Body
-		}
+	if len(f.Docs) == 0 || f.Docs[0] == nil {
+		return nil
 	}
-	return nil
+	return f.Docs[0].Body
 }
 
 // LoadBytes parses and validates spec bytes, labeling errors with path.

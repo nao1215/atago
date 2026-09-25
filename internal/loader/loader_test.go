@@ -461,6 +461,14 @@ func TestLoadBytes_Errors(t *testing.T) {
 			wantMsg:  "spec is empty",
 		},
 		{
+			// A spec is the first document; an empty one is not skipped to
+			// read a later document instead.
+			name:     "empty first document",
+			src:      "---\n# nothing here\n---\nversion: \"1\"\nsuite:\n  name: x\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo",
+			wantKind: KindParse,
+			wantMsg:  "spec is empty",
+		},
+		{
 			name:     "unknown field is strict-rejected",
 			src:      "version: \"1\"\nsuite:\n  name: x\nbogus: true\nscenarios:\n  - name: a\n    steps:\n      - run:\n          command: echo",
 			wantKind: KindParse,
