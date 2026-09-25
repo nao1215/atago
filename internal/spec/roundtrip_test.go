@@ -7,7 +7,7 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Three spec fields decode several authoring shapes through a custom
@@ -136,7 +136,7 @@ func TestJSONAssert_YAMLRoundTrip(t *testing.T) {
 	cases := map[string]JSONAssert{
 		"equals null":   {Path: "$.v", EqualsSet: true},
 		"equals string": {Path: "$.v", Equals: "x"},
-		"equals number": {Path: "$.v", Equals: uint64(2)},
+		"equals number": {Path: "$.v", Equals: int64(2)},
 		"equals bool":   {Path: "$.v", Equals: true},
 		"equals empty":  {Path: "$.v", Equals: ""},
 		"matches":       {Path: "$.v", Matches: strp("^a")},

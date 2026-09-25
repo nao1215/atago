@@ -1,7 +1,7 @@
 // Package loader reads a atago YAML file and turns it into a validated
 // *spec.Spec. Validation happens in layers: YAML parse, then
 // schema/semantic checks. Errors carry the file path and, for parse failures,
-// the line/column reported by goccy/go-yaml.
+// the line/column the YAML reader reports.
 package loader
 
 import (
@@ -12,11 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
-	"github.com/goccy/go-yaml/parser"
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Kind classifies why loading failed, so callers can map it to an exit code
@@ -83,97 +81,42 @@ const binaryTag = "!!binary"
 // and fully typed — every field's Go type already fixes how its value is read —
 // so a tag can only ever restate or contradict the schema, and no spec,
 // example, or doc in this repository authors one.
-//
-// Turning tags away up front is also what keeps the decoder's nil-panic path
-// out of everyday use. When a tagged node lands on a list field,
-// goccy/go-yaml v1.19.2 panics: ast.TagNode.ArrayRange returns a nil
-// *ArrayNodeIter whenever the tag's value is not a sequence, and decodeSlice
-// dereferences it without a nil check (decode.go:1593 -> ast.go:1543).
-// decodeSpec recovers from that, but internal/loader is then the only package
-// here that raises a real runtime nil dereference on every test run, and it is
-// also the only package that has crashed Windows CI with Go GC heap-corruption
-// fatal errors ("found pointer to free object"). Not provoking the panic costs
-// nothing and removes that correlation.
-//
-// A `!!binary` over a list field still reaches the panic, because record's
-// output has to stay loadable; decodeSpec's recover remains the backstop for
-// that residue.
-func explicitTagError(doc ast.Node) string {
-	// Decode reads a single document, so only that document can reach the panic.
-	v := &tagFinder{}
-	ast.Walk(v, doc)
-	if v.found == nil || v.found.Start == nil {
+func explicitTagError(doc *yaml.Node) string {
+	found := firstTag(doc, map[*yaml.Node]bool{})
+	if found == nil {
 		return ""
 	}
-	pos := v.found.Start.Position
-	name := strings.TrimSpace(v.found.Start.Value)
-	where := ""
-	if pos != nil {
-		where = fmt.Sprintf("[%d:%d] ", pos.Line, pos.Column)
-	}
-	if name == "" || name == "!" {
+	where := fmt.Sprintf("[%d:%d] ", found.Line, found.Col)
+	if found.Tag == "!" {
 		return where + "explicit YAML tag is not supported in a spec: remove the tag"
 	}
-	return fmt.Sprintf("%sexplicit YAML tag %q is not supported in a spec: remove the tag", where, name)
+	return fmt.Sprintf("%sexplicit YAML tag %q is not supported in a spec: remove the tag", where, found.Tag)
 }
 
-// tagFinder is an ast.Visitor that stops at the first unsupported explicit tag
-// it meets.
-type tagFinder struct {
-	found *ast.TagNode
-}
-
-// Visit records the first unsupported *ast.TagNode and then stops descending.
-// A `!!binary` scalar is skipped over rather than accepted wholesale: the walk
-// continues into its children so a tag nested under it is still caught. Walk
-// also calls Visit(nil) after a node's children, which the type assertion
-// ignores.
-func (v *tagFinder) Visit(n ast.Node) ast.Visitor {
-	if v.found != nil {
+// firstTag returns the first node in document order that carries a tag other
+// than !!binary. seen keeps an aliased node from being walked twice.
+func firstTag(n *yaml.Node, seen map[*yaml.Node]bool) *yaml.Node {
+	if n == nil || seen[n] {
 		return nil
 	}
-	tag, ok := n.(*ast.TagNode)
-	if !ok {
-		return v
+	seen[n] = true
+	if n.Tag != "" && n.Tag != binaryTag {
+		return n
 	}
-	if tag.Start != nil && strings.TrimSpace(tag.Start.Value) == binaryTag {
-		return v
-	}
-	v.found = tag
-	return nil
-}
-
-// decodeSpec decodes one YAML document into s, converting a panic from the
-// third-party decoder into an ordinary error. goccy/go-yaml can nil-panic on
-// some malformed input (a bare `!` tag over a broken mapping, found by
-// FuzzLoadBytes); atago's contract is that loading untrusted spec bytes never
-// crashes the process, so recover here and let the caller report a parse error.
-// explicitTagError already turns away the inputs known to reach that panic, so
-// this stays as a backstop for any shape not yet found.
-func decodeSpec(doc ast.Node, s *spec.Spec) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			// Report a spec problem, not the raw runtime panic: "nil pointer
-			// dereference" reads like an atago crash, but the cause is malformed
-			// input the third-party decoder mishandled.
-			err = fmt.Errorf("malformed YAML: the document could not be parsed")
+	for _, item := range n.Items {
+		if t := firstTag(item, seen); t != nil {
+			return t
 		}
-	}()
-	// The document is decoded from the AST the loader already parsed, so the
-	// bytes are parsed once for the decoder, the tag check, the verbatim repair
-	// and the source locator alike; the decoder's reader is never read.
-	return yaml.NewDecoder(bytes.NewReader(nil), yaml.Strict()).DecodeFromNode(doc, s)
-}
-
-// specDocument returns the document a spec is read from: the first one. A
-// file whose first document is empty (comments or a bare `---`) is an empty
-// spec, as it was when the decoder read the bytes itself, even if a later
-// document has content.
-func specDocument(f *ast.File) ast.Node {
-	if len(f.Docs) == 0 || f.Docs[0] == nil {
-		return nil
 	}
-	return f.Docs[0].Body
+	for _, pair := range n.Pairs {
+		if t := firstTag(pair.Key, seen); t != nil {
+			return t
+		}
+		if t := firstTag(pair.Value, seen); t != nil {
+			return t
+		}
+	}
+	return nil
 }
 
 // LoadBytes parses and validates spec bytes, labeling errors with path.
@@ -183,40 +126,28 @@ func LoadBytes(path string, data []byte) (*spec.Spec, error) {
 }
 
 // loadBytesWithProject is LoadBytes with a directory manifest layered beneath
-// the spec's own values (#392).
-func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, *ast.File, error) {
-	// Strip a leading UTF-8 byte-order mark. Windows/Notepad-family editors emit
-	// one routinely, and goccy/go-yaml does not skip it: it glues the BOM onto the
-	// first key, so a correctly-authored spec failed with a confusing "unknown
-	// field" error naming a field the author wrote right. Most YAML tooling strips
-	// a single leading BOM transparently.
-	data = bytes.TrimPrefix(data, []byte("\ufeff"))
-	f, err := parser.ParseBytes(data, 0)
+// the spec's own values (#392). It also returns the document the spec was
+// decoded from, which the source locator answers from.
+func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, *yaml.Node, error) {
+	f, err := yaml.Parse(data)
 	if err != nil {
-		// The decoder parses with the same parser and mode, so this is the
-		// syntax error Decode would have returned.
-		return nil, nil, &Error{Path: path, Kind: KindParse, Code: diag.YAMLSyntax, Msg: formatYAMLError(err)}
+		return nil, nil, &Error{Path: path, Kind: KindParse, Code: diag.YAMLSyntax, Msg: formatYAMLError(err, sourceOf(data))}
 	}
-	doc := specDocument(f)
+	doc := firstDocument(f)
 	if doc == nil {
-		// An empty document (empty file, whitespace, or comments only) has
-		// nothing to decode. Name the problem and what a spec needs instead.
 		return nil, nil, &Error{Path: path, Kind: KindParse, Code: diag.SpecEmpty, Msg: "spec is empty: expected a YAML document with version, suite, and scenarios"}
 	}
 	if msg := explicitTagError(doc); msg != "" {
 		return nil, nil, &Error{Path: path, Kind: KindParse, Code: diag.YAMLTag, Msg: msg}
 	}
 	var s spec.Spec
-	if err := decodeSpec(doc, &s); err != nil {
-		msg := formatYAMLError(err)
-		return nil, nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(msg), Msg: msg}
+	// A plain scalar decodes into a text field as the text written, so
+	// `contains: 1.20` asserts the four characters 1.20 and `env: {V: 007}`
+	// exports 007; only a field typed as a number or `any` reads what the
+	// scalar spells.
+	if err := yaml.Decode(doc, &s, true); err != nil {
+		return nil, nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(err), Msg: formatYAMLError(err, f.Source())}
 	}
-	// Restore the source text of any plain scalar that landed in a text field
-	// before anything reads those values: YAML types an unquoted 1.20 as a float,
-	// and a spec that compares literals must mean the characters the author
-	// wrote. It runs while the model still mirrors the document one-to-one,
-	// which is what lets the two be walked together.
-	applyVerbatimScalars(&s, doc)
 	// Record each scenario's authored index before matrix expansion, so every
 	// expanded instance can be traced back to its authored source location (#80).
 	for i := range s.Scenarios {
@@ -246,29 +177,54 @@ func loadBytesWithProject(path string, data []byte, proj *Project) (*spec.Spec, 
 	if errs := validate(&s); len(errs) > 0 {
 		return nil, nil, &Error{Path: path, Kind: KindValidation, Msg: joinErrors(errs)}
 	}
-	return &s, f, nil
+	return &s, doc, nil
 }
 
-// formatYAMLError renders goccy errors with position context when available,
-// and appends a did-you-mean hint for misspelled field names.
-func formatYAMLError(err error) string {
-	var yerr yaml.Error
-	if errors.As(err, &yerr) {
-		return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(yaml.FormatError(err, false, true))))
+// firstDocument returns the root of the file's first document. A spec or a
+// manifest is that document: an empty one (comments or a bare `---`) is empty,
+// even if a later document has content.
+func firstDocument(f *yaml.File) *yaml.Node {
+	if len(f.Docs) == 0 {
+		return nil
 	}
-	return suggestCollectionShape(suggestScalarMatcher(suggestUnknownField(err.Error())))
+	return f.Docs[0].Root
+}
+
+// sourceOf returns data as the reader sees it, which is what an error's line
+// and column count in: without a byte-order mark, with CRLF read as LF.
+func sourceOf(data []byte) []byte {
+	data = bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
+	if bytes.IndexByte(data, '\r') >= 0 {
+		data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+		data = bytes.ReplaceAll(data, []byte("\r"), []byte("\n"))
+	}
+	return data
+}
+
+// formatYAMLError renders a reader error with the excerpt of src it points at,
+// and appends a hint for the mistakes that have a known fix.
+func formatYAMLError(err error, src []byte) string {
+	msg := yaml.FormatError(err, src)
+	var ye *yaml.Error
+	if !errors.As(err, &ye) {
+		return msg
+	}
+	if ye.Key != "" {
+		return suggestUnknownField(msg, ye.Key)
+	}
+	if ye.Want != "" {
+		return suggestShape(msg, ye)
+	}
+	return msg
 }
 
 // classifyYAMLError picks the diagnostic for a decode failure of a document
-// that parsed. goccy reports all of them through one error type, but they are
-// different mistakes with different fixes: a key the schema does not define,
-// and a value written in a shape its key cannot take. A document that is not
-// YAML at all never gets here: the loader reports it as a syntax error when the
-// parser cannot build a document from the bytes, which keeps the
-// classification correct for the schema errors raised by the spec package's
-// own unmarshalers, whose wording this file has no business knowing.
-func classifyYAMLError(msg string) diag.Code {
-	if unknownFieldRe.MatchString(msg) {
+// that parsed: a key the schema does not define, or a value written in a shape
+// its key cannot take. A document that is not YAML at all never gets here; the
+// loader reports it as a syntax error when the reader cannot parse it.
+func classifyYAMLError(err error) diag.Code {
+	var ye *yaml.Error
+	if errors.As(err, &ye) && ye.Key != "" {
 		return diag.UnknownKey
 	}
 	return diag.WrongValueShape

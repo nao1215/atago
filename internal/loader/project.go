@@ -6,11 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/parser"
-
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // ProjectFileName is the directory-level manifest a spec tree may carry (#392).
@@ -102,13 +100,12 @@ func LoadProject(path string) (*Project, error) {
 		return nil, &Error{Path: path, Kind: KindValidation, Code: diag.SpecUnreadable, Msg: err.Error()}
 	}
 	var p Project
-	if derr := yaml.UnmarshalWithOptions(data, &p, yaml.Strict()); derr != nil {
-		msg := yaml.FormatError(derr, false, true)
-		code := diag.YAMLSyntax
-		if _, perr := parser.ParseBytes(data, 0); perr == nil {
-			code = classifyYAMLError(msg)
-		}
-		return nil, &Error{Path: path, Kind: KindParse, Code: code, Msg: msg}
+	f, perr := yaml.Parse(data)
+	if perr != nil {
+		return nil, &Error{Path: path, Kind: KindParse, Code: diag.YAMLSyntax, Msg: formatYAMLError(perr, sourceOf(data))}
+	}
+	if derr := yaml.Decode(firstDocument(f), &p, true); derr != nil {
+		return nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(derr), Msg: formatYAMLError(derr, f.Source())}
 	}
 	p.Path = path
 

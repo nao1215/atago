@@ -1,12 +1,11 @@
 package loader
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/goccy/go-yaml/ast"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // verbatimSpec wraps one step in a minimal spec.
@@ -194,57 +193,56 @@ func TestVerbatim_TypedFieldsKeepTheirTyping(t *testing.T) {
 	})
 }
 
-// TestVerbatim_EveryCustomDecodeIsCovered walks the spec model for types that
-// decode themselves. Such a type ignores its yaml tags, so the repair walk has
-// no way to reach the text it holds unless customDecodes says how — and a type
-// missing from there fails silently, which is the failure mode this whole
-// change exists to remove. Every entry must also say why it is shaped the way
-// it is, so "nobody looked at this one" cannot pass as a decision.
-func TestVerbatim_EveryCustomDecodeIsCovered(t *testing.T) {
+// TestVerbatim_CustomDecodesKeepTheSourceText covers the types that decode
+// themselves. They read their text through the same reader, so a retyped plain
+// scalar in one of them is the text written as well; before, each needed an
+// entry in a repair table, and a type missing from it rewrote `1.20` in
+// silence.
+func TestVerbatim_CustomDecodesKeepTheSourceText(t *testing.T) {
 	t.Parallel()
-	nodeUnmarshaler := reflect.TypeFor[interface{ UnmarshalYAML(ast.Node) error }]()
-	funcUnmarshaler := reflect.TypeFor[interface {
-		UnmarshalYAML(func(any) error) error
-	}]()
-
-	seen := map[reflect.Type]bool{}
-	var walk func(reflect.Type)
-	walk = func(t reflect.Type) {
-		for t.Kind() == reflect.Pointer {
-			t = t.Elem()
-		}
-		if seen[t] {
-			return
-		}
-		seen[t] = true
-		switch t.Kind() {
-		case reflect.Struct:
-			for i := 0; i < t.NumField(); i++ {
-				walk(t.Field(i).Type)
+	tests := []struct {
+		name string
+		src  string
+		got  func(*spec.Spec) string
+	}{
+		{
+			name: "stdin inline",
+			src:  verbatimSpec("run: {command: cat, stdin: 1.20}"),
+			got:  func(s *spec.Spec) string { return s.Scenarios[0].Steps[0].Run.Stdin.Inline },
+		},
+		{
+			name: "contains list item",
+			src:  verbatimSpec("run: {command: echo}\n      - assert: {stdout: {contains: [1.20, 007]}}"),
+			got:  func(s *spec.Spec) string { return strings.Join(s.Scenarios[0].Steps[1].Assert.Stdout.Contains, ",") },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := LoadBytes("t.atago.yaml", []byte(tt.src))
+			if err != nil {
+				t.Fatalf("load: %v", err)
 			}
-		case reflect.Slice, reflect.Array, reflect.Map, reflect.Pointer:
-			walk(t.Elem())
-		default:
-		}
+			got := tt.got(s)
+			if !strings.Contains(got, "1.20") {
+				t.Errorf("value = %q, want the text as written (1.20)", got)
+			}
+		})
 	}
-	walk(reflect.TypeFor[spec.Spec]())
-
-	for typ := range seen {
-		if !reflect.PointerTo(typ).Implements(nodeUnmarshaler) && !reflect.PointerTo(typ).Implements(funcUnmarshaler) {
-			continue
+	t.Run("forall one_of", func(t *testing.T) {
+		t.Parallel()
+		src := "version: \"1\"\nsuite:\n  name: s\nscenarios:\n  - name: a\n    forall:\n      v: {one_of: [1.20, 007]}\n    steps:\n      - run: {command: echo}\n"
+		var g spec.Generator
+		f, err := yaml.Parse([]byte(src))
+		if err != nil {
+			t.Fatal(err)
 		}
-		entry, ok := customDecodes[typ]
-		if !ok {
-			t.Errorf("%s decodes itself but has no customDecodes entry; the verbatim walk cannot reach its text, so a retyped scalar there would be restored nowhere", typ)
-			continue
+		node := f.First().Get("scenarios").Index(0).Get("forall").Get("v")
+		if err := yaml.Decode(node, &g, true); err != nil {
+			t.Fatal(err)
 		}
-		if entry.why == "" {
-			t.Errorf("customDecodes[%s] states no reason; record how this type's text is reached", typ)
+		if strings.Join(g.OneOf, ",") != "1.20,007" {
+			t.Errorf("one_of = %q, want the text as written", g.OneOf)
 		}
-	}
-	for typ := range customDecodes {
-		if !seen[typ] {
-			t.Errorf("customDecodes lists %s, which the spec model no longer reaches; remove the entry", typ)
-		}
-	}
+	})
 }

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 708 scenarios
+86 suites · 710 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -320,10 +320,11 @@
   - [repeat surfaces flakiness that a single run would miss](#scenario-repeat-surfaces-flakiness-that-a-single-run-would-miss)
   - [a gated-out scenario reports no repeat rate](#scenario-a-gated-out-scenario-reports-no-repeat-rate)
   - [repeat and retry-failed are mutually exclusive](#scenario-repeat-and-retry-failed-are-mutually-exclusive)
-- [atago self-hosting / forall generated scenarios (#656)](#atago-self-hosting--forall-generated-scenarios-656) — 5 scenarios
+- [atago self-hosting / forall generated scenarios (#656)](#atago-self-hosting--forall-generated-scenarios-656) — 6 scenarios
   - [forall expands into one scenario per generated row](#scenario-forall-expands-into-one-scenario-per-generated-row)
   - [the generated values are the same on every machine](#scenario-the-generated-values-are-the-same-on-every-machine)
   - [runs is an upper bound because duplicate rows are dropped](#scenario-runs-is-an-upper-bound-because-duplicate-rows-are-dropped)
+  - [choices that look like numbers are the text written](#scenario-choices-that-look-like-numbers-are-the-text-written)
   - [the examples an author names are the first instances](#scenario-the-examples-an-author-names-are-the-first-instances)
   - [an unknown generator is a load error, not a silent default](#scenario-an-unknown-generator-is-a-load-error-not-a-silent-default)
 - [atago self-hosting / grpc runner](#atago-self-hosting--grpc-runner) — 3 scenarios
@@ -427,7 +428,7 @@
   - [list surfaces suites, scenarios, tags, and gates](#scenario-list-surfaces-suites-scenarios-tags-and-gates)
   - [list --json is a stable machine contract](#scenario-list---json-is-a-stable-machine-contract)
   - [list marks an expect_fail scenario](#scenario-list-marks-an-expect_fail-scenario)
-- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 30 scenarios
+- [atago self-hosting / loader rejects malformed specs](#atago-self-hosting--loader-rejects-malformed-specs) — 31 scenarios
   - [an empty scenario list is rejected](#scenario-an-empty-scenario-list-is-rejected)
   - [a wrong version string is rejected](#scenario-a-wrong-version-string-is-rejected)
   - [an unknown top-level field is rejected with its position](#scenario-an-unknown-top-level-field-is-rejected-with-its-position)
@@ -457,6 +458,7 @@
   - [a file assertion with no matcher names the size bounds too](#scenario-a-file-assertion-with-no-matcher-names-the-size-bounds-too)
   - [a file assertion with two content matchers still names only those](#scenario-a-file-assertion-with-two-content-matchers-still-names-only-those)
   - [a list written where one value belongs names the key and the shape](#scenario-a-list-written-where-one-value-belongs-names-the-key-and-the-shape)
+  - [of several unknown keys the first one written is reported](#scenario-of-several-unknown-keys-the-first-one-written-is-reported)
   - [a mapping written where text belongs names the key too](#scenario-a-mapping-written-where-text-belongs-names-the-key-too)
 - [atago self-hosting / manifest](#atago-self-hosting--manifest) — 6 scenarios
   - [manifest emits a stable JSON summary without running the spec](#scenario-manifest-emits-a-stable-json-summary-without-running-the-spec)
@@ -7822,6 +7824,34 @@ ${atago} run --report junit choices.atago.yaml
 - exit code is `0`
 - stdout contains `tests="2"`, `name="accepts json"`, `name="accepts yaml"`
 
+### Scenario: choices that look like numbers are the text written
+#### Given
+- Fixture file `numbers.atago.yaml` is created.
+
+#### Inputs
+_Fixture `numbers.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: numbers
+scenarios:
+  - name: "version ${v}"
+    forall:
+      vars:
+        v: {one_of: [1.20, 007, 1e3]}
+    steps:
+      - run:
+          shell: true
+          command: echo ${v}
+```
+#### When
+```shell
+${atago} run --report junit numbers.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `tests="3"`, `name="version 1.20"`, `name="version 007"`, `name="version 1e3"`
+
 ### Scenario: the examples an author names are the first instances
 #### Given
 - Fixture file `examples.atago.yaml` is created.
@@ -10187,7 +10217,33 @@ ${atago} run bad.atago.yaml
 ```
 #### Then
 - exit code is `2`
-- stderr contains `"matches" takes a single value, not a list`, `one assert per pattern`
+- stderr contains `scenarios[0].steps[1].assert.stdout.matches: expected a string, not a list`, `"matches" takes a single value, not a list`, `one assert per pattern`
+
+### Scenario: of several unknown keys the first one written is reported
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### Inputs
+_Fixture `bad.atago.yaml`:_
+```text
+version: "1"
+suite: {name: x}
+scenarios:
+  - name: a
+    steps:
+      - run: {command: echo}
+      - assert:
+          exit_cod: 0
+          stdut: {contains: x}
+          stderrr: {contains: y}
+```
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2005: [8:11] unknown field "exit_cod"`, `did you mean "exit_code"?`, does not contain `"stdut"`, `"stderrr"`
 
 ### Scenario: a mapping written where text belongs names the key too
 #### Given

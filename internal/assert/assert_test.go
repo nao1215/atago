@@ -644,7 +644,7 @@ func TestCheck_JSON_NumericStringStrict(t *testing.T) {
 	}
 }
 
-// TestCheck_YAML_UnsignedInteger is a regression (CodeRabbit): goccy/go-yaml
+// TestCheck_YAML_UnsignedInteger is a regression (CodeRabbit): the YAML reader
 // decodes an integer that overflows int64 as uint64, so the numeric matchers
 // must recognize unsigned kinds — otherwise a large value falls back to string
 // comparison and fails gt/gte/lt/lte and equals.

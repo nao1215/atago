@@ -1,14 +1,11 @@
 package loader
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
-	"github.com/goccy/go-yaml/parser"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Source resolves stable source locations (line and column) for the declarations
@@ -21,13 +18,12 @@ import (
 // cannot be resolved — e.g. an optional block is absent — the position is zero,
 // which callers treat as "unknown" and omit.
 type Source struct {
-	file *ast.File
+	root *yaml.Node
 }
 
 // LoadWithSource loads and validates the spec at path and also returns a Source
 // locator for it. The spec is identical to what Load returns; the extra Source
-// exposes authored line/column positions. A parse error for the position AST is
-// non-fatal (the spec already decoded), so Source methods simply report unknown.
+// exposes authored line/column positions.
 func LoadWithSource(path string) (*spec.Spec, *Source, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // path comes from user-specified spec args
 	if err != nil {
@@ -41,24 +37,22 @@ func LoadWithSource(path string) (*spec.Spec, *Source, error) {
 	if perr != nil {
 		return nil, nil, perr
 	}
-	s, f, lerr := loadBytesWithProject(path, data, proj)
+	s, doc, lerr := loadBytesWithProject(path, data, proj)
 	if lerr != nil {
 		return nil, nil, lerr
 	}
-	// The locator answers from the AST the spec was decoded from; the decoder
-	// only reads it, so the positions are those of the authored bytes.
-	return s, &Source{file: f}, nil
+	// The locator answers from the document the spec was decoded from.
+	return s, &Source{root: doc}, nil
 }
 
-// newSource parses data into an AST for position lookups. A parse failure yields
-// a Source that reports every position as unknown rather than an error, since
-// the caller already holds a successfully-decoded spec.
+// newSource parses data for position lookups. A parse failure yields a Source
+// that reports every position as unknown.
 func newSource(data []byte) *Source {
-	f, err := parser.ParseBytes(data, 0)
+	f, err := yaml.Parse(data)
 	if err != nil {
 		return &Source{}
 	}
-	return &Source{file: f}
+	return &Source{root: f.First()}
 }
 
 // Position is a 1-based source location. A zero Line means "unknown".
@@ -67,39 +61,33 @@ type Position struct {
 	Column int
 }
 
-// pos resolves a YAML path (e.g. "$.scenarios[2].name") to a Position. Any error
-// or a missing node yields the zero Position.
-func (s *Source) pos(path string) Position {
-	if s == nil || s.file == nil {
+// at returns the Position of a node; a missing node is the zero Position.
+func at(n *yaml.Node) Position {
+	if n == nil {
 		return Position{}
 	}
-	p, err := yaml.PathString(path)
-	if err != nil {
-		return Position{}
-	}
-	node, err := p.FilterFile(s.file)
-	if err != nil || node == nil {
-		return Position{}
-	}
-	tk := node.GetToken()
-	if tk == nil {
-		return Position{}
-	}
-	return Position{Line: tk.Position.Line, Column: tk.Position.Column}
+	return Position{Line: n.Line, Column: n.Col}
 }
 
 // SuitePos returns the location of the suite declaration.
 func (s *Source) SuitePos() (line, column int) {
-	p := s.pos("$.suite.name")
+	if s == nil {
+		return 0, 0
+	}
+	suite := s.root.Get("suite")
+	p := at(suite.Get("name"))
 	if p.Line == 0 {
-		p = s.pos("$.suite")
+		p = at(suite)
 	}
 	return p.Line, p.Column
 }
 
 // RunnerPos returns the location of a named runner declaration.
 func (s *Source) RunnerPos(name string) (line, column int) {
-	p := s.pos(fmt.Sprintf("$.runners.%s", yamlPathKey(name)))
+	if s == nil {
+		return 0, 0
+	}
+	p := at(s.root.Get("runners").Get(name))
 	return p.Line, p.Column
 }
 
@@ -107,9 +95,13 @@ func (s *Source) RunnerPos(name string) (line, column int) {
 // (its pre-matrix-expansion index). Every instance expanded from one matrix
 // template shares this location.
 func (s *Source) ScenarioPos(authoredIndex int) (line, column int) {
-	p := s.pos(fmt.Sprintf("$.scenarios[%d].name", authoredIndex))
+	if s == nil {
+		return 0, 0
+	}
+	sc := s.root.Get("scenarios").Index(authoredIndex)
+	p := at(sc.Get("name"))
 	if p.Line == 0 {
-		p = s.pos(fmt.Sprintf("$.scenarios[%d]", authoredIndex))
+		p = at(sc)
 	}
 	return p.Line, p.Column
 }
@@ -117,15 +109,9 @@ func (s *Source) ScenarioPos(authoredIndex int) (line, column int) {
 // StepPos returns the location of step stepIndex within the authored scenario at
 // authoredScenarioIndex.
 func (s *Source) StepPos(authoredScenarioIndex, stepIndex int) (line, column int) {
-	p := s.pos(fmt.Sprintf("$.scenarios[%d].steps[%d]", authoredScenarioIndex, stepIndex))
+	if s == nil {
+		return 0, 0
+	}
+	p := at(s.root.Get("scenarios").Index(authoredScenarioIndex).Get("steps").Index(stepIndex))
 	return p.Line, p.Column
-}
-
-// yamlPathKey guards a runner name for use as a YAML path segment. goccy's path
-// parser treats a bare identifier segment literally; names with path-significant
-// characters (dots, brackets, spaces) cannot be expressed, so they resolve to
-// unknown rather than mis-resolving. Returning the name unchanged keeps the
-// common identifier case exact.
-func yamlPathKey(name string) string {
-	return name
 }

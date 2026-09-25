@@ -6,8 +6,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // PTYSend is the polymorphic pty send payload (#26): exactly one of Text
@@ -56,23 +55,21 @@ const (
 // rejecting unknown mapping keys (a custom unmarshaler bypasses the loader's
 // strict decode). It decodes from the AST node so every shape error carries
 // the offending value's [line:col] for the loader's excerpt formatter.
-func (p *PTYSend) UnmarshalYAML(node ast.Node) error {
-	fail := func(format string, args ...any) error {
-		return &yaml.SyntaxError{Message: fmt.Sprintf(format, args...), Token: node.GetToken()}
-	}
-	var one string
-	if err := yaml.NodeToValue(node, &one); err == nil {
+func (p *PTYSend) UnmarshalYAML(node *yaml.Node) error {
+	fail := failf
+	if node.Kind == yaml.ScalarNode {
+		var one string
+		if err := yaml.Decode(node, &one, true); err != nil {
+			return err
+		}
 		p.Text = &one
 		return nil
 	}
-	var raw map[string]any
-	if err := yaml.NodeToValue(node, &raw); err != nil {
+	if node.Kind != yaml.MappingNode {
 		return fail("send must be a string or {key: <name>} (e.g. {key: enter})")
 	}
-	for k, v := range raw {
-		if err := p.decodeSendField(k, v, fail); err != nil {
-			return err
-		}
+	if err := eachEntry(node, func(k string, v any) error { return p.decodeSendField(k, v, fail) }); err != nil {
+		return err
 	}
 	return p.checkSendShape(fail)
 }

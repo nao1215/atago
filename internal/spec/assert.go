@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/goccy/go-yaml"
-	"github.com/goccy/go-yaml/ast"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // Assert checks externally observable behavior. Exactly one target family is set.
@@ -254,9 +253,9 @@ type ExitCode struct {
 // gets, instead of a message the author must hunt for across the spec. A
 // quoted integer (exit_code: "0") is still an integer to the author; the plain
 // int decode unquotes it.
-func (e *ExitCode) UnmarshalYAML(node ast.Node) error {
+func (e *ExitCode) UnmarshalYAML(node *yaml.Node) error {
 	var n int
-	if err := yaml.NodeToValue(node, &n); err == nil {
+	if node.Kind == yaml.ScalarNode && yaml.Decode(node, &n, true) == nil {
 		e.Equals = &n
 		return nil
 	}
@@ -265,20 +264,14 @@ func (e *ExitCode) UnmarshalYAML(node ast.Node) error {
 		In  []int `yaml:"in"`
 	}
 	// Decode strictly so an unknown key (a typo like {not: 0, bogus: 5}) is
-	// rejected here too. A custom unmarshaler bypasses the loader's document-wide
-	// yaml.Strict(), so without this the mapping form silently drops misspelled
-	// fields — the same reason PTYSend and Stdin reject unknown keys. A strict
-	// unknown-field error already carries its own position and did-you-mean, so
-	// it passes through untouched.
-	if err := yaml.NodeToValue(node, &m, yaml.Strict()); err != nil {
-		var unknown *yaml.UnknownFieldError
-		if errors.As(err, &unknown) {
+	// rejected here too, with its own position; the did-you-mean comes from the
+	// loader, which sees the key the error names.
+	if err := yaml.Decode(node, &m, true); err != nil {
+		var ye *yaml.Error
+		if errors.As(err, &ye) && ye.Key != "" {
 			return err
 		}
-		return &yaml.SyntaxError{
-			Message: fmt.Sprintf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %q", strings.TrimSpace(node.String())),
-			Token:   node.GetToken(),
-		}
+		return fmt.Errorf("exit_code must be an integer (exit_code: 0), a negation (exit_code: {not: 0}), or a set (exit_code: {in: [0, 2]}), got %s", nodeText(node))
 	}
 	e.Not = m.Not
 	e.In = m.In
@@ -387,17 +380,18 @@ func (l StringList) Quoted() string {
 	return strings.Join(parts, ", ")
 }
 
-// UnmarshalYAML accepts a scalar string or a sequence of strings. It uses the
-// interface-based decoder (not the raw-bytes form) so escapes like "\x1b" are
-// resolved by goccy's parser once, rather than re-tokenized from node bytes.
-func (l *StringList) UnmarshalYAML(unmarshal func(any) error) error {
-	var one string
-	if err := unmarshal(&one); err == nil {
+// UnmarshalYAML accepts a scalar string or a sequence of strings.
+func (l *StringList) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		var one string
+		if err := yaml.Decode(node, &one, true); err != nil {
+			return err
+		}
 		*l = StringList{one}
 		return nil
 	}
 	var many []string
-	if err := unmarshal(&many); err != nil {
+	if err := yaml.Decode(node, &many, true); err != nil {
 		return err
 	}
 	*l = StringList(many)
@@ -514,18 +508,21 @@ func (j *JSONAssert) HasEquals() bool {
 // whether `equals` was present. It decodes strictly so an unknown key inside a
 // check is still rejected: a custom unmarshaler bypasses the loader's
 // document-wide yaml.Strict(), the same trap ExitCode and PTYSend document.
-// Presence is read from a generic map decode rather than by walking the AST so
-// an aliased or merged mapping is resolved first.
-func (j *JSONAssert) UnmarshalYAML(node ast.Node) error {
+// Presence is read from the node's entries, which already hold what a merge
+// key brought in.
+func (j *JSONAssert) UnmarshalYAML(node *yaml.Node) error {
 	type plain JSONAssert // no UnmarshalYAML, so the default decode applies
 	var p plain
-	if err := yaml.NodeToValue(node, &p, yaml.Strict()); err != nil {
+	if err := yaml.Decode(node, &p, true); err != nil {
 		return err
 	}
 	*j = JSONAssert(p)
-	var keys map[string]any
-	if err := yaml.NodeToValue(node, &keys); err == nil {
-		_, j.EqualsSet = keys["equals"]
+	if node.Kind == yaml.MappingNode {
+		for _, pair := range node.Pairs {
+			if pair.Key.Value == "equals" {
+				j.EqualsSet = true
+			}
+		}
 	}
 	return nil
 }
@@ -575,23 +572,20 @@ type JSONChecks []JSONAssert
 // every error — a strict unknown-key rejection inside a check, or the
 // empty-list message — carries the ORIGINAL document's [line:col] instead of a
 // position relative to a detached snippet.
-func (c *JSONChecks) UnmarshalYAML(node ast.Node) error {
-	if _, isSeq := node.(*ast.SequenceNode); isSeq {
+func (c *JSONChecks) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.SequenceNode {
 		var many []JSONAssert
-		if err := yaml.NodeToValue(node, &many, yaml.Strict()); err != nil {
+		if err := yaml.Decode(node, &many, true); err != nil {
 			return err
 		}
 		if len(many) == 0 {
-			return &yaml.SyntaxError{
-				Message: "a json/yaml matcher list must have at least one check",
-				Token:   node.GetToken(),
-			}
+			return errors.New("a json/yaml matcher list must have at least one check")
 		}
 		*c = JSONChecks(many)
 		return nil
 	}
 	var one JSONAssert
-	if err := yaml.NodeToValue(node, &one, yaml.Strict()); err != nil {
+	if err := yaml.Decode(node, &one, true); err != nil {
 		return err
 	}
 	*c = JSONChecks{one}

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goccy/go-yaml"
+	"github.com/nao1215/atago/internal/yaml"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/nao1215/atago/internal/engine"
