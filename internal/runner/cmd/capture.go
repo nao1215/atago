@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nao1215/atago/internal/diag"
@@ -87,7 +89,7 @@ func (c *capture) releaseWriter() {
 func (c *capture) drain() {
 	go func() {
 		defer close(c.done)
-		_, err := io.Copy(&c.buf, c.r)
+		err := c.readAll()
 		c.endedAt = time.Now()
 		// io.Copy reports EOF as a nil error. Anything else means the loop ended
 		// for a reason other than the stream ending — including forceClose below,
@@ -95,6 +97,32 @@ func (c *capture) drain() {
 		c.eof = err == nil
 		c.err = err
 	}()
+}
+
+// copyBufPool holds the read buffers of the drains. io.Copy into a
+// strings.Builder goes through os.File.WriteTo, which allocates a fresh 32KB
+// buffer for every stream, two per step; on a suite of a thousand steps that
+// was a quarter of everything atago allocated.
+var copyBufPool = sync.Pool{New: func() any { b := make([]byte, 32*1024); return &b }}
+
+// readAll copies the stream into c.buf until EOF, which it reports as a nil
+// error the way io.Copy does.
+func (c *capture) readAll() error {
+	bp, _ := copyBufPool.Get().(*[]byte)
+	defer copyBufPool.Put(bp)
+	buf := *bp
+	for {
+		n, err := c.r.Read(buf)
+		if n > 0 {
+			c.buf.Write(buf[:n])
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // waitUntil reports whether the drain finished before deadline.

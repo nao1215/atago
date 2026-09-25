@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The output of every step is read through a reused buffer. Reading a stream allocated a new 32KB buffer, two per step, which was a fifth of everything atago allocated on sqly's suite of 1028 scenarios; atago now allocates 21% less there, runs 20% fewer garbage collections and spends about 7% less CPU time.
+
 ### Fixed
 
 - The website's Since column showed the keys a release added as "unreleased" after the release was out. The release PR stamps its new keys with the upcoming version, but the site is rebuilt when that PR merges, before the tag exists, and the generator turned the stamp back into "unreleased". The deployment the tag then triggered was of the same commit, and GitHub Pages kept the one it already had, so v0.24.0's 28 new keys stayed "unreleased" on the site. The generator now keeps a stamp that names a version newer than every tag.
