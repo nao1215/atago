@@ -738,3 +738,41 @@ func TestEchoOf(t *testing.T) {
 		})
 	}
 }
+
+// TestTranscriptDrain_GrowthWakesAWait pins what lets an expect see output the
+// moment it arrives rather than at its next poll: the channel growth hands out
+// is closed when bytes land in the transcript, and the next one waits for the
+// next bytes.
+func TestTranscriptDrain_GrowthWakesAWait(t *testing.T) {
+	t.Parallel()
+	pr, pw := io.Pipe()
+	term := startTranscriptDrain(struct {
+		io.Reader
+		io.Writer
+	}{pr, io.Discard}, &spec.PTY{})
+
+	grew := term.growth()
+	select {
+	case <-grew:
+		t.Fatal("growth closed before any output")
+	default:
+	}
+	if _, err := pw.Write([]byte("prompt> ")); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-grew:
+	case <-time.After(10 * time.Second):
+		t.Fatal("growth was not closed when output arrived")
+	}
+	if got := string(term.snapshot()); got != "prompt> " {
+		t.Errorf("transcript = %q", got)
+	}
+	select {
+	case <-term.growth():
+		t.Fatal("the next growth channel is already closed with no new output")
+	default:
+	}
+	_ = pw.Close()
+	term.waitDrain(func() {}, 0)
+}

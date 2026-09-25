@@ -17,8 +17,12 @@ import (
 	"github.com/nao1215/atago/internal/spec"
 )
 
-// pollInterval is how often an expect re-checks the accumulated transcript.
+// pollInterval is how often a wait re-checks the accumulated transcript or the
+// screen when no new output has woken it.
 const pollInterval = 10 * time.Millisecond
+
+// rescanGap is the least time between two scans of an expect woken by output.
+const rescanGap = time.Millisecond
 
 // drainGrace bounds how long finish waits for the reader to hit EOF before
 // closing the terminal: an orphaned grandchild that inherited the pty can hold
@@ -367,8 +371,11 @@ func (d *sessionDriver) canceled(ctx context.Context) *sessionOutcome {
 func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, pattern string) *sessionOutcome {
 	matched := false
 	scannedTo := -1 // transcript length at the last scan; -1 forces one
+	var scannedAt time.Time
 	for {
+		grew := d.term.growth()
 		if n := d.term.curLen(); n != scannedTo {
+			scannedAt = time.Now()
 			d.locateEchoes(d.term.snapshot())
 			tail, m := d.term.tailFrom(d.matchOffset)
 			scannedTo = m
@@ -388,6 +395,15 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 				d.matchOffset += loc[1]
 				matched = true
 			}
+		case <-grew:
+			// Output arrived: scan it now rather than at the next poll, but
+			// no sooner than rescanGap after the last scan, so a program that
+			// writes in many small pieces is scanned in batches instead of
+			// once per piece.
+			if wait := rescanGap - time.Since(scannedAt); wait > 0 {
+				time.Sleep(wait)
+			}
+			continue
 		case <-time.After(pollInterval):
 			continue
 		}
