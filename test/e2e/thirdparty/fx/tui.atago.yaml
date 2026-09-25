@@ -222,10 +222,9 @@ scenarios:
     skip:
       os: windows
     steps:
-      # A top-level `screen:` assert needs the viewer to still be on the
-      # alternate screen, because quitting restores the (empty) primary one.
-      # So this scenario deliberately never sends q: the step timeout ends it
-      # while fx is live, and the assertions read the last frame it painted.
+      # The frame is checked while the viewer is still on the alternate
+      # screen, because quitting restores the (empty) primary one; q then ends
+      # the session instead of the step timeout.
       - fixture:
           file: viewer.json
           content: '{"name":"atago","tags":["cli","e2e"],"nested":{"deep":{"leaf":42}}}'
@@ -233,21 +232,19 @@ scenarios:
           command: fx viewer.json
           cols: 80
           rows: 24
-          timeout: 12s
+          timeout: 20s
           session:
             - expect_screen:
                 contains: '"leaf": 42'
                 stable_for: 100ms
+            - expect_screen:
+                line: 1
+                contains: "{"
+            - expect_screen:
+                contains: viewer.json
+            - send: "q"
       - assert:
-          screen:
-            line: 1
-            contains: "{"
-      - assert:
-          screen:
-            contains: '"leaf": 42'
-      - assert:
-          screen:
-            contains: viewer.json
+          exit_code: 0
 
   - name: with a terminal and no file, fx prints its usage instead of opening the viewer
     only:

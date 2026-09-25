@@ -58,6 +58,4 @@ _only when `htop --version` succeeds · skipped on Windows_
 # interactive (pty): htop
 ```
 #### Then
-- rendered screen contains `CPU%`
-- rendered screen contains `Command`
-- rendered screen contains `F10`
+- exit code is `0`

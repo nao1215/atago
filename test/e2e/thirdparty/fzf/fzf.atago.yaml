@@ -151,24 +151,24 @@ scenarios:
     skip:
       os: windows
     steps:
-      # The `screen:` assertion replays the transcript through the vt100
-      # emulator and checks what the finder actually SHOWS. Typing a query
-      # narrows the visible list; fzf stays on its full screen (no Enter), so
-      # the per-step timeout ends the step while the finder is live and the
-      # rendered frame still holds the narrowed list.
+      # `expect_screen:` replays the transcript through the vt100 emulator and
+      # checks what the finder actually SHOWS. Typing a query narrows the
+      # visible list; the frame is checked while the finder is live, and Esc
+      # then leaves it with 130 instead of the step timeout ending it.
       - pty:
           shell: true
           command: printf 'apple\nbanana\ncherry\n' | fzf
           cols: 80
           rows: 20
-          timeout: 5s
+          timeout: 20s
           session:
             - expect: "3/3"
             - send: "ban"
             - expect: "1/3"
+            - expect_screen:
+                contains: banana
+            - expect_screen:
+                not_contains: cherry
+            - send: {key: esc}
       - assert:
-          screen:
-            contains: banana
-      - assert:
-          screen:
-            not_contains: cherry
+          exit_code: 130
