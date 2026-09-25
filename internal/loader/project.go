@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/parser"
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
@@ -103,7 +104,11 @@ func LoadProject(path string) (*Project, error) {
 	var p Project
 	if derr := yaml.UnmarshalWithOptions(data, &p, yaml.Strict()); derr != nil {
 		msg := yaml.FormatError(derr, false, true)
-		return nil, &Error{Path: path, Kind: KindParse, Code: classifyYAMLError(data, msg), Msg: msg}
+		code := diag.YAMLSyntax
+		if _, perr := parser.ParseBytes(data, 0); perr == nil {
+			code = classifyYAMLError(msg)
+		}
+		return nil, &Error{Path: path, Kind: KindParse, Code: code, Msg: msg}
 	}
 	p.Path = path
 

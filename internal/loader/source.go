@@ -41,11 +41,13 @@ func LoadWithSource(path string) (*spec.Spec, *Source, error) {
 	if perr != nil {
 		return nil, nil, perr
 	}
-	s, lerr := loadBytesWithProject(path, data, proj)
+	s, f, lerr := loadBytesWithProject(path, data, proj)
 	if lerr != nil {
 		return nil, nil, lerr
 	}
-	return s, newSource(data), nil
+	// The locator answers from the AST the spec was decoded from; the decoder
+	// only reads it, so the positions are those of the authored bytes.
+	return s, &Source{file: f}, nil
 }
 
 // newSource parses data into an AST for position lookups. A parse failure yields
