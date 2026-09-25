@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-
 )
 
 // SplitDoc is one generated per-spec Markdown document: the file name to write it
