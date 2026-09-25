@@ -3,10 +3,12 @@
 APP         = atago
 VERSION     = $(shell git describe --tags --always --dirty 2>/dev/null)
 # Scenario concurrency for the spawn/IO-bound suites (atago-on-atago, sqly).
-# Override with `make e2e PARALLEL=1`. NOT used for dogfood-gup: its scenarios
-# each run a CPU-bound `go install` that already parallelizes compilation, so
-# concurrency oversubscribes the CPU and is slower than serial.
-PARALLEL    = 8
+# Empty leaves it to atago's default of four per CPU; override with
+# `make e2e PARALLEL=1`. NOT used for dogfood-gup: its scenarios each run a
+# CPU-bound `go install` that already parallelizes compilation, so concurrency
+# oversubscribes the CPU and is slower than serial.
+PARALLEL    =
+PARALLEL_FLAG = $(if $(PARALLEL),--parallel $(PARALLEL))
 GO          = go
 GO_BUILD    = $(GO) build
 GO_FORMAT   = $(GO) fmt
@@ -71,7 +73,7 @@ release-smoke: ## Build release artifacts locally and smoke-test them (requires 
 
 e2e: ## Build the binary and run the hermetic self-hosted E2E specs plus the git third-party suite (atago tested by atago)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
-	./dist/$(APP) run --parallel $(PARALLEL) ./test/e2e/atago ./test/e2e/thirdparty/git
+	./dist/$(APP) run $(PARALLEL_FLAG) ./test/e2e/atago ./test/e2e/thirdparty/git
 
 thirdparty: ## Run atago against third-party programs (needs git, caddy, helix, pushgateway, webhook, restic, rclone, minio+mc, prometheus+promtool, gitea, coredns+dig, lazygit, nats-server+nats, mailpit, ntfy, yazi, gum on PATH)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
@@ -79,16 +81,16 @@ thirdparty: ## Run atago against third-party programs (needs git, caddy, helix, 
 
 dogfood: ## Run atago against real nao1215 CLIs that just need a binary on PATH (gup, sqly, truss)
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
-	./dist/$(APP) run --parallel $(PARALLEL) --retry-failed 3 --allow-flaky ./test/e2e/tools/gup ./test/e2e/tools/sqly ./test/e2e/tools/truss
+	./dist/$(APP) run $(PARALLEL_FLAG) --retry-failed 3 --allow-flaky ./test/e2e/tools/gup ./test/e2e/tools/sqly ./test/e2e/tools/truss
 
 dogfood-iso8583tool: ## Full iso8583tool e2e (builds latest iso8583tool + its TCP mock; set ISO_REPO)
-	bash ./test/e2e/tools/iso8583tool/run.sh --parallel $(PARALLEL)
+	bash ./test/e2e/tools/iso8583tool/run.sh $(PARALLEL_FLAG)
 
 dogfood-jose: ## Full jose e2e (builds latest jose with GOEXPERIMENT=jsonv2; set JOSE_REPO)
-	bash ./test/e2e/tools/jose/run.sh --parallel $(PARALLEL)
+	bash ./test/e2e/tools/jose/run.sh $(PARALLEL_FLAG)
 
 dogfood-career: ## Full career e2e (builds latest career; set CAREER_REPO)
-	bash ./test/e2e/tools/career/run.sh --parallel $(PARALLEL)
+	bash ./test/e2e/tools/career/run.sh $(PARALLEL_FLAG)
 
 dogfood-gup: ## Full offline gup e2e (builds gup's in-repo module proxy; set GUP_REPO)
 	# Runs serially on purpose: each scenario's `go install` is CPU-bound and
@@ -106,7 +108,7 @@ dogfood-mimixbox: ## Full mimixbox applet e2e (builds + --full-installs applets;
 	bash ./test/e2e/tools/mimixbox/run.sh --parallel 1
 
 dogfood-mobilepkg: ## Full mobilepkg e2e (builds latest mobilepkg; set MOBILEPKG_REPO)
-	bash ./test/e2e/tools/mobilepkg/run.sh --parallel $(PARALLEL)
+	bash ./test/e2e/tools/mobilepkg/run.sh $(PARALLEL_FLAG)
 
 docs: ## Regenerate the committed behavior docs under doc/e2e/ and the error reference in doc/errors.md
 	env CGO_ENABLED=0 $(GO_BUILD) $(GO_LDFLAGS) -o ./dist/$(APP) .
