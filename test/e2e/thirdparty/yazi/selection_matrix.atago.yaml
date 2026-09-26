@@ -320,7 +320,11 @@ scenarios:
           pass_env: [PATH]
           sandbox_home: true
           session:
-            - expect: "a one"
+            # The listing is drawn before yazi reads keys; a key sent in that
+            # window is lost. Wait for the first frame to hold still.
+            - expect_screen:
+                contains: "a one"
+                stable_for: 100ms
             - send: "v"
             - send: "j"
             - expect: "b two"
