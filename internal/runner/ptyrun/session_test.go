@@ -810,3 +810,66 @@ func TestTranscriptDrain_GrowthWakesAWait(t *testing.T) {
 	_ = pw.Close()
 	term.waitDrain(func() {}, 0)
 }
+
+// slowReplyPTY is a fakePTY whose first write, the terminal answering the
+// program, does not return until release is closed.
+type slowReplyPTY struct {
+	*fakePTY
+
+	release chan struct{}
+	once    sync.Once
+}
+
+func (s *slowReplyPTY) Write(p []byte) (int, error) {
+	s.once.Do(func() { <-s.release })
+	return s.fakePTY.Write(p)
+}
+
+// TestDriveSession_ExpectScreenSeesGraphicsAppliedAfterTheAppend is the
+// regression for a wait on the screen's images that missed the program's last
+// command. The drain appends a chunk to the transcript before it applies the
+// graphics commands in it, and here it is held between the two: answering the
+// second image's transmission blocks until release, with the delete of the
+// first still to come. A wait that rendered on the grown transcript saw two
+// images, took the length as scanned, and with no output after the delete never
+// looked again until its deadline, by which a real session has been killed.
+func TestDriveSession_ExpectScreenSeesGraphicsAppliedAfterTheAppend(t *testing.T) {
+	t.Parallel()
+	chunk := "\x1b_Gi=1,a=T,q=2,f=32,s=1,v=1;/wAA/w==\x1b\\" +
+		"\x1b_Gi=2,a=T,f=32,s=1,v=1;AP8A/w==\x1b\\" +
+		"\x1b_Ga=d,d=i,i=1,q=2\x1b\\"
+	f := &slowReplyPTY{fakePTY: &fakePTY{script: []readStep{bytesStep(chunk)}, end: io.EOF}, release: make(chan struct{})}
+	// The answer is held back for 200ms, and the program exits 300ms after
+	// that, so the wait has long seen the grown transcript before the delete
+	// is applied, and the session ends on its own once the program is gone.
+	exit := make(chan int, 1)
+	time.AfterFunc(200*time.Millisecond, func() { close(f.release) })
+	time.AfterFunc(500*time.Millisecond, func() { exit <- 0 })
+	one := 1
+	p := &spec.PTY{
+		Graphics: spec.PTYGraphicsKitty,
+		Timeout:  "3s",
+		Session:  []spec.PTYAction{{ExpectScreen: &spec.PTYExpectScreen{ScreenAssert: spec.ScreenAssert{Images: &spec.ScreenImages{Count: &one}}}}},
+	}
+	session := ptyProcess{
+		rw:        f,
+		exit:      exit,
+		kill:      func() {},
+		closeTerm: f.close,
+		dir:       "/tmp/fake",
+	}
+	start := time.Now()
+	_, ef, err := driveSession(context.Background(), p, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ef != nil {
+		t.Fatalf("the wait missed the delete applied after the append: %+v", ef)
+	}
+	// Missing the delete shows as waiting out the timeout: only the final
+	// check at the deadline renders again, and a real session is killed by
+	// then.
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("the wait matched only at its %s deadline, %s in; it should match once the delete is applied", p.Timeout, elapsed)
+	}
+}
