@@ -174,10 +174,19 @@ type echoSpan struct {
 	// echo is what the line discipline writes back: the sent bytes with each LF
 	// rendered as CRLF, which is what ONLCR does on the way out.
 	echo []byte
+	// sentAt is when the send was written. An echo still incomplete
+	// echoSettle later is taken to be absent.
+	sentAt time.Time
 	// state is whether the bytes at `at` have been examined yet, and what they
 	// turned out to be.
 	state echoState
 }
+
+// echoSettle bounds how long an echo that has begun to arrive may take to
+// finish. The line discipline writes the whole echo when the send is written,
+// so its bytes only lag the write by the time it takes to read them; one still
+// incomplete after this long is not coming, and the terminal did not echo.
+const echoSettle = 200 * time.Millisecond
 
 // echoState is what is known about one send's echo.
 type echoState int
@@ -218,9 +227,10 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 			continue
 		}
 		if e.at+len(e.echo) > len(transcript) {
-			// Not enough has arrived to tell; a later poll decides. A prefix
-			// that already disagrees is decided now rather than waited on.
-			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) {
+			// Not enough has arrived to tell; a later scan decides. A prefix
+			// that already disagrees is decided now rather than waited on, and
+			// so is one that has stopped growing short of the echo.
+			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) || (!e.sentAt.IsZero() && time.Since(e.sentAt) > echoSettle) {
 				e.state = echoAbsent
 			}
 			continue
@@ -233,8 +243,20 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 	}
 }
 
+// echoPending reports whether some send's echo is still undecided.
+func (d *sessionDriver) echoPending() bool {
+	for _, e := range d.echoes {
+		if e.state == echoPending && len(e.echo) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // isEcho reports whether the transcript range [from,to) lies entirely inside
-// the echo of a send this expect has not yet passed.
+// the echo of a send this expect has not yet passed, or inside the part of an
+// echo that has begun to arrive and may still be one. The second is what keeps
+// an expect woken by the first half of its own echo from matching it.
 //
 // An expect that matches only its own keystrokes has asserted that atago can
 // type, not that the program answered: it passes whether the program is
@@ -249,7 +271,7 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 // prints the line, and the printed one falls outside the echo span.
 func (d *sessionDriver) isEcho(from, to int) bool {
 	for _, e := range d.echoes {
-		if e.state != echoConfirmed {
+		if e.state == echoAbsent {
 			continue
 		}
 		if from >= e.at && to <= e.at+len(e.echo) {
@@ -374,7 +396,9 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 	var scannedAt time.Time
 	for {
 		grew := d.term.growth()
-		if n := d.term.curLen(); n != scannedTo {
+		// An echo still arriving can settle as absent with no new output, so
+		// while one is pending every poll scans again.
+		if n := d.term.curLen(); n != scannedTo || d.echoPending() {
 			scannedAt = time.Now()
 			d.locateEchoes(d.term.snapshot())
 			tail, m := d.term.tailFrom(d.matchOffset)
@@ -578,7 +602,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	if werr := d.term.typeInput(typed, times); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent)})
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent), sentAt: time.Now()})
 	return nil
 }
 
