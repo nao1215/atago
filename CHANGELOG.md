@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- With `graphics: kitty`, a pty `expect_screen` on `images:` could miss the program's last graphics command and wait out its timeout. atago's emulated terminal appends output to the transcript before it applies the image commands in it, and the wait rendered again only when the transcript grew, so a render between the two saw the image the program had just deleted, and with no output after the delete it never looked again. The wait now follows how much of the output the terminal has finished acting on. Under many concurrent sessions about one in eighteen timed out; none do now.
+
 ## [0.25.0] - 2026-09-26
 
 ### Changed

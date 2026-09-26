@@ -4,8 +4,10 @@ package ptyrun
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -386,5 +388,53 @@ func TestRun_UnechoedCopyOfTheSentTextMatches(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > 4*time.Second {
 		t.Errorf("the session took %s; the expect should match once the echo is ruled out, not at its timeout", elapsed)
+	}
+}
+
+// TestRun_ExpectScreenSeesTheImagesItsOutputChanged is the regression for a
+// wait on the screen's images that missed the program's last command. The
+// drain appends a chunk to the transcript before it applies the graphics
+// commands in it, and the wait re-rendered only when the transcript grew: a
+// render between the two saw the image the program had just deleted, and with
+// no output after the delete it was never repeated, so the session ran into
+// its timeout. The race needs sessions to overlap, so many run at once; before
+// the fix about one in eighteen timed out.
+func TestRun_ExpectScreenSeesTheImagesItsOutputChanged(t *testing.T) {
+	t.Parallel()
+	shell := true
+	hide, show := "hide\r", "show\r"
+	count := func(n int) *spec.PTYExpectScreen {
+		return &spec.PTYExpectScreen{ScreenAssert: spec.ScreenAssert{Images: &spec.ScreenImages{Count: &n}}}
+	}
+	const sessions = 150
+	errs := make(chan string, sessions)
+	var wg sync.WaitGroup
+	for range sessions {
+		wg.Go(func() {
+			p := &spec.PTY{
+				Shell:    &shell,
+				Graphics: spec.PTYGraphicsKitty,
+				Command: `printf '\033_Gi=1,a=T,q=2,f=32,s=1,v=1;/wAA/w==\033\\'; ` +
+					`printf '\033_Gi=2,a=T,q=2,f=32,s=1,v=1;AP8A/w==\033\\'; read -r line; ` +
+					`printf '\033_Ga=d,d=i,i=1,q=2\033\\'; read -r line`,
+				Timeout: "10s",
+				Session: []spec.PTYAction{
+					{ExpectScreen: count(2)}, {Send: &spec.PTYSend{Text: &hide}},
+					{ExpectScreen: count(1)}, {Send: &spec.PTYSend{Text: &show}},
+				},
+			}
+			res, ef, err := Run(context.Background(), p, t.TempDir(), nil)
+			switch {
+			case err != nil:
+				errs <- err.Error()
+			case ef != nil || res.ExitCode != 0:
+				errs <- fmt.Sprintf("exit %d, transcript %q", res.ExitCode, res.Stdout)
+			}
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		t.Errorf("a session missed the deleted image: %s", e)
 	}
 }

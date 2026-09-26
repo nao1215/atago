@@ -453,9 +453,14 @@ func (d *sessionDriver) waitExpectScreen(ctx context.Context, es *spec.PTYExpect
 	defer cancelWait()
 	var matched bool
 	stable := &stability{need: parsePositiveDuration(es.StableFor)}
-	scannedTo := -1 // transcript length at the last render; -1 forces one
+	// scannedTo is the settled length at the last render; -1 forces one. It
+	// follows the settled length rather than the transcript's: the images a
+	// check reads are updated after the bytes that change them are appended,
+	// and a render between the two would see the old images and, keyed on the
+	// transcript, never be repeated once the output stopped.
+	scannedTo := -1
 	for {
-		if n := d.term.curLen(); n != scannedTo {
+		if n := d.term.settledLen(); n != scannedTo {
 			scannedTo = n
 			if matched = stable.observe(d.checkScreen(es).OK); matched {
 				break
