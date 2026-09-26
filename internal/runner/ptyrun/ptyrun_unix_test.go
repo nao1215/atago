@@ -355,3 +355,36 @@ func TestResolveCwd(t *testing.T) {
 		}
 	}
 }
+
+// TestRun_UnechoedCopyOfTheSentTextMatches pins what an echo still arriving
+// must not cost: with echo off,
+// a program that prints back exactly what it was sent puts that text where an
+// echo would start. The expect waits for the echo to be ruled out and then
+// matches, well inside its timeout, rather than waiting on an echo that never
+// comes.
+func TestRun_UnechoedCopyOfTheSentTextMatches(t *testing.T) {
+	t.Parallel()
+	shell := true
+	text := "ABC\n"
+	p := &spec.PTY{
+		Shell:   &shell,
+		Command: `stty -echo; echo ready; read x; printf '%s' "$x"; sleep 1`,
+		Timeout: "5s",
+		Session: []spec.PTYAction{
+			{Expect: "ready"},
+			{Send: &spec.PTYSend{Text: &text}},
+			{Expect: "ABC"},
+		},
+	}
+	start := time.Now()
+	res, ef, err := Run(context.Background(), p, t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ef != nil {
+		t.Fatalf("expect failure %+v, transcript %q", ef, res.Stdout)
+	}
+	if elapsed := time.Since(start); elapsed > 4*time.Second {
+		t.Errorf("the session took %s; the expect should match once the echo is ruled out, not at its timeout", elapsed)
+	}
+}

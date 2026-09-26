@@ -698,6 +698,14 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 			sentAt: 6, sent: ":", transcript: "ready\n:",
 			scanFrom: 6, pattern: ":", wantMatch: false,
 		},
+		"the echo is still arriving": {
+			// The reader handed over the echo in two pieces and the expect
+			// scanned between them: the text is there, its line break is not
+			// yet. Until the rest arrives the text may be the echo, so it
+			// does not count.
+			sentAt: 7, sent: "ABC\n", transcript: "ready\r\nABC",
+			scanFrom: 7, pattern: "ABC", wantMatch: false,
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -713,6 +721,32 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 				t.Errorf("match = %v, want %v (transcript %q, echo span %+v)", got, tt.wantMatch, tt.transcript, d.echoes[0])
 			}
 		})
+	}
+}
+
+// TestSessionDriver_UnfinishedEchoSettles covers the other side of an echo
+// still arriving: a terminal that does not echo (a program in raw mode) never
+// completes it, and the program's own copy of the sent text must then count
+// once the echo has had time to arrive, instead of blocking the expect until
+// its timeout.
+func TestSessionDriver_UnfinishedEchoSettles(t *testing.T) {
+	t.Parallel()
+	transcript := []byte("ready\r\nABC")
+	re := regexp.MustCompile("ABC")
+
+	recent := &sessionDriver{echoes: []echoSpan{{at: 7, echo: EchoOf([]byte("ABC\n")), sentAt: time.Now()}}}
+	recent.locateEchoes(transcript)
+	if recent.findReal(re, transcript[7:], 7) != nil {
+		t.Error("text that may still be the echo matched right after the send")
+	}
+
+	settled := &sessionDriver{echoes: []echoSpan{{at: 7, echo: EchoOf([]byte("ABC\n")), sentAt: time.Now().Add(-2 * echoSettle)}}}
+	settled.locateEchoes(transcript)
+	if settled.echoes[0].state != echoAbsent {
+		t.Errorf("an echo still incomplete %s after the send is state %v, want absent", 2*echoSettle, settled.echoes[0].state)
+	}
+	if settled.findReal(re, transcript[7:], 7) == nil {
+		t.Error("the program's copy did not match once the echo had had time to arrive")
 	}
 }
 
