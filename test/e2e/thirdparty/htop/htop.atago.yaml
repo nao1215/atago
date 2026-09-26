@@ -72,25 +72,23 @@ scenarios:
     skip:
       os: windows
     steps:
-      # The `screen:` assertion replays the transcript through the vt100
-      # emulator and pins what the user actually SEES. htop must still be on its
-      # alternate screen for the frame to hold its UI: quitting would restore
-      # the (empty) primary screen, so this scenario deliberately does NOT send
-      # q — the per-step timeout ends it while htop is live, and the assertion
-      # checks the final rendered frame rather than the exit code.
+      # `expect_screen:` replays the transcript through the vt100 emulator and
+      # pins what the user actually SEES. It checks the frame while htop is
+      # still on its alternate screen, because quitting restores the (empty)
+      # primary one; then q ends the session instead of the step timeout.
       - pty:
           command: htop
           cols: 100
           rows: 30
-          timeout: 4s
+          timeout: 20s
           session:
             - expect: "F10"
+            - expect_screen:
+                contains: "CPU%"
+            - expect_screen:
+                contains: "Command"
+            - expect_screen:
+                contains: "F10"
+            - send: "q"
       - assert:
-          screen:
-            contains: "CPU%"
-      - assert:
-          screen:
-            contains: "Command"
-      - assert:
-          screen:
-            contains: "F10"
+          exit_code: 0

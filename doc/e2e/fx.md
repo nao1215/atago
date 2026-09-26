@@ -1167,9 +1167,7 @@ _Fixture `viewer.json`:_
 # interactive (pty): fx viewer.json
 ```
 #### Then
-- rendered screen line `1` contains `{`
-- rendered screen contains `"leaf": 42`
-- rendered screen contains `viewer.json`
+- exit code is `0`
 
 ### Scenario: with a terminal and no file, fx prints its usage instead of opening the viewer
 _only when `fx --version` succeeds · skipped on Windows_

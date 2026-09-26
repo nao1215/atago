@@ -116,5 +116,4 @@ _only when `fzf --version` succeeds · skipped on Windows_
 # interactive (pty): printf 'apple\nbanana\ncherry\n' | fzf
 ```
 #### Then
-- rendered screen contains `banana`
-- rendered screen does not contain `cherry`
+- exit code is `130`
