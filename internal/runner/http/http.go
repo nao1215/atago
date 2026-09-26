@@ -58,12 +58,29 @@ type Runner struct {
 // "CloseIdleConnections called" in a scenario that did nothing wrong.
 var transport = newTransport()
 
+// It keeps up to maxIdlePerHost idle connections to each host instead of the
+// default two. Scenarios run concurrently and usually all call one API, so with
+// two kept every other request closed its connection and the next one dialed
+// again: 2000 plain-HTTP requests from 500 concurrent scenarios opened about 950
+// connections, and a server that speaks only HTTP/1.1 over TLS would pay a
+// handshake for each. (HTTP/2 multiplexes, so an h2 server saw four either way.)
 func newTransport() http.RoundTripper {
-	if t, ok := http.DefaultTransport.(*http.Transport); ok {
-		return t.Clone()
+	t, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Transport{Proxy: http.ProxyFromEnvironment, MaxIdleConns: maxIdle, MaxIdleConnsPerHost: maxIdlePerHost}
 	}
-	return &http.Transport{Proxy: http.ProxyFromEnvironment}
+	t = t.Clone()
+	t.MaxIdleConns = maxIdle
+	t.MaxIdleConnsPerHost = maxIdlePerHost
+	return t
 }
+
+// maxIdlePerHost and maxIdle bound the idle connections the shared transport
+// keeps, per host and in all.
+const (
+	maxIdlePerHost = 256
+	maxIdle        = 1024
+)
 
 // New returns an HTTP runner for the given configuration.
 func New(cfg Config) *Runner {
