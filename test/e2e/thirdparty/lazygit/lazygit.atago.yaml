@@ -399,8 +399,15 @@ scenarios:
           session:
             - expect: "Unstaged changes"
             - send: " "
-            - expect: "Staged changes"
+            - expect_screen:
+                contains: ["Staged changes"]
+                stable_for: 100ms
             - send: "C"
+            # C commits through the editor in a subprocess; wait for the commit
+            # in the log before quitting, or `q` can end lazygit first.
+            - expect_screen:
+                contains: ["editor commit"]
+                stable_for: 100ms
             # Quit so the step ends on its assertions: lazygit outlives the session
             # otherwise, and the pty step fails on its timeout instead.
             - send: "q"
@@ -457,8 +464,15 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "Staged changes"
+            - expect_screen:
+                contains: ["Staged changes"]
+                stable_for: 100ms
             - send: "C"
+            # C commits through the editor in a subprocess; wait for the commit
+            # in the log before quitting, or `q` can end lazygit first.
+            - expect_screen:
+                contains: ["pre-staged commit"]
+                stable_for: 100ms
             # Quit so the step ends on its assertions: lazygit outlives the session
             # otherwise, and the pty step fails on its timeout instead.
             - send: "q"
@@ -670,9 +684,20 @@ scenarios:
                 not_contains: ["No branches for this repo"]
                 stable_for: 100ms
             - send: "n"
-            - expect: "New branch name"
+            # The prompt's title is drawn before its input takes keys; typing
+            # into that window loses the name.
+            - expect_screen:
+                contains: ["New branch name"]
+                stable_for: 100ms
             - send: "feature-one"
             - send: {key: enter}
+            # lazygit creates the branch in the background: a `q` sent right
+            # after enter can quit before the branch exists. Wait for the new
+            # branch in the list with the prompt gone.
+            - expect_screen:
+                contains: ["feature-one"]
+                not_contains: ["New branch name"]
+                stable_for: 100ms
             # Quit so the step ends on its assertions: lazygit outlives the session
             # otherwise, and the pty step fails on its timeout instead.
             - send: "q"
@@ -722,9 +747,20 @@ scenarios:
                 not_contains: ["No branches for this repo"]
                 stable_for: 100ms
             - send: "n"
-            - expect: "New branch name"
+            # The prompt's title is drawn before its input takes keys; typing
+            # into that window loses the name.
+            - expect_screen:
+                contains: ["New branch name"]
+                stable_for: 100ms
             - send: "feature/two"
             - send: {key: enter}
+            # lazygit creates the branch in the background: a `q` sent right
+            # after enter can quit before the branch exists. Wait for the new
+            # branch in the list with the prompt gone.
+            - expect_screen:
+                contains: ["feature/two"]
+                not_contains: ["New branch name"]
+                stable_for: 100ms
             # Quit so the step ends on its assertions: lazygit outlives the session
             # otherwise, and the pty step fails on its timeout instead.
             - send: "q"
@@ -998,10 +1034,22 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "stash@{0}"
+            # The stash entry shows in the preview before the list takes keys;
+            # a `g` sent in that window is dropped. Wait for the list to settle.
+            - expect_screen:
+                contains: ["stash@{0}", "On master: probe"]
+                stable_for: 100ms
             - send: "g"
-            - expect: "Stash pop"
+            # The confirmation takes keys once it is drawn and still.
+            - expect_screen:
+                contains: ["Stash pop"]
+                stable_for: 100ms
             - send: {key: enter}
+            # The pop runs in the background: wait for the stash to leave the
+            # list before quitting, or `q` can end lazygit before git ran.
+            - expect_screen:
+                not_contains: ["Stash pop", "stash@{0}"]
+                stable_for: 100ms
             # Quit so the step ends on its assertions: lazygit outlives the session
             # otherwise, and the pty step fails on its timeout instead.
             - send: "q"
@@ -1054,9 +1102,16 @@ scenarios:
           clear_env: true
           pass_env: [PATH]
           session:
-            - expect: "stash@{0}"
+            # The stash entry shows in the preview before the list takes keys;
+            # a `g` sent in that window is dropped. Wait for the list to settle.
+            - expect_screen:
+                contains: ["stash@{0}", "On master: probe"]
+                stable_for: 100ms
             - send: "g"
-            - expect: "Stash pop"
+            # The confirmation takes keys once it is drawn and still.
+            - expect_screen:
+                contains: ["Stash pop"]
+                stable_for: 100ms
             - send: {key: esc}
             # The dialog owns the keyboard until it is gone: a `q` sent right after
             # esc dismisses the dialog instead of quitting, and lazygit outlives the
