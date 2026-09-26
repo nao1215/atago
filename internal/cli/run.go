@@ -194,6 +194,17 @@ func formatProse() string {
 	return strings.Join(names[:len(names)-1], ", ") + ", or " + names[len(names)-1]
 }
 
+// parallelPerCPU is how many scenarios run at once per CPU by default. A
+// scenario spends much of its time waiting, on the program it started, on a
+// pipe, on a prompt or a port, so one per CPU left CPUs idle: on four CPUs,
+// sqly's suite took 5.9s at 4, 3.4s at 8 and 3.2s at 16, and atago's own
+// 10.3s at 4 and 4.7s at 16, while a suite that only runs short commands took
+// the same time at every setting.
+const parallelPerCPU = 4
+
+// defaultParallel is the --parallel default.
+func defaultParallel() int { return parallelPerCPU * runtime.NumCPU() }
+
 // parseRunFlags parses and validates `atago run`'s flags into a runOptions. The
 // bool return is true when parsing already decided the outcome (a --help, a bad
 // flag, an unknown --report, no matching spec files, or a failed bounds check),
@@ -205,7 +216,7 @@ func parseRunFlags(label string, args []string, stdout, stderr io.Writer) (*runO
 	reportFmt := fs.String("report", "console", "report format: "+formatAlternatives())
 	updateSnapshots := fs.Bool("update-snapshots", false, "create or overwrite snapshot files instead of comparing")
 	ci := fs.Bool("ci", false, "CI-safe defaults: deterministic, no color (sets NO_COLOR), secret masking")
-	parallel := fs.Int("parallel", runtime.NumCPU(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
+	parallel := fs.Int("parallel", defaultParallel(), "number of scenarios to run concurrently; scenarios are isolated, each in its own temp dir")
 	failFast := fs.Bool("fail-fast", false, "stop scheduling new scenarios after the first outcome that fails the run (a failure, an error, an XPASS, or a flake unless allowed)")
 	var filter csvFlag
 	fs.Var(&filter, "filter", "run only scenarios whose name contains any of these comma-separated substrings (repeatable; OR semantics like --tag)")
