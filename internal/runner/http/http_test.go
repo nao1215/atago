@@ -503,3 +503,20 @@ func TestRunner_Do_FollowRedirects(t *testing.T) {
 		t.Errorf("Location = %q, want /login", got)
 	}
 }
+
+// TestTransportKeepsIdleConnectionsPerHost pins the idle pool the shared
+// transport keeps per host: with Go's default of two, concurrent scenarios
+// calling one API closed and redialed most of their connections.
+func TestTransportKeepsIdleConnectionsPerHost(t *testing.T) {
+	t.Parallel()
+	tr, ok := transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport is %T, want *http.Transport", transport)
+	}
+	if tr.MaxIdleConnsPerHost != maxIdlePerHost || tr.MaxIdleConns != maxIdle {
+		t.Errorf("idle pool = %d per host, %d in all; want %d and %d", tr.MaxIdleConnsPerHost, tr.MaxIdleConns, maxIdlePerHost, maxIdle)
+	}
+	if tr.Proxy == nil {
+		t.Error("the clone lost the proxy-from-environment setting")
+	}
+}
