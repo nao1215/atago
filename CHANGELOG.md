@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-26
+
 ### Changed
 
 - A service's readiness probe (`file`, `port`, `log`) checks every 5ms instead of every 20ms. The service was noticed ready 10ms after it was, on average, and a suite that starts a service per scenario paid that every time; atago's own service, parallel and signal specs run in 2.67s instead of 2.83s.
