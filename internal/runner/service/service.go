@@ -51,8 +51,10 @@ func (p *Proc) exitedEarly() error {
 // defaultReadyTimeout bounds a readiness probe when the spec omits one.
 const defaultReadyTimeout = 5 * time.Second
 
-// pollInterval is how often a file/port/log probe re-checks.
-const pollInterval = 20 * time.Millisecond
+// pollInterval is how often a file/port/log probe re-checks. A readiness
+// signal is noticed on average half an interval after it appears, and a probe
+// is a stat, a dial or a scan of the captured log, so the interval is short.
+const pollInterval = 5 * time.Millisecond
 
 // defaultMaxLogBytes caps a service's retained stdout/stderr when the spec
 // does not set services[].max_log_bytes: suite-level services live for the
