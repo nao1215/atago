@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `atago record --shell` failed with "generated spec does not validate" when the command line held a tab, a carriage return or an escape character. With `--shell` the argument is the whole command line, and the suite was named after the base name of the whole line, control characters included, which the loader refuses in a name. The suite is now named after the line's first word, and a control character left in a name becomes a space, as it already did in the scenario name.
 - With `graphics: kitty`, a pty `expect_screen` on `images:` could miss the program's last graphics command and wait out its timeout. atago's emulated terminal appends output to the transcript before it applies the image commands in it, and the wait rendered again only when the transcript grew, so a render between the two saw the image the program had just deleted, and with no output after the delete it never looked again. The wait now follows how much of the output the terminal has finished acting on. Under many concurrent sessions about one in eighteen timed out; none do now.
 
 ## [0.25.0] - 2026-09-26

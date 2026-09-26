@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 710 scenarios
+86 suites · 711 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -565,12 +565,13 @@
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
   - [a stable_for above the session budget is a load-time error](#scenario-a-stable_for-above-the-session-budget-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 17 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 18 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
   - [an observed stderr diagnostic is anchored, not dropped](#scenario-an-observed-stderr-diagnostic-is-anchored-not-dropped)
   - [created files become exists asserts (shell mode)](#scenario-created-files-become-exists-asserts-shell-mode)
+  - [a shell command line with a tab in it records a spec that loads](#scenario-a-shell-command-line-with-a-tab-in-it-records-a-spec-that-loads)
   - [snapshot mode writes a golden the run then matches](#scenario-snapshot-mode-writes-a-golden-the-run-then-matches)
   - [no command is a usage error](#scenario-no-command-is-a-usage-error)
   - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
@@ -12579,6 +12580,20 @@ ${atago} run gen.atago.yaml
   - exit code is `0`
   - file `gen.atago.yaml` contains `path: out.txt`, `exists: true`
   - file `gen.atago.yaml` contains `shell: true`
+- after `${atago} run gen.atago.yaml`:
+  - exit code is `0`
+
+### Scenario: a shell command line with a tab in it records a spec that loads
+_skipped on Windows_
+#### When
+```shell
+${atago} record --shell --out gen.atago.yaml -- "echo /tmp/x; printf '%s\n' 'a	b'"
+${atago} run gen.atago.yaml
+```
+#### Then
+- after `${atago} record --shell --out gen.atago.yaml -- "echo /tmp/x; printf '%s\n' 'a	b'"`:
+  - exit code is `0`
+  - file `gen.atago.yaml` contains `name: echo`
 - after `${atago} run gen.atago.yaml`:
   - exit code is `0`
 

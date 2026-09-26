@@ -120,7 +120,7 @@ non-goal for now — write those steps by hand.
 		Stderr:       res.Stderr,
 		CreatedFiles: created,
 	}
-	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0]), Workdir: workdir}
+	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0], *shell), Workdir: workdir}
 	if *snap {
 		opts.Snapshot = true
 		opts.SnapshotPath = "snapshots/" + strings.TrimSuffix(filepath.Base(*out), ".atago.yaml") + ".stdout.txt"
@@ -196,7 +196,7 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, timeout tim
 		return ExitExec
 	}
 
-	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0])}
+	opts := record.Options{SuiteName: suiteNameFor(cmdArgs[0], shell)}
 	generated, err := record.GeneratePTY(rec, opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "atago record: %v\n", err)
@@ -334,10 +334,23 @@ func plainPOSIXWord(s string) bool {
 	return true
 }
 
-// suiteNameFor derives a suite name from the command's base name.
-func suiteNameFor(argv0 string) string {
+// suiteNameFor derives a suite name from the base name of the program the
+// command starts. With --shell, argv0 is the whole command line, so only its
+// first word names the program; the rest are arguments and may hold slashes
+// and control bytes. The loader refuses a control character in a name, so any
+// left becomes a space, as in the scenario name, rather than producing a spec
+// that cannot load.
+func suiteNameFor(argv0 string, shell bool) string {
+	if shell {
+		fields := strings.Fields(argv0)
+		if len(fields) == 0 {
+			return "recorded"
+		}
+		argv0 = fields[0]
+	}
 	name := filepath.Base(filepath.FromSlash(argv0))
 	name = strings.TrimSuffix(name, ".exe")
+	name = strings.Join(strings.FieldsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f || r == ' ' }), " ")
 	if name == "" || name == "." {
 		return "recorded"
 	}
