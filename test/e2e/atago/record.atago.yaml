@@ -125,6 +125,27 @@ scenarios:
       - assert:
           exit_code: 0
 
+  - name: a shell command line with a tab in it records a spec that loads
+    skip:
+      os: windows
+    steps:
+      # With --shell the argument is the whole command line. The slash in
+      # /tmp/x is there because the base name of the whole line is everything
+      # after it, tab included, which the loader refuses in a name; the suite
+      # must be named after echo.
+      - run:
+          shell: true
+          command: "${atago} record --shell --out gen.atago.yaml -- \"echo /tmp/x; printf '%s\\n' 'a\tb'\""
+      - assert:
+          exit_code: 0
+          file:
+            path: gen.atago.yaml
+            contains: "name: echo"
+      - run:
+          command: ${atago} run gen.atago.yaml
+      - assert:
+          exit_code: 0
+
   - name: snapshot mode writes a golden the run then matches
     skip:
       os: windows

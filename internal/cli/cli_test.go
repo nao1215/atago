@@ -702,18 +702,33 @@ func TestSplitCSV(t *testing.T) {
 
 func TestSuiteNameFor(t *testing.T) {
 	t.Parallel()
-	cases := []struct{ in, want string }{
-		{"echo", "echo"},
-		{"/usr/bin/grep", "grep"},
-		{"tool.exe", "tool"},
-		{"a.b.exe", "a.b"},
-		{"", "recorded"},
-		{".", "recorded"},
-		{"dir/", "dir"},
+	cases := []struct {
+		in    string
+		shell bool
+		want  string
+	}{
+		{"echo", false, "echo"},
+		{"/usr/bin/grep", false, "grep"},
+		{"tool.exe", false, "tool"},
+		{"a.b.exe", false, "a.b"},
+		{"", false, "recorded"},
+		{".", false, "recorded"},
+		{"dir/", false, "dir"},
+		{"/opt/my tools/run", false, "run"},
+		// A name must load: the loader refuses a control character in it, so
+		// one in the program's own name becomes a space.
+		{"to\x1bol", false, "to ol"},
+		// With --shell the argument is the whole command line; the suite is
+		// named after the program it starts, not after the tail of the line,
+		// which carries the arguments and whatever control bytes they hold.
+		{"/usr/bin/printf 'a\tb\n' > out/x.txt", true, "printf"},
+		{"\tgrep -c x\r", true, "grep"},
+		{"cd dir/sub && ./build.sh", true, "cd"},
+		{"   ", true, "recorded"},
 	}
 	for _, c := range cases {
-		if got := suiteNameFor(c.in); got != c.want {
-			t.Errorf("suiteNameFor(%q) = %q, want %q", c.in, got, c.want)
+		if got := suiteNameFor(c.in, c.shell); got != c.want {
+			t.Errorf("suiteNameFor(%q, shell=%v) = %q, want %q", c.in, c.shell, got, c.want)
 		}
 	}
 }
