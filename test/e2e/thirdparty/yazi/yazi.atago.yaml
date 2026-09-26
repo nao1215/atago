@@ -2055,7 +2055,11 @@ scenarios:
           pass_env: [PATH]
           sandbox_home: true
           session:
-            - expect: "dst"
+            # The listing is drawn before yazi reads keys; a key sent in that
+            # window is lost. Wait for the first frame to hold still.
+            - expect_screen:
+                contains: "dst"
+                stable_for: 100ms
             - send: "j"
             - expect: "src"
             - send: "l"

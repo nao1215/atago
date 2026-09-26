@@ -90,9 +90,16 @@ scenarios:
           pass_env: [PATH]
           sandbox_home: true
           session:
-            - expect: "a.txt"
+            # Both names are on screen from the first frame, so they cannot say
+            # where the cursor is; the position counter in the status bar can.
+            # Wait for it to settle before j, and for it to move before enter.
+            - expect_screen:
+                contains: "1/2"
+                stable_for: 100ms
             - send: "j"
-            - expect: "b.txt"
+            - expect_screen:
+                contains: "2/2"
+                stable_for: 100ms
             - send: {key: enter}
       - assert: {file: {path: chosen.txt, contains: "/target/b.txt"}}
 
