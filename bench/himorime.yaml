@@ -47,8 +47,11 @@ defaults:
     cpu_total:
       max_percent: 15
       min_difference: 2ms
+    # Speed comes first: atago trades memory for CPU time where it has to
+    # (the GC target in main.go), so peak RSS is still measured and reported
+    # but fails the job only when it grows by more than half.
     peak_rss:
-      max_percent: 15
+      max_percent: 50
       min_difference: 2MiB
 
 benchmarks:
