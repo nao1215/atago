@@ -25,7 +25,13 @@ type transcriptDrain struct {
 	transcript []byte
 	// grew is closed, and replaced, whenever the transcript grows, so a wait
 	// for output wakes when the output arrives instead of at its next poll.
-	grew        chan struct{}
+	grew chan struct{}
+	// settled is how much of the transcript the terminal has finished
+	// acting on: answered its probes and applied its graphics commands. It
+	// trails the transcript by the chunk being processed, and a check of the
+	// screen's images keys on it, since the images reflect only what has
+	// settled.
+	settled     int
 	readErr     error
 	readDone    chan struct{}
 	screenLen   int
@@ -113,6 +119,9 @@ func startTranscriptDrain(rw io.ReadWriter, p *spec.PTY) *transcriptDrain {
 				}
 				applied += len(pending)
 				queries.consume(buf[:n])
+				t.mu.Lock()
+				t.settled += n
+				t.mu.Unlock()
 			}
 			if rerr == nil {
 				continue
@@ -188,6 +197,14 @@ func (t *transcriptDrain) tailFrom(from int) ([]byte, int) {
 		from = len(t.transcript)
 	}
 	return append([]byte(nil), t.transcript[from:]...), len(t.transcript)
+}
+
+// settledLen returns how much of the transcript the terminal has acted on; see
+// settled.
+func (t *transcriptDrain) settledLen() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.settled
 }
 
 func (t *transcriptDrain) curLen() int {
