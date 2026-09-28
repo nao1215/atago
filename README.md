@@ -10,6 +10,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/nao1215/atago.svg)](https://pkg.go.dev/github.com/nao1215/atago)
 ![GitHub](https://img.shields.io/github/license/nao1215/atago)
 [![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/nao1215/atago/total)](https://github.com/nao1215/atago/releases)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/nao1215/atago/badge)](https://scorecard.dev/viewer/?uri=github.com/nao1215/atago)
 
 <p align="center">
   <img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />

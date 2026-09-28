@@ -3,12 +3,15 @@ on: [pull_request]
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   misspell:
     name: misspell
     runs-on: ubuntu-latest
+    # The github-pr-review reporter posts review comments.
+    permissions:
+      contents: read
+      pull-requests: write
     timeout-minutes: 10
     # The github-pr-review reporter 403s under Dependabot's read-only token.
     if: github.actor != 'dependabot[bot]'
@@ -27,6 +30,10 @@ jobs:
 
   actionlint:
     runs-on: ubuntu-latest
+    # The github-pr-review reporter posts review comments.
+    permissions:
+      contents: read
+      pull-requests: write
     timeout-minutes: 10
     if: github.actor != 'dependabot[bot]'
     steps:
