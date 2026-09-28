@@ -15,3 +15,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+  # Dockerfile.goreleaser pins its base image by digest; this keeps it fresh.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
