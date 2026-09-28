@@ -25,6 +25,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # Accepted exception: the pinned action.yaml runs ghcr.io/ossf/scorecard-action
+      # by version tag, not by digest. The Scorecard API only accepts results from a
+      # workflow whose steps are the official actions (no run steps or substitutes),
+      # so the image cannot be digest-pinned here. The commit pin fixes the action
+      # metadata; Dependabot moves it to upstream releases as they ship.
       - name: Run analysis
         uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
