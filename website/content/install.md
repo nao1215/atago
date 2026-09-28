@@ -46,7 +46,7 @@ Every release ships supply-chain metadata so you can verify what you download:
 
 - Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
 - SBOM: an SPDX Software Bill of Materials is attached to each release archive.
-- Build provenance: SLSA build provenance is attested via GitHub OIDC.
+- Build provenance: SLSA build provenance is attested via GitHub OIDC and attached to the release as `multiple.intoto.jsonl`.
 
 ```shell
 cosign verify-blob \
@@ -59,4 +59,13 @@ sha256sum --check --ignore-missing checksums.txt
 
 ```shell
 gh attestation verify atago_<version>_<os>_<arch>.tar.gz --repo nao1215/atago  # .zip on Windows
+```
+
+To verify an archive against the attached provenance without the GitHub CLI, use [slsa-verifier](https://github.com/slsa-framework/slsa-verifier):
+
+```shell
+slsa-verifier verify-artifact atago_<version>_<os>_<arch>.tar.gz \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/nao1215/atago \
+  --source-tag v<version>
 ```

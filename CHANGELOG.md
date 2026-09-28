@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Release artifacts now ship with SLSA build provenance as a release asset (`multiple.intoto.jsonl`), which `slsa-verifier verify-artifact` checks against a downloaded archive. The release run verifies every published archive against it before finishing. The GitHub attestation checked by `gh attestation verify` is still published.
+
 ### Fixed
 
 - `atago record --shell` failed with "generated spec does not validate" when the command line held a tab, a carriage return or an escape character. With `--shell` the argument is the whole command line, and the suite was named after the base name of the whole line, control characters included, which the loader refuses in a name. The suite is now named after the line's first word, and a control character left in a name becomes a space, as it already did in the scenario name.
