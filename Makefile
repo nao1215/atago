@@ -52,7 +52,7 @@ lint: ## Run golangci-lint for every target OS (a linter only sees the files tha
 	done
 
 tools: ## Install developer tools used by this repository
-	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+	$(GO_INSTALL) github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 	$(GO_INSTALL) github.com/nao1215/himorime@latest
 
 bench: ## Measure atago with the himorime suite in bench/ (requires himorime on PATH)
