@@ -359,9 +359,8 @@ func TestResolveCwd(t *testing.T) {
 // TestRun_UnechoedCopyOfTheSentTextMatches pins what an echo still arriving
 // must not cost: with echo off,
 // a program that prints back exactly what it was sent puts that text where an
-// echo would start. The expect waits for the echo to be ruled out and then
-// matches, well inside its timeout, rather than waiting on an echo that never
-// comes.
+// echo would start. The terminal says it does not echo, so the expect matches
+// well inside its timeout rather than waiting on an echo that never comes.
 func TestRun_UnechoedCopyOfTheSentTextMatches(t *testing.T) {
 	t.Parallel()
 	shell := true
@@ -386,5 +385,40 @@ func TestRun_UnechoedCopyOfTheSentTextMatches(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > 4*time.Second {
 		t.Errorf("the session took %s; the expect should match once the echo is ruled out, not at its timeout", elapsed)
+	}
+}
+
+// TestTerminalEchoMode_FollowsTheEchoFlag pins the answer the echo rule rests
+// on: a fresh terminal echoes, and one whose program cleared ECHO (a password
+// prompt, a TUI in raw mode) says it does not. The flag is flipped on the slave,
+// the side a program changes.
+func TestTerminalEchoMode_FollowsTheEchoFlag(t *testing.T) {
+	t.Parallel()
+	master, tty, err := OpenTerminal(24, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = master.Close() }()
+	defer func() { _ = tty.Close() }()
+
+	if got := terminalEchoMode(tty); got != echoModeOn {
+		t.Fatalf("a fresh terminal reports echo mode %v, want on", got)
+	}
+	if err := ControlFD(tty, func(fd int) error {
+		tio, err := unix.IoctlGetTermios(fd, ioctlGetTermios)
+		if err != nil {
+			return err
+		}
+		tio.Lflag &^= unix.ECHO
+		return unix.IoctlSetTermios(fd, ioctlSetTermios, tio)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := terminalEchoMode(tty); got != echoModeOff {
+		t.Errorf("a terminal with ECHO cleared reports echo mode %v, want off", got)
+	}
+	_ = tty.Close()
+	if got := terminalEchoMode(tty); got != echoModeUnknown {
+		t.Errorf("a closed terminal reports echo mode %v, want unknown", got)
 	}
 }

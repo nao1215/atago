@@ -65,6 +65,10 @@ type ptyProcess struct {
 	// SIGWINCH to the foreground process group, and ConPTY notifies its client
 	// directly — so driveSession only has to say when.
 	resize func(rows, cols int) error
+	// echoMode reports whether the terminal currently echoes typed input. It may
+	// be nil for a backend that cannot ask, which is the same as answering
+	// echoModeUnknown.
+	echoMode func() echoMode
 	// dir is the resolved workdir the child ran in, surfaced as Result.Workdir.
 	dir string
 	// env is the environment the pty child was started with, reused for
@@ -165,27 +169,54 @@ type sessionDriver struct {
 // echoSpan is one send's echo: the bytes the terminal would write back, and
 // the transcript position they must occupy to be that echo.
 type echoSpan struct {
-	// at is the transcript length at the moment of the send. The echo, if the
-	// terminal performs one, begins exactly here: the line discipline writes it
-	// synchronously with the write, before the program is scheduled to respond.
-	// Anything appearing later is the program's, however much it resembles what
-	// was sent.
+	// at is the transcript length at the moment of the send: nothing before it
+	// can be this send's echo. Once an echo the terminal promised (echoModeOn)
+	// is found, at moves to where it actually sits.
 	at int
 	// echo is what the line discipline writes back: the sent bytes with each LF
 	// rendered as CRLF, which is what ONLCR does on the way out.
 	echo []byte
-	// sentAt is when the send was written. An echo still incomplete
-	// echoSettle later is taken to be absent.
+	// sentAt is when the send was written. When the terminal could not say
+	// whether it echoes, an echo still incomplete echoSettle later is taken to
+	// be absent.
 	sentAt time.Time
-	// state is whether the bytes at `at` have been examined yet, and what they
-	// turned out to be.
+	// state is whether the echo has been found yet, and what the search
+	// turned up.
 	state echoState
+	// mode is what the terminal said about echoing when the send was written.
+	mode echoMode
+	// partial is where a promised echo that has begun to arrive starts: the
+	// transcript ends in a prefix of the echo from here on. -1 when none has.
+	partial int
 }
 
+// echoMode is whether the terminal's line discipline had ECHO set when a send
+// was written, as the terminal itself reports it.
+//
+// Asking the terminal is what makes the echo decidable. Without the answer the
+// only evidence is whether the echo shows up soon, and "soon" is a guess about
+// the machine: on a loaded runner the echo reached the transcript after the
+// guess expired, was taken for the program's output, and an expect passed on
+// the scenario's own keystrokes.
+type echoMode int
+
+const (
+	// echoModeUnknown means the platform could not say (the Windows pseudo
+	// console, or a terminal that refused the query). The echo is then looked
+	// for only at the write's offset, within echoSettle.
+	echoModeUnknown echoMode = iota
+	// echoModeOn means the line discipline echoes, so the echo will arrive. It
+	// lands after whatever the program had already written when the input was
+	// processed, so it is the first copy at or after the write's offset, and
+	// however late it comes it is still the echo.
+	echoModeOn
+	// echoModeOff means it does not, so nothing the send causes is an echo.
+	echoModeOff
+)
+
 // echoSettle bounds how long an echo that has begun to arrive may take to
-// finish. The line discipline writes the whole echo when the send is written,
-// so its bytes only lag the write by the time it takes to read them; one still
-// incomplete after this long is not coming, and the terminal did not echo.
+// finish when the terminal could not say whether it echoes. It is a guess,
+// which is why it applies only then.
 const echoSettle = 200 * time.Millisecond
 
 // echoState is what is known about one send's echo.
@@ -210,20 +241,43 @@ func EchoOf(sent []byte) []byte {
 	return bytes.ReplaceAll(sent, []byte("\n"), []byte("\r\n"))
 }
 
-// locateEchoes decides, for each send, whether the terminal echoed it —
-// by looking only at the bytes sitting exactly where the write landed.
+// locateEchoes decides, for each send, where the terminal's echo of it is, or
+// that there is none.
 //
-// Position is what separates an echo from the program's own output, and it is
-// the only thing that can: the two are identical bytes on the same stream. The
-// line discipline writes its echo synchronously with the write, so it is at the
-// write's offset or it does not exist. Searching further along would find any
-// later occurrence of the same text and call it an echo — which is how a TUI
-// redrawing the `:` it was just sent had its own output discounted, leaving an
-// expect waiting for something already on screen.
+// Position is what separates an echo from the program's own output: the two
+// are identical bytes on the same stream. What the terminal reported when the
+// send was written (see echoMode) says whether an echo exists at all. With ECHO
+// off nothing is discounted, which is what keeps a TUI in raw mode redrawing
+// the `:` it was just sent from having its own output taken for an echo. With
+// ECHO on the echo is the first copy at or after the write's offset, and past
+// the previous send's echo, since the line discipline echoes input in order.
 func (d *sessionDriver) locateEchoes(transcript []byte) {
+	floor := 0 // end of the last promised echo found; later echoes follow it
 	for i := range d.echoes {
 		e := &d.echoes[i]
-		if e.state != echoPending || len(e.echo) == 0 {
+		if len(e.echo) == 0 {
+			continue
+		}
+		switch e.mode {
+		case echoModeOff:
+			e.state = echoAbsent
+			continue
+		case echoModeOn:
+			if e.state == echoConfirmed {
+				floor = max(floor, e.at+len(e.echo))
+				continue
+			}
+			start := min(max(e.at, floor), len(transcript))
+			if idx := bytes.Index(transcript[start:], e.echo); idx >= 0 {
+				e.at, e.state, e.partial = start+idx, echoConfirmed, -1
+				floor = e.at + len(e.echo)
+				continue
+			}
+			e.partial = partialEchoAt(transcript, start, e.echo)
+			continue
+		case echoModeUnknown:
+		}
+		if e.state != echoPending {
 			continue
 		}
 		if e.at+len(e.echo) > len(transcript) {
@@ -243,10 +297,25 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 	}
 }
 
-// echoPending reports whether some send's echo is still undecided.
-func (d *sessionDriver) echoPending() bool {
+// partialEchoAt returns where the transcript's tail, from start on, begins a
+// prefix of echo, taking the longest such tail, or -1 when it does not end in
+// one. It is how an echo that has begun to arrive is held back before the rest
+// of it lands.
+func partialEchoAt(transcript []byte, start int, echo []byte) int {
+	for k := min(len(echo)-1, len(transcript)-start); k > 0; k-- {
+		if bytes.Equal(transcript[len(transcript)-k:], echo[:k]) {
+			return len(transcript) - k
+		}
+	}
+	return -1
+}
+
+// echoSettling reports whether some send's echo is still undecided in a way
+// only time can settle: one the terminal could not say it would produce. A
+// promised echo waits for bytes, not for the clock, so it needs no rescan.
+func (d *sessionDriver) echoSettling() bool {
 	for _, e := range d.echoes {
-		if e.state == echoPending && len(e.echo) > 0 {
+		if e.mode == echoModeUnknown && e.state == echoPending && len(e.echo) > 0 {
 			return true
 		}
 	}
@@ -271,7 +340,15 @@ func (d *sessionDriver) echoPending() bool {
 // prints the line, and the printed one falls outside the echo span.
 func (d *sessionDriver) isEcho(from, to int) bool {
 	for _, e := range d.echoes {
-		if e.state == echoAbsent {
+		if e.state == echoAbsent || len(e.echo) == 0 {
+			continue
+		}
+		if e.mode == echoModeOn && e.state == echoPending {
+			// Not found yet: only the part that has begun to arrive at the
+			// end of the transcript can be it.
+			if e.partial >= 0 && from >= e.partial {
+				return true
+			}
 			continue
 		}
 		if from >= e.at && to <= e.at+len(e.echo) {
@@ -397,13 +474,12 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 	for {
 		grew := d.term.growth()
 		// An echo still arriving can settle as absent with no new output, so
-		// while one is pending every poll scans again.
-		if n := d.term.curLen(); n != scannedTo || d.echoPending() {
+		// while one is settling every poll scans again.
+		if n := d.term.curLen(); n != scannedTo || d.echoSettling() {
 			scannedAt = time.Now()
-			d.locateEchoes(d.term.snapshot())
-			tail, m := d.term.tailFrom(d.matchOffset)
-			scannedTo = m
-			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
+			var loc []int
+			loc, scannedTo = d.scanExpect(re)
+			if loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 				break
@@ -413,9 +489,7 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 		case <-ctx.Done():
 			// One last check: bytes may have landed in the final poll
 			// window before the deadline fired.
-			d.locateEchoes(d.term.snapshot())
-			tail, _ := d.term.tailFrom(d.matchOffset)
-			if loc := d.findReal(re, tail, d.matchOffset); loc != nil {
+			if loc, _ := d.scanExpect(re); loc != nil {
 				d.matchOffset += loc[1]
 				matched = true
 			}
@@ -443,6 +517,17 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 		return d.abort(&ExpectFailure{Pattern: pattern, Transcript: string(d.term.snapshot())})
 	}
 	return nil
+}
+
+// scanExpect looks for re past the previous match in one snapshot of the
+// transcript, and returns the match relative to matchOffset (nil when there is
+// none) and the length it scanned. Echoes are located in that same snapshot:
+// bytes that land between locating the echoes and matching would be matched
+// without ever having been checked for being one.
+func (d *sessionDriver) scanExpect(re *regexp.Regexp) ([]int, int) {
+	tr := d.term.snapshot()
+	d.locateEchoes(tr)
+	return d.findReal(re, tr[min(d.matchOffset, len(tr)):], d.matchOffset), len(tr)
 }
 
 // waitExpectScreen polls the rendered screen until the matcher holds (and, with
@@ -598,6 +683,12 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	// meaningful — it is the boundary between what the terminal had already
 	// shown and what this send causes.
 	at := d.term.curLen()
+	// Whether the terminal echoes is read before the write too: it is the
+	// terminal's state when the input reaches the line discipline that decides.
+	mode := echoModeUnknown
+	if d.proc.echoMode != nil {
+		mode = d.proc.echoMode()
+	}
 	// A repeated key is handed over as one key and a count, so a host that
 	// needs keys encoded one by one (#678) can repeat the encoded key.
 	typed, times := sent, 1
@@ -607,7 +698,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	if werr := d.term.typeInput(typed, times); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent), sentAt: time.Now()})
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent), sentAt: time.Now(), mode: mode, partial: -1})
 	return nil
 }
 

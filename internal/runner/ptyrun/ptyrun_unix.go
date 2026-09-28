@@ -115,8 +115,9 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 			}
 			return setTerminalSize(master, uint16(rows), uint16(cols))
 		},
-		dir: cmd.Dir,
-		env: env,
+		echoMode: func() echoMode { return terminalEchoMode(tty) },
+		dir:      cmd.Dir,
+		env:      env,
 	}
 	return driveSession(ctx, p, proc)
 }

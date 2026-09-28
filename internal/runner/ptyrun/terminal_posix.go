@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/creack/pty"
+	"golang.org/x/sys/unix"
 )
 
 // openTerminalPair opens a pseudo-terminal pair. Everywhere but Linux this is
@@ -15,3 +16,7 @@ import (
 func openTerminalPair() (master, tty *os.File, err error) {
 	return pty.Open()
 }
+
+// ioctlGetTermios is the request that reads a terminal's attributes on Darwin
+// and the BSDs.
+const ioctlGetTermios = unix.TIOCGETA

@@ -40,3 +40,26 @@ func setTerminalSize(master *os.File, rows, cols uint16) error {
 		return unix.IoctlSetWinsize(fd, unix.TIOCSWINSZ, &unix.Winsize{Row: rows, Col: cols})
 	})
 }
+
+// terminalEchoMode asks the terminal whether its line discipline echoes typed
+// input right now. tty is the slave side, whose attributes are the ones the
+// program sets and the line discipline obeys; atago keeps its own handle on it
+// until the child is reaped, which covers every send. A terminal that will not
+// answer is echoModeUnknown rather than a failed step: the driver still has
+// its older, timing-based way to tell.
+func terminalEchoMode(tty *os.File) echoMode {
+	mode := echoModeUnknown
+	_ = ControlFD(tty, func(fd int) error {
+		t, err := unix.IoctlGetTermios(fd, ioctlGetTermios)
+		if err != nil {
+			return err
+		}
+		if t.Lflag&unix.ECHO != 0 {
+			mode = echoModeOn
+		} else {
+			mode = echoModeOff
+		}
+		return nil
+	})
+	return mode
+}
