@@ -42,3 +42,7 @@ func TestOpenTerminalPair_SlaveIsTheOneTheKernelNamed(t *testing.T) {
 		_ = master.Close()
 	}
 }
+
+// ioctlSetTermios is the request that writes a terminal's attributes on Linux;
+// only tests change them.
+const ioctlSetTermios = unix.TCSETS

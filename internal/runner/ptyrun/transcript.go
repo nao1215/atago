@@ -186,19 +186,6 @@ func (t *transcriptDrain) snapshot() []byte {
 	return append([]byte(nil), t.transcript...)
 }
 
-// tailFrom copies only transcript[from:] under the lock and reports the
-// transcript's current length; curLen reports the length alone. Together they
-// let a pending expect skip the poll entirely when nothing new arrived and copy
-// only the bytes it can still match.
-func (t *transcriptDrain) tailFrom(from int) ([]byte, int) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if from > len(t.transcript) {
-		from = len(t.transcript)
-	}
-	return append([]byte(nil), t.transcript[from:]...), len(t.transcript)
-}
-
 // settledLen returns how much of the transcript the terminal has acted on; see
 // settled.
 func (t *transcriptDrain) settledLen() int {

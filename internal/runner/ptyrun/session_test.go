@@ -725,10 +725,11 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 }
 
 // TestSessionDriver_UnfinishedEchoSettles covers the other side of an echo
-// still arriving: a terminal that does not echo (a program in raw mode) never
-// completes it, and the program's own copy of the sent text must then count
-// once the echo has had time to arrive, instead of blocking the expect until
-// its timeout.
+// still arriving, on a terminal that could not say whether it echoes (the
+// spans here carry echoModeUnknown): one that does not echo never completes
+// it, and the program's own copy of the sent text must then count once the
+// echo has had time to arrive, instead of blocking the expect until its
+// timeout.
 func TestSessionDriver_UnfinishedEchoSettles(t *testing.T) {
 	t.Parallel()
 	transcript := []byte("ready\r\nABC")
@@ -747,6 +748,199 @@ func TestSessionDriver_UnfinishedEchoSettles(t *testing.T) {
 	}
 	if settled.findReal(re, transcript[7:], 7) == nil {
 		t.Error("the program's copy did not match once the echo had had time to arrive")
+	}
+}
+
+// TestSessionDriver_EchoTheTerminalReported covers sends whose echo the
+// terminal said it would, or would not, produce. What decides it is the
+// terminal's own ECHO flag rather than how soon the bytes show up: an echo that
+// arrives after other output, or late because the machine is busy, is still the
+// echo, and a terminal with ECHO off has no echo to wait for at all.
+func TestSessionDriver_EchoTheTerminalReported(t *testing.T) {
+	t.Parallel()
+	type send struct {
+		at   int
+		sent string
+	}
+	tests := map[string]struct {
+		mode       echoMode
+		sends      []send
+		transcript string
+		scanFrom   int
+		pattern    string
+		wantMatch  bool
+	}{
+		"an echo that arrives late is still the echo": {
+			// Nothing was there when the send was written and the echo landed
+			// long after; lateness does not make it the program's.
+			mode: echoModeOn, sends: []send{{7, "ABC\n"}}, transcript: "ready\r\nABC\r\n",
+			scanFrom: 7, pattern: "ABC", wantMatch: false,
+		},
+		"an echo behind the rest of an earlier line is still the echo": {
+			// The program's line reached atago in two reads and the send went
+			// out between them, so the echo follows the line's CRLF instead of
+			// sitting where the write was.
+			mode: echoModeOn, sends: []send{{5, "ABC\n"}}, transcript: "ready\r\nABC\r\n",
+			scanFrom: 5, pattern: "ABC", wantMatch: false,
+		},
+		"the program's copy after the echo counts": {
+			mode: echoModeOn, sends: []send{{0, "ABC\n"}}, transcript: "ABC\r\nABC\r\n",
+			scanFrom: 0, pattern: "ABC", wantMatch: true,
+		},
+		"an echo still arriving behind other output does not count": {
+			mode: echoModeOn, sends: []send{{5, "ABC\n"}}, transcript: "ready\r\nAB",
+			scanFrom: 5, pattern: "AB", wantMatch: false,
+		},
+		"two sends written before either echo arrived are two echoes": {
+			mode: echoModeOn, sends: []send{{0, "a\n"}, {0, "a\n"}}, transcript: "a\r\na\r\n",
+			scanFrom: 0, pattern: "a", wantMatch: false,
+		},
+		"a third copy after two echoes is the program's": {
+			mode: echoModeOn, sends: []send{{0, "a\n"}, {0, "a\n"}}, transcript: "a\r\na\r\na\r\n",
+			scanFrom: 0, pattern: "a", wantMatch: true,
+		},
+		"with echo off the text at the write is the program's at once": {
+			// A program in raw mode redraws the key it was sent right where
+			// the write landed. The terminal said it would not echo, so there
+			// is nothing to wait for.
+			mode: echoModeOff, sends: []send{{6, ":"}}, transcript: "ready\n:",
+			scanFrom: 6, pattern: ":", wantMatch: true,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := &sessionDriver{}
+			for _, s := range tt.sends {
+				// Written long ago: the verdict must not depend on the clock.
+				d.echoes = append(d.echoes, echoSpan{at: s.at, echo: EchoOf([]byte(s.sent)), sentAt: time.Now().Add(-10 * echoSettle), mode: tt.mode})
+			}
+			transcript := []byte(tt.transcript)
+			d.locateEchoes(transcript)
+			re := regexp.MustCompile(tt.pattern)
+			got := d.findReal(re, transcript[tt.scanFrom:], tt.scanFrom) != nil
+			if got != tt.wantMatch {
+				t.Errorf("match = %v, want %v (transcript %q, echo spans %+v)", got, tt.wantMatch, tt.transcript, d.echoes)
+			}
+		})
+	}
+}
+
+// echoingPTY is a terminal with ECHO on whose echo of a send reaches the reader
+// only after a delay, and optionally behind output the program wrote before the
+// send: the two orders a loaded machine produces. Nothing before the send is
+// held back, so the session sees exactly the prefix first.
+type echoingPTY struct {
+	mu       sync.Mutex
+	prefix   []byte // what the program printed before the send
+	inFlight []byte // output already written by the program but not yet read when the send happens
+	delay    time.Duration
+	written  chan struct{}
+	once     sync.Once
+	sent     []byte
+	step     int
+	closed   chan struct{}
+}
+
+func newEchoingPTY(prefix, inFlight string, delay time.Duration) *echoingPTY {
+	return &echoingPTY{prefix: []byte(prefix), inFlight: []byte(inFlight), delay: delay, written: make(chan struct{}), closed: make(chan struct{})}
+}
+
+func (e *echoingPTY) Read(p []byte) (int, error) {
+	e.mu.Lock()
+	step := e.step
+	e.step++
+	e.mu.Unlock()
+	switch step {
+	case 0:
+		return copy(p, e.prefix), nil
+	case 1:
+		select {
+		case <-e.written:
+		case <-e.closed:
+			return 0, io.ErrClosedPipe
+		}
+		select {
+		case <-time.After(e.delay):
+		case <-e.closed:
+			return 0, io.ErrClosedPipe
+		}
+		e.mu.Lock()
+		out := append(append([]byte(nil), e.inFlight...), EchoOf(e.sent)...)
+		e.mu.Unlock()
+		return copy(p, out), nil
+	default:
+		<-e.closed
+		return 0, io.ErrClosedPipe
+	}
+}
+
+func (e *echoingPTY) Write(p []byte) (int, error) {
+	e.mu.Lock()
+	e.sent = append(e.sent, p...)
+	e.mu.Unlock()
+	e.once.Do(func() { close(e.written) })
+	return len(p), nil
+}
+
+func (e *echoingPTY) close() {
+	select {
+	case <-e.closed:
+	default:
+		close(e.closed)
+	}
+}
+
+// TestDriveSession_ADelayedEchoIsNotTheProgramsAnswer is the regression for an
+// expect that matched its own send on a loaded CI runner. The session is the
+// one in pty.atago.yaml: the program prints "ready" and then never writes
+// again, so the only copy of the sent text is the terminal's echo, and the
+// expect for it has to fail however late or however placed that echo arrives.
+func TestDriveSession_ADelayedEchoIsNotTheProgramsAnswer(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		prefix, inFlight string
+		delay            time.Duration
+	}{
+		// The reader got to the echo well after echoSettle.
+		"the echo arrives late": {prefix: "ready\r\n", delay: 3 * echoSettle},
+		// The program's line reached the reader in two pieces and the send was
+		// written between them.
+		"the echo follows the rest of the prompt line": {prefix: "ready", inFlight: "\r\n"},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newEchoingPTY(tt.prefix, tt.inFlight, tt.delay)
+			exit := make(chan int, 1)
+			proc := ptyProcess{
+				rw:        f,
+				exit:      exit,
+				kill:      func() { exit <- -1 },
+				closeTerm: f.close,
+				echoMode:  func() echoMode { return echoModeOn },
+				dir:       "/tmp/fake",
+			}
+			line := "NEVER-PRODUCED-BY-THE-PROGRAM\n"
+			_, ef, err := driveSession(context.Background(), &spec.PTY{
+				Command: "sh -c 'echo ready; sleep 30'",
+				Timeout: "1500ms",
+				Session: []spec.PTYAction{
+					{Expect: "ready"},
+					{Send: &spec.PTYSend{Text: &line}},
+					{Expect: "NEVER-PRODUCED-BY-THE-PROGRAM"},
+				},
+			}, proc)
+			if err != nil {
+				t.Fatalf("driveSession: %v", err)
+			}
+			if ef == nil {
+				t.Fatal("the expect matched the terminal's echo of its own send; it must fail, since the program never printed the text")
+			}
+			if ef.Pattern != "NEVER-PRODUCED-BY-THE-PROGRAM" {
+				t.Errorf("failed expect = %q, want the one after the send", ef.Pattern)
+			}
+		})
 	}
 }
 

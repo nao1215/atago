@@ -76,3 +76,6 @@ func openTerminalPair() (master, tty *os.File, err error) {
 	}
 	return master, tty, nil
 }
+
+// ioctlGetTermios is the request that reads a terminal's attributes on Linux.
+const ioctlGetTermios = unix.TCGETS
