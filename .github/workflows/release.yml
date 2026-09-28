@@ -6,15 +6,20 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
-  attestations: write
+  contents: read
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    # goreleaser publishes the GitHub release (contents), pushes the image to
+    # GHCR (packages), signs with cosign keyless (id-token), and the provenance
+    # step writes attestations.
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
     timeout-minutes: 10
     steps:
       - name: Checkout code
