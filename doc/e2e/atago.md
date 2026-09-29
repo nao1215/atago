@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 714 scenarios
+86 suites · 715 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -683,7 +683,8 @@
   - [a snapshot assertion passes against a committed snapshot](#scenario-a-snapshot-assertion-passes-against-a-committed-snapshot)
   - [snapshot update creates the snapshot file](#scenario-snapshot-update-creates-the-snapshot-file)
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
-- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 10 scenarios
+- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 11 scenarios
+  - [a workdir ending at a JSON quote is masked and replays](#scenario-a-workdir-ending-at-a-json-quote-is-masked-and-replays)
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green-1)
   - [a UUID is masked in the golden](#scenario-a-uuid-is-masked-in-the-golden)
   - [an ISO timestamp is masked in the golden](#scenario-an-iso-timestamp-is-masked-in-the-golden)
@@ -15273,6 +15274,36 @@ cat arts/*/*/step-*-snapshot.actual.txt
 
 ## atago self-hosting / snapshot normalization and round-trip
 Source: `test/e2e/atago/snapshot_normalization.atago.yaml`
+### Scenario: a workdir ending at a JSON quote is masked and replays
+_skipped on Windows_
+#### Given
+- Fixture file `quoted_path.atago.yaml` is created.
+
+#### Inputs
+_Fixture `quoted_path.atago.yaml`:_
+```text
+version: "1"
+suite: {name: quoted path}
+scenarios:
+  - name: prints its workdir as JSON
+    steps:
+      - run:
+          shell: true
+          command: 'printf ''{"cwd":"%s"}\n'' "$(pwd)"'
+      - assert: {stdout: {snapshot: quoted_path.snap}}
+```
+#### When
+```shell
+${atago} snapshot update quoted_path.atago.yaml
+${atago} run quoted_path.atago.yaml
+```
+#### Then
+- after `${atago} snapshot update quoted_path.atago.yaml`:
+  - exit code is `0`
+  - file `quoted_path.snap` equals exact bytes
+- after `${atago} run quoted_path.atago.yaml`:
+  - exit code is `0`
+
 ### Scenario: record then run round-trips green
 #### Given
 - Fixture file `rt.atago.yaml` is created.

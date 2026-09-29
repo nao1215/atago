@@ -327,4 +327,18 @@ func TestNormalize_PathMaskingBoundaries(t *testing.T) {
 			t.Errorf("workdir masking corrupted a prefix-sibling: %q", got)
 		}
 	})
+	t.Run("workdir at the end of a JSON string is masked", func(t *testing.T) {
+		got := string(Normalize([]byte(`{"cwd":"/tmp/run1","sibling":"/tmp/run10"}`), Options{Workdir: "/tmp/run1"}))
+		want := `{"cwd":"<workdir>","sibling":"/tmp/run10"}`
+		if got != want {
+			t.Errorf("Normalize = %q, want %q", got, want)
+		}
+	})
+	t.Run("workdir at the end of a shell-quoted string is masked", func(t *testing.T) {
+		got := string(Normalize([]byte("path='/tmp/run1' sibling='/tmp/run1+cache'"), Options{Workdir: "/tmp/run1"}))
+		want := "path='<workdir>' sibling='/tmp/run1+cache'"
+		if got != want {
+			t.Errorf("Normalize = %q, want %q", got, want)
+		}
+	})
 }
