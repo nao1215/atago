@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Snapshot path normalization masks a workdir or home path that ends at a closing quote, so JSON and shell-quoted output does not leave a volatile path in the golden. Prefix-sibling paths remain unchanged.
+- Specs and YAML assertions reject malformed UTF-8 and raw control bytes with a located YAML error. The new YAML reader previously accepted these invalid documents as text.
+- On Windows, an `expect` no longer treats a slow, partially delivered echo of its own `send` as program output after 200ms. When ConPTY cannot report the echo state, a matching prefix remains ambiguous until more bytes arrive; write the expectation against the program's response when it would otherwise match only the typed text.
+
 ## [0.25.1] - 2026-09-28
 
 ### Changed
@@ -15,8 +21,6 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Specs and YAML assertions reject malformed UTF-8 and raw control bytes with a located YAML error. The new YAML reader previously accepted these invalid documents as text.
-- On Windows, an `expect` no longer treats a slow, partially delivered echo of its own `send` as program output after 200ms. When ConPTY cannot report the echo state, a matching prefix remains ambiguous until more bytes arrive; write the expectation against the program's response when it would otherwise match only the typed text.
 - `atago record --shell` failed with "generated spec does not validate" when the command line held a tab, a carriage return or an escape character. With `--shell` the argument is the whole command line, and the suite was named after the base name of the whole line, control characters included, which the loader refuses in a name. The suite is now named after the line's first word, and a control character left in a name becomes a space, as it already did in the scenario name.
 - With `graphics: kitty`, a pty `expect_screen` on `images:` could miss the program's last graphics command and wait out its timeout. atago's emulated terminal appends output to the transcript before it applies the image commands in it, and the wait rendered again only when the transcript grew, so a render between the two saw the image the program had just deleted, and with no output after the delete it never looked again. The wait now follows how much of the output the terminal has finished acting on. Under many concurrent sessions about one in eighteen timed out; none do now.
 - On a busy machine, a pty `expect` could match the terminal's echo of the scenario's own `send` and pass although the program never printed the text. atago took an echo that had not reached it within 200ms, or that arrived behind the rest of a line the program was still writing, to mean the terminal did not echo, and then counted the echo as the program's output. On Linux, macOS and the BSDs atago now asks the terminal whether it echoes and, if it does, discounts the echo whenever and wherever after the send it arrives. With the CPU limited to a quarter of a core, 269 of 1000 concurrent sessions matched their own echo before and none of 2400 do now.

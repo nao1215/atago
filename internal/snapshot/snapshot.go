@@ -171,12 +171,13 @@ func maskPathPrefix(s, prefix, replacement string) string {
 
 // isComponentBoundary reports whether byte c ends a path component so the prefix
 // before it can be masked: a path separator or a whitespace/control byte, where a
-// path token in captured output ends. Filename-legal bytes — letters, digits, and
-// punctuation like '.', '-', '_', '+', '@' — are NOT boundaries, so a longer
+// path token in captured output ends. Quotes also close paths printed as JSON
+// strings or shell-quoted text. Letters, digits, and punctuation like '.',
+// '-', '_', '+', '@' are NOT boundaries, so a longer
 // sibling path (/home/naoki for home /home/nao, /tmp/run1+cache for workdir
 // /tmp/run1) is left intact rather than corrupted.
 func isComponentBoundary(c byte) bool {
-	return c == '/' || c == '\\' || c <= ' '
+	return c == '/' || c == '\\' || c == '"' || c == '\'' || c <= ' '
 }
 
 // Compare normalizes actual and checks it against the stored snapshot at path,

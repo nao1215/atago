@@ -12,6 +12,30 @@ suite:
 # names the update flag. Volatile values are printed with printf, so the suite
 # runs on make e2e; the normalizer is unit-tested for Windows in internal/snapshot.
 scenarios:
+  - name: a workdir ending at a JSON quote is masked and replays
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: quoted_path.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: quoted path}
+            scenarios:
+              - name: prints its workdir as JSON
+                steps:
+                  - run:
+                      shell: true
+                      command: 'printf ''{"cwd":"%s"}\n'' "$(pwd)"'
+                  - assert: {stdout: {snapshot: quoted_path.snap}}
+      - run: {command: "${atago} snapshot update quoted_path.atago.yaml"}
+      - assert: {exit_code: 0}
+      - assert:
+          file:
+            path: quoted_path.snap
+            equals: "{\"cwd\":\"<workdir>\"}\n"
+      - run: {command: "${atago} run quoted_path.atago.yaml"}
+      - assert: {exit_code: 0}
+
   - name: record then run round-trips green
     steps:
       - fixture:
