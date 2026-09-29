@@ -168,6 +168,13 @@ func buildJUnit(results []*engine.SuiteResult, allowXPass bool, loadFailures []L
 		if td := stepsDetailText(res.Teardown); td != "" {
 			ts.SystemErr = "suite teardown failed (teardown outcomes never change the suite status):\n" + td
 		}
+		if res.SecurityViolation {
+			ts.Testcases = append(ts.Testcases, junitTestcase{
+				Name: "security policy", Error: &junitMessage{Message: "security policy violated"},
+			})
+			ts.Tests++
+			ts.Errors++
+		}
 		root.Suites = append(root.Suites, ts)
 		root.Tests += ts.Tests
 		root.Failures += ts.Failures

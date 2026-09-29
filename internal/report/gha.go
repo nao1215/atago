@@ -31,6 +31,11 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 			ghaEscapeData("spec failed to load: "+oneLine(lf.Message)))
 	}
 	for _, res := range results {
+		if res.SecurityViolation {
+			fmt.Fprintf(&b, "::error title=%s::security policy violated\n", ghaEscapeProp(res.Suite+" / security policy"))
+			agg.Errored++
+			total++
+		}
 		for i := range res.Scenarios {
 			sc := &res.Scenarios[i]
 			switch sc.Status {

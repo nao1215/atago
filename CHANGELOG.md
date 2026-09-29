@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A security-policy violation raised during teardown now makes every report visibly fail, matching the non-zero exit code while leaving the scenario's passed status intact.
 - Snapshot path normalization masks a workdir or home path that ends at a closing quote, so JSON and shell-quoted output does not leave a volatile path in the golden. Prefix-sibling paths remain unchanged.
 - Specs and YAML assertions reject malformed UTF-8 and raw control bytes with a located YAML error. The new YAML reader previously accepted these invalid documents as text.
 - On Windows, an `expect` no longer treats a slow, partially delivered echo of its own `send` as program output after 200ms. When ConPTY cannot report the echo state, a matching prefix remains ambiguous until more bytes arrive; write the expectation against the program's response when it would otherwise match only the typed text.

@@ -233,6 +233,9 @@ func Render(w io.Writer, f Format, results []*engine.SuiteResult, opts ...Option
 			if suiteErroredWithoutScenarios(res) {
 				hardFail = true
 			}
+			if res.SecurityViolation {
+				hardFail = true
+			}
 		}
 		if o.hasElapsed {
 			dur = o.elapsed

@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 715 scenarios
+86 suites · 716 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -643,7 +643,8 @@
   - [unquoted literals keep their digits in matchers, env, and fixtures](#scenario-unquoted-literals-keep-their-digits-in-matchers-env-and-fixtures)
   - [output that lacks the literal fails instead of matching a shortened one](#scenario-output-that-lacks-the-literal-fails-instead-of-matching-a-shortened-one)
   - [a json matcher keeps YAML's typing, so true is not the text true](#scenario-a-json-matcher-keeps-yamls-typing-so-true-is-not-the-text-true)
-- [atago self-hosting / security](#atago-self-hosting--security) — 6 scenarios
+- [atago self-hosting / security](#atago-self-hosting--security) — 7 scenarios
+  - [security denial in teardown is a failing report](#scenario-security-denial-in-teardown-is-a-failing-report)
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
   - [a file assertion may not read through a symlinked directory](#scenario-a-file-assertion-may-not-read-through-a-symlinked-directory)
@@ -14346,6 +14347,42 @@ echo '{"ok": true, "name": "true"}'
 
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
+### Scenario: security denial in teardown is a failing report
+_skipped on Windows_
+#### Given
+- Fixture file `teardown_policy.atago.yaml` is created.
+
+#### Inputs
+_Fixture `teardown_policy.atago.yaml`:_
+```text
+version: "1"
+suite: {name: guarded}
+permissions:
+  network:
+    allow: [allowed.example]
+runners:
+  api: {type: http, base_url: "http://denied.example"}
+scenarios:
+  - name: passes before cleanup
+    steps:
+      - run: {shell: true, command: "echo ok"}
+      - assert: {stdout: {contains: ok}}
+    teardown:
+      - http: {runner: api, method: GET, path: /}
+```
+#### When
+```shell
+${atago} run --report json teardown_policy.atago.yaml
+${atago} run --report junit teardown_policy.atago.yaml
+```
+#### Then
+- after `${atago} run --report json teardown_policy.atago.yaml`:
+  - exit code is `6`
+  - stdout at `$.suites[0].security_violation` equals `true`; at `$.suites[0].scenarios[0].status` equals `passed`
+- after `${atago} run --report junit teardown_policy.atago.yaml`:
+  - exit code is `6`
+  - stdout contains `errors="1"`
+
 ### Scenario: declared secrets are masked in failure output
 #### Given
 - Fixture file `sec.atago.yaml` is created.

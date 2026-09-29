@@ -50,6 +50,9 @@ type jsonReport struct {
 	DurationMS int64          `json:"duration_ms"`
 	Scenarios  []jsonScenario `json:"scenarios"`
 	Failures   []jsonFailure  `json:"failures"`
+	// SecurityViolation is separate from scenario status because a policy breach
+	// in teardown fails the run without changing the scenario's verdict.
+	SecurityViolation bool `json:"security_violation,omitempty"`
 	// SetupFailures / TeardownFailures list failed suite.setup / suite.teardown
 	// steps (#7). Setup failures also error every scenario; teardown failures
 	// never change the suite status but incomplete cleanup must stay visible.
@@ -116,11 +119,17 @@ func buildJSON(res *engine.SuiteResult, allowXPass bool) jsonReport {
 		Suite: res.Suite,
 		// Forward slashes keep spec_path portable across platforms (Windows uses
 		// backslashes), matching the manifest's stable-contract convention.
-		SpecPath:   filepath.ToSlash(res.SpecPath),
-		Status:     string(res.Status),
-		DurationMS: res.Duration.Milliseconds(),
-		Scenarios:  make([]jsonScenario, 0, len(res.Scenarios)),
-		Failures:   []jsonFailure{},
+		SpecPath:          filepath.ToSlash(res.SpecPath),
+		Status:            string(res.Status),
+		DurationMS:        res.Duration.Milliseconds(),
+		Scenarios:         make([]jsonScenario, 0, len(res.Scenarios)),
+		Failures:          []jsonFailure{},
+		SecurityViolation: res.SecurityViolation,
+	}
+	if res.SecurityViolation {
+		out.Failures = append(out.Failures, jsonFailure{
+			Scenario: res.Suite, Step: "security policy", Error: "security policy violated",
+		})
 	}
 	out.SetupFailures = suiteStepFailures(res.Suite, res.Setup)
 	out.TeardownFailures = suiteStepFailures(res.Suite, res.Teardown)

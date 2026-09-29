@@ -51,9 +51,13 @@
           "items": {"$ref": "#/$defs/scenario"}
         },
         "failures": {
-          "description": "Flat list of failures across all scenarios; empty on success.",
+          "description": "Flat list of scenario failures and any suite-level security violation; empty on success.",
           "type": "array",
           "items": {"$ref": "#/$defs/failure"}
+        },
+        "security_violation": {
+          "description": "True when a policy breach fails the run, including one raised during teardown after the scenario passed; omitted otherwise.",
+          "type": "boolean"
         },
         "setup_failures": {
           "description": "suite.setup steps that failed (#7). A setup failure also errors every scenario; omitted when setup was clean or absent.",

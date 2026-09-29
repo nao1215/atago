@@ -22,6 +22,9 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 	}
 	for _, res := range results {
 		total += len(res.Scenarios)
+		if res.SecurityViolation {
+			total++
+		}
 		// A suite that errored before any scenario ran (#7) still contributes a
 		// failing point, so the plan is never a bare "1..0" for a non-zero exit.
 		if suiteErroredWithoutScenarios(res) {
@@ -104,6 +107,11 @@ func writeTAP(w io.Writer, results []*engine.SuiteResult, loadFailures []LoadFai
 		// status, so they surface as a comment rather than a point.
 		if msg := firstStepFailureMessage(res.Teardown); msg != "" {
 			fmt.Fprintf(&b, "# suite teardown failed: %s\n", tapFlatten(msg))
+		}
+		if res.SecurityViolation {
+			n++
+			fmt.Fprintf(&b, "not ok %d - %s\n", n, tapDescription(res.Suite, "security policy"))
+			writeTAPDiagnostic(&b, "security policy violated", "")
 		}
 	}
 	// A snapshot rewrite is not a test point — nothing was verified — so it is a
