@@ -38,6 +38,25 @@ func Parse(data []byte) (*File, error) {
 		if b == '\n' {
 			p.lines = append(p.lines, i+1)
 		}
+		// YAML is text. A raw control byte is invalid even inside a quoted or
+		// block scalar; an escaped spelling of that byte remains valid.
+		if b < 0x20 && b != '\n' && b != '\t' || b == 0x7f {
+			return nil, p.errorf(i, "invalid control character in YAML")
+		}
+		// UTF-8 encodes the C1 controls as C2 80..9F. YAML permits only
+		// U+0085 (next-line) among them.
+		if b == 0xc2 && i+1 < len(data) && data[i+1] >= 0x80 && data[i+1] <= 0x9f && data[i+1] != 0x85 {
+			return nil, p.errorf(i, "invalid control character in YAML")
+		}
+	}
+	if !utf8.Valid(data) {
+		for off := 0; off < len(data); {
+			_, size := utf8.DecodeRune(data[off:])
+			if size == 1 && data[off] >= utf8.RuneSelf {
+				return nil, p.errorf(off, "invalid UTF-8 encoding")
+			}
+			off += size
+		}
 	}
 	return p.stream()
 }

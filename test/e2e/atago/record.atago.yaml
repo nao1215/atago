@@ -251,6 +251,35 @@ scenarios:
           stdout:
             contains: "1 passed"
 
+  - name: record --pty replays two prompt-gated sends
+    skip:
+      os: windows
+    steps:
+      - pty:
+          shell: true
+          command: '${atago} record --pty --out two.atago.yaml -- sh -c ''printf FIRST; read a; printf SECOND-$a; read b; printf DONE-$b'''
+          timeout: 20s
+          session:
+            - expect: FIRST
+            - send: "a\n"
+            - expect: SECOND-a
+            - send: "b\n"
+            - expect: DONE-b
+      - assert:
+          exit_code: 0
+      - assert:
+          file:
+            path: two.atago.yaml
+            contains:
+              - "- expect:"
+              - "- send:"
+              - "SECOND-a"
+      - run:
+          command: ${atago} run two.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout: {contains: "1 passed"}
+
   - name: record --pty of a silent program anchors on nothing rather than on the echo
     skip:
       os: windows

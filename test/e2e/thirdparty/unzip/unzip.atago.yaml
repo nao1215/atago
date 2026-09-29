@@ -198,7 +198,7 @@ scenarios:
             contains: "No errors detected in compressed data"
       # A file that is not a zip at all: unzip cannot find a central directory,
       # which is exit 9 (cannot open or find the archive), not a generic 1.
-      - fixture: {file: broken.zip, content: "PK truncated garbage"}
+      - fixture: {file: broken.zip, content: "PK\x03\x04 truncated garbage"}
       - run: {command: unzip -t broken.zip}
       - assert:
           exit_code: 9
