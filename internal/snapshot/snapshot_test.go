@@ -278,6 +278,22 @@ func TestCompare_CRLFGolden(t *testing.T) {
 	}
 }
 
+func TestCompare_RepeatedCRLFGolden(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "golden.txt")
+	if err := os.WriteFile(path, []byte("hello\r\r\nworld\r\r\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ok, expected, actual, err := Compare(dir, path, []byte("hello\nworld\n"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || expected != actual {
+		t.Errorf("Compare = ok %v, expected %q, actual %q; repeated CRLF should fold to LF", ok, expected, actual)
+	}
+}
+
 // TestNormalize_PathMaskingBoundaries is a regression for the naive substring
 // masking of the home and workdir prefixes: a masked prefix must only replace a
 // whole path component, or it corrupts an unrelated sibling path.

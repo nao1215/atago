@@ -12,6 +12,23 @@ suite:
 # names the update flag. Volatile values are printed with printf, so the suite
 # runs on make e2e; the normalizer is unit-tested for Windows in internal/snapshot.
 scenarios:
+  - name: a golden with repeated carriage returns matches normalized output
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: repeated_cr.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: repeated carriage returns}
+            scenarios:
+              - name: prints two lines
+                steps:
+                  - run: {shell: true, command: "printf 'hello\\nworld\\n'"}
+                  - assert: {stdout: {snapshot: repeated_cr.snap}}
+      - fixture: {file: repeated_cr.snap, content: "hello\r\r\nworld\r\r\n"}
+      - run: {command: "${atago} run repeated_cr.atago.yaml"}
+      - assert: {exit_code: 0}
+
   - name: a workdir ending at a JSON quote is masked and replays
     skip: {os: windows}
     steps:

@@ -198,7 +198,7 @@ func Compare(root, path string, actual []byte, opt Options) (ok bool, expected, 
 	// would otherwise carry \r\n and never match the LF-folded actual — a
 	// spurious failure on every snapshot assertion. Line endings are an OS
 	// artifact, not observable behavior (same rule as the equals matcher).
-	expected = strings.ReplaceAll(string(stored), "\r\n", "\n")
+	expected = foldCRLF(string(stored))
 	return expected == actualNorm, expected, actualNorm, nil
 }
 
