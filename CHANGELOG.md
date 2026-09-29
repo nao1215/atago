@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `atago record` escapes C1 control characters (U+0080 to U+009F) and DEL in generated scalars, so a created file name, output line, or typed pty input carrying one no longer yields a spec that fails its own validation.
+- `atago record --pty` quotes a recorded key name that contains a YAML flow indicator, so pressing Ctrl+] records `{key: "ctrl-]"}` instead of a spec that fails to load.
+
 ## [0.25.2] - 2026-09-29
 
 ### Fixed
