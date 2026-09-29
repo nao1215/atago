@@ -80,6 +80,30 @@ func TestLoadBytes_MatrixNameEscapeStaysLiteral(t *testing.T) {
 	}
 }
 
+func TestLoadBytes_MatrixNameEscapeStaysLiteralWhenRowBindsIt(t *testing.T) {
+	t.Parallel()
+	src := `version: "1"
+suite:
+  name: x
+scenarios:
+  - name: "writes $${who} verbatim"
+    matrix:
+      - { who: Alice }
+      - { who: Bob }
+    steps:
+      - run: {command: echo}`
+	s, err := LoadBytes("m.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := s.Scenarios[0].Name, "writes $${who} verbatim [who=Alice]"; got != want {
+		t.Errorf("expanded name = %q, want %q", got, want)
+	}
+	if got, want := s.Scenarios[1].Name, "writes $${who} verbatim [who=Bob]"; got != want {
+		t.Errorf("expanded name = %q, want %q", got, want)
+	}
+}
+
 func TestLoadBytes_MatrixErrors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

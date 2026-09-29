@@ -70,10 +70,11 @@ func validateMatrix(s *spec.Spec) []string {
 // auto-disambiguates via a deterministic suffix), are left for that check.
 func matrixNameCollapse(template string, rows []map[string]string) string {
 	byName := map[string][]map[string]string{}
+	refs := spec.VarRefs(template)
 	for _, row := range rows {
 		referenced := false
-		for k := range row {
-			if strings.Contains(template, "${"+k+"}") {
+		for _, k := range refs {
+			if _, ok := row[k]; ok {
 				referenced = true
 				break
 			}
@@ -118,6 +119,11 @@ func matrixNameCollapse(template string, rows []map[string]string) string {
 // rows differ on but the name template does not reference — the variables the
 // author must add to the name to tell the rows apart.
 func omittedDistinguishingKeys(template string, group []map[string]string) []string {
+	refs := spec.VarRefs(template)
+	referenced := make(map[string]bool, len(refs))
+	for _, ref := range refs {
+		referenced[ref] = true
+	}
 	keys := map[string]bool{}
 	for k := range group[0] {
 		keys[k] = true
@@ -129,7 +135,7 @@ func omittedDistinguishingKeys(template string, group []map[string]string) []str
 	}
 	var omitted []string
 	for k := range keys {
-		if strings.Contains(template, "${"+k+"}") {
+		if referenced[k] {
 			continue
 		}
 		first := group[0][k]
@@ -183,15 +189,7 @@ func expandMatrix(s *spec.Spec) {
 // owns uniqueness); otherwise a deterministic "[k=v ...]" suffix is appended so
 // every instance stays distinct.
 func matrixInstanceName(template string, row map[string]string) string {
-	name := template
-	referenced := false
-	for k, v := range row {
-		token := "${" + k + "}"
-		if strings.Contains(name, token) {
-			referenced = true
-			name = strings.ReplaceAll(name, token, v)
-		}
-	}
+	name, referenced := spec.ExpandMatrixName(template, row)
 	if referenced {
 		return name
 	}

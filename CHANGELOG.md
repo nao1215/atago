@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Matrix scenario names keep escaped `$${name}` references literal even when a row binds `name`, and append the row suffix when the name has no live row reference.
 - Snapshot comparison folds runs of carriage returns before a line feed in stored goldens the same way it folds captured output, so equivalent line endings do not fail verification.
 - `run --rerun-failed` rejects a `null` state file instead of treating it as an empty ledger and exiting successfully.
 - A security-policy violation raised during teardown now makes every report visibly fail, matching the non-zero exit code while leaving the scenario's passed status intact.
