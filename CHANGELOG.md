@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-09-29
+
 ### Fixed
 
 - `run --retry-failed` keeps a security-policy violation from any attempt, including one before the final reported attempt, so retries cannot hide the security exit code.
