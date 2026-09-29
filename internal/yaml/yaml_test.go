@@ -394,9 +394,10 @@ func TestQuoteRoundTrips(t *testing.T) {
 		":", "a: b", "a #b", "a#b", "#", "&a", "*a", "!t", "|", ">", "'", `"`, "%", "@", "`", "[", "{", ",",
 		"---", "...", "a\tb", "line\nbreak", "cr\r", "esc\x1b", "del\x7f", "\u0085", "\u2028", "\ufeff",
 		"back\\slash", "日本語", "trailing ", " leading", ".inf", "0x10", "1e3", "http://x:1/y",
+		"\u0080", "\u00940", "c1\u009fend", "\u00a0nbsp",
 	}
 	r := rand.New(rand.NewPCG(1, 2))
-	alphabet := []rune("ab :#-?'\"\\\n\t{}[],&*!|>%@`~.01e\u00e9\u3042")
+	alphabet := []rune("ab :#-?'\"\\\n\t{}[],&*!|>%@`~.01e\u00e9\u3042\u0080\u0094\u009f")
 	for range 2000 {
 		n := r.IntN(8)
 		rs := make([]rune, n)

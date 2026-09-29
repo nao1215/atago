@@ -642,6 +642,80 @@ func TestGeneratePTY_NonUTF8InputReplaysTheSameBytes(t *testing.T) {
 	}
 }
 
+// TestGeneratePTY_DELAndC1InputReplaysTheSameText is a regression: the send
+// escaper escaped only C0 controls, so a typed DEL or a C1 control (valid UTF-8
+// such as U+0094) went into the spec raw, and the loader rejects both, so the
+// recording failed its own validation.
+func TestGeneratePTY_DELAndC1InputReplaysTheSameText(t *testing.T) {
+	t.Parallel()
+	for _, typed := range []string{"ab\x7fc", "x\u0094y", "c1\u0080\u009fend", "nel\u0085ok"} {
+		for _, seg := range []PTYSegment{inSeg(typed), inSeg("\x1b[200~" + typed + "\x1b[201~")} {
+			rec := PTYRecording{
+				Command:  "app",
+				ExitCode: 0,
+				Segments: []PTYSegment{outSeg("name: "), seg, outSeg("done\r\n")},
+			}
+			out, err := GeneratePTY(rec, Options{SuiteName: "s"})
+			if err != nil {
+				t.Fatalf("GeneratePTY(%q): %v", seg.Input, err)
+			}
+			pty := loadGenerated(t, out)
+			var sent string
+			for _, act := range pty.Session {
+				switch {
+				case act.Send != nil && act.Send.Text != nil:
+					sent = *act.Send.Text
+				case act.Send != nil && act.Send.Paste != nil:
+					sent = *act.Send.Paste
+				}
+			}
+			if sent != typed {
+				t.Errorf("input %q replays as %q\n%s", seg.Input, sent, out)
+			}
+		}
+	}
+}
+
+// TestGeneratePTY_EveryControlKeyReplaysAsItsKey is a regression found by
+// FuzzGeneratePTYRoundTrip: a lone 0x1d records as the key ctrl-], and the name
+// went into the flow mapping bare, where `]` is a flow indicator, so the
+// recording failed its own validation. Every control byte that names a key, once
+// or held, has to load back as that key.
+func TestGeneratePTY_EveryControlKeyReplaysAsItsKey(t *testing.T) {
+	t.Parallel()
+	for b := range 0x80 {
+		if b >= 0x20 && b != 0x7f {
+			continue
+		}
+		seq := string(rune(b))
+		key, ok := spec.PTYKeyForSequence(seq)
+		if !ok {
+			continue
+		}
+		for _, input := range []string{seq, strings.Repeat(seq, 3)} {
+			rec := PTYRecording{
+				Command:  "app",
+				ExitCode: 0,
+				Segments: []PTYSegment{outSeg("name: "), inSeg(input), outSeg("done\r\n")},
+			}
+			out, err := GeneratePTY(rec, Options{SuiteName: "s"})
+			if err != nil {
+				t.Fatalf("GeneratePTY(%q): %v", input, err)
+			}
+			pty := loadGenerated(t, out)
+			var got string
+			for _, act := range pty.Session {
+				if act.Send != nil && act.Send.Key != "" {
+					got = act.Send.Key
+				}
+			}
+			if got != key {
+				t.Errorf("input %q replays as key %q, want %q\n%s", input, got, key, out)
+			}
+		}
+	}
+}
+
 // TestGeneratePTY_ControlCharacterInCommandStillGenerates is a regression found
 // by FuzzGeneratePTYRoundTrip: the scenario name was the recorded command
 // verbatim, and the loader rejects a control character in a name, so recording a

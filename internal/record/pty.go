@@ -15,6 +15,7 @@ import (
 	"github.com/nao1215/atago/internal/loader"
 	"github.com/nao1215/atago/internal/runner/ptyrun"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/yaml"
 )
 
 // PTYSegment is one chronological chunk of a recorded interactive session:
@@ -281,13 +282,13 @@ func renderSend(seg PTYSegment, secretN *int) []string {
 		// escape hatch below, which preserves the bytes markers and all.
 	}
 	if key, ok := spec.PTYKeyForSequence(string(seg.Input)); ok {
-		return []string{fmt.Sprintf("            - send: {key: %s}\n", key)}
+		return []string{fmt.Sprintf("            - send: {key: %s}\n", flowKey(key))}
 	}
 	// A held navigation key arrives as one burst of the same sequence over and
 	// over (capture coalesces consecutive input reads), which would otherwise
 	// record as an opaque wall of escapes. `times` says what happened (#377).
 	if key, n, ok := keyRepeat(seg.Input); ok {
-		return []string{fmt.Sprintf("            - send: {key: %s, times: %d}\n", key, n)}
+		return []string{fmt.Sprintf("            - send: {key: %s, times: %d}\n", flowKey(key), n)}
 	}
 	// Typed text is raw: escape ${...} so the replay engine types the literal
 	// bytes the user typed instead of expanding them (the secret placeholder
@@ -448,34 +449,23 @@ func keyRepeat(input []byte) (string, int, bool) {
 	return "", 0, false
 }
 
+// flowKey renders a key name for a send flow mapping: bare when it is only
+// letters, digits and dashes, double-quoted otherwise, since a name such as
+// ctrl-] carries a flow indicator that would end the mapping early.
+func flowKey(name string) string {
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return yamlDoubleQuoted(name)
+		}
+	}
+	return name
+}
+
 // yamlDoubleQuoted renders s as a YAML double-quoted flow scalar, escaping
 // control characters (notably \n and \r) so a multi-line send stays on one line
 // instead of becoming a block scalar that would break the session list (#69).
 func yamlDoubleQuoted(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch r {
-		case '\\':
-			b.WriteString(`\\`)
-		case '"':
-			b.WriteString(`\"`)
-		case '\n':
-			b.WriteString(`\n`)
-		case '\r':
-			b.WriteString(`\r`)
-		case '\t':
-			b.WriteString(`\t`)
-		default:
-			if r < 0x20 {
-				fmt.Fprintf(&b, `\x%02x`, r)
-			} else {
-				b.WriteRune(r)
-			}
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
+	return yaml.DoubleQuote(s)
 }
 
 // literalSend renders a printable input burst for a send scalar: carriage

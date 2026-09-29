@@ -35,7 +35,7 @@ func Quote(s string) string {
 	if plainSafe(s) {
 		return s
 	}
-	return doubleQuote(s)
+	return DoubleQuote(s)
 }
 
 // plainSafe reports whether s can be written bare: it would read back as the
@@ -60,7 +60,7 @@ func plainSafe(s string) bool {
 		return false
 	}
 	for _, r := range s {
-		if r < 0x20 || r == 0x7f || r == 0x85 || r == 0xfeff || r == 0x2028 || r == 0x2029 {
+		if r < 0x20 || isC1(r) || r == 0x7f || r == 0xfeff || r == 0x2028 || r == 0x2029 {
 			return false
 		}
 	}
@@ -75,8 +75,16 @@ func plainSafe(s string) bool {
 	return true
 }
 
-// doubleQuote writes s as a double-quoted scalar on one line.
-func doubleQuote(s string) string {
+// isC1 reports whether r is a C1 control (U+0080 to U+009F). Parse rejects
+// every raw one but U+0085, so none may be written unescaped.
+func isC1(r rune) bool {
+	return r >= 0x80 && r <= 0x9f
+}
+
+// DoubleQuote writes s as a double-quoted scalar on one line that reads back
+// as exactly s, for a place where a bare scalar could be misread, such as inside
+// a flow mapping.
+func DoubleQuote(s string) string {
 	var b strings.Builder
 	b.WriteByte('"')
 	for i := 0; i < len(s); {
@@ -106,7 +114,7 @@ func doubleQuote(s string) string {
 		case 0xfeff:
 			b.WriteString(`\ufeff`)
 		default:
-			if r < 0x20 || r == 0x7f {
+			if r < 0x20 || r == 0x7f || isC1(r) {
 				fmt.Fprintf(&b, `\x%02x`, r)
 			} else {
 				b.WriteRune(r)
