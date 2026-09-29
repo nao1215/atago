@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"unicode/utf8"
 
 	yamlv3 "gopkg.in/yaml.v3"
 )
@@ -78,6 +79,23 @@ func TestRawControlBytesAreRejectedLikeYAMLv3(t *testing.T) {
 		}
 		if _, err := Parse(data); err == nil {
 			t.Errorf("Parse accepted raw control byte %#x", invalid)
+		}
+	}
+}
+
+func TestRawC1ControlsAgreeWithYAMLv3(t *testing.T) {
+	for r := rune(0x80); r <= 0x9f; r++ {
+		data := append([]byte("v: "), utf8.AppendRune(nil, r)...)
+		data = append(data, '\n')
+		var decoded any
+		wantErr := yamlv3.Unmarshal(data, &decoded)
+		if _, err := Parse(data); (err == nil) != (wantErr == nil) {
+			t.Errorf("U+%04X: Parse error = %v; yaml.v3 disagrees", r, err)
+		} else if err != nil {
+			var parseErr *Error
+			if !errors.As(err, &parseErr) || parseErr.Line != 1 || parseErr.Col != 4 {
+				t.Errorf("U+%04X: error = %v; want line 1, column 4", r, err)
+			}
 		}
 	}
 }
