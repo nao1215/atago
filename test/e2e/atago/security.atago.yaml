@@ -4,6 +4,35 @@ suite:
   name: atago self-hosting / security
 
 scenarios:
+  - name: repeat keeps a security violation from a later iteration
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: repeat_policy.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: guarded repeat}
+            permissions:
+              network:
+                allow: [allowed.example]
+            runners:
+              api: {type: http, base_url: "http://denied.example"}
+            scenarios:
+              - name: denied on second iteration
+                steps:
+                  - run: {shell: true, command: "echo ready"}
+                  - fixture: {file: source.txt, from: "${workdir}/source.txt"}
+                  - http: {runner: api, method: GET, path: /}
+                teardown:
+                  - run: {shell: true, command: "touch '${workdir}/source.txt'"}
+      - run: {command: "${atago} run --repeat 2 --report json repeat_policy.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout:
+            json:
+              - path: "$.suites[0].security_violation"
+                equals: true
+
   - name: security denial in teardown is a failing report
     skip: {os: windows}
     steps:

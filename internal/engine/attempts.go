@@ -49,6 +49,7 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 	var folded ScenarioResult
 	var iterations []Status
 	haveFailure := false
+	securityViolation := false
 	total := folded.Duration
 
 	for i := 0; i < e.Repeat; i++ {
@@ -56,6 +57,7 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 			break // canceled mid-repeat: report what actually ran
 		}
 		run := e.runScenario(ctx, idx, sc, rc, i+1)
+		securityViolation = securityViolation || run.SecurityViolation
 		iterations = append(iterations, run.Status)
 		total += run.Duration
 		bad := run.Status == StatusFailed || run.Status == StatusError
@@ -68,6 +70,7 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 	}
 	folded.Iterations = iterations
 	folded.Duration = total
+	folded.SecurityViolation = securityViolation
 
 	// Classify the fold by how many iterations came out clean. A skip gate is
 	// deterministic (every iteration skips), so a skipped iteration counts as
