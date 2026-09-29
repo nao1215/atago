@@ -11,6 +11,45 @@ import (
 	"github.com/nao1215/atago/internal/loader"
 )
 
+func TestEngine_RetryPreservesEarlierSecurityViolation(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	marker := filepath.ToSlash(filepath.Join(t.TempDir(), "source.txt"))
+	if err := os.WriteFile(marker, []byte("ready"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src := fmt.Sprintf(`
+version: "1"
+suite: {name: guarded}
+permissions:
+  network:
+    allow: [allowed.example]
+runners:
+  api: {type: http, base_url: "http://denied.example"}
+scenarios:
+  - name: denied before retry
+    steps:
+      - run: {shell: true, command: "echo ready"}
+      - fixture: {file: source.txt, from: "%s"}
+      - http: {runner: api, method: GET, path: /}
+    teardown:
+      - run: {shell: true, command: "rm -f '%s'"}
+`, marker, marker)
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := New()
+	eng.RetryFailed = 1
+	res := eng.Run(context.Background(), s, "t.atago.yaml")
+	if got := res.Scenarios[0].Attempts; got != 2 {
+		t.Fatalf("attempts = %d, want 2", got)
+	}
+	if !res.Scenarios[0].SecurityViolation || !res.SecurityViolation {
+		t.Errorf("security violation lost from retry result: scenario=%v suite=%v", res.Scenarios[0].SecurityViolation, res.SecurityViolation)
+	}
+}
+
 func TestEngine_RepeatPreservesLaterSecurityViolation(t *testing.T) {
 	skipOnWindows(t)
 	t.Parallel()

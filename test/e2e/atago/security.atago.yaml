@@ -4,6 +4,36 @@ suite:
   name: atago self-hosting / security
 
 scenarios:
+  - name: retry keeps a security violation from an earlier attempt
+    skip: {os: windows}
+    steps:
+      - fixture: {file: retry_source.txt, content: ready}
+      - fixture:
+          file: retry_policy.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: guarded retry}
+            permissions:
+              network:
+                allow: [allowed.example]
+            runners:
+              api: {type: http, base_url: "http://denied.example"}
+            scenarios:
+              - name: denied before retry
+                steps:
+                  - run: {shell: true, command: "echo ready"}
+                  - fixture: {file: source.txt, from: "${workdir}/retry_source.txt"}
+                  - http: {runner: api, method: GET, path: /}
+                teardown:
+                  - run: {shell: true, command: "rm -f '${workdir}/retry_source.txt'"}
+      - run: {command: "${atago} run --retry-failed 1 --report json retry_policy.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout:
+            json:
+              - path: "$.suites[0].security_violation"
+                equals: true
+
   - name: repeat keeps a security violation from a later iteration
     skip: {os: windows}
     steps:

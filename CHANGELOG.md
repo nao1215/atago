@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `run --retry-failed` keeps a security-policy violation from any attempt, including one before the final reported attempt, so retries cannot hide the security exit code.
 - `run --repeat` keeps a security-policy violation from any iteration, even when the displayed steps come from an earlier failed iteration, so the run exits with the security code.
 - Matrix scenario names keep escaped `$${name}` references literal even when a row binds `name`, and append the row suffix when the name has no live row reference.
 - Snapshot comparison folds runs of carriage returns before a line feed in stored goldens the same way it folds captured output, so equivalent line endings do not fail verification.
