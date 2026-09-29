@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 719 scenarios
+86 suites · 720 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -645,7 +645,8 @@
   - [unquoted literals keep their digits in matchers, env, and fixtures](#scenario-unquoted-literals-keep-their-digits-in-matchers-env-and-fixtures)
   - [output that lacks the literal fails instead of matching a shortened one](#scenario-output-that-lacks-the-literal-fails-instead-of-matching-a-shortened-one)
   - [a json matcher keeps YAML's typing, so true is not the text true](#scenario-a-json-matcher-keeps-yamls-typing-so-true-is-not-the-text-true)
-- [atago self-hosting / security](#atago-self-hosting--security) — 7 scenarios
+- [atago self-hosting / security](#atago-self-hosting--security) — 8 scenarios
+  - [repeat keeps a security violation from a later iteration](#scenario-repeat-keeps-a-security-violation-from-a-later-iteration)
   - [security denial in teardown is a failing report](#scenario-security-denial-in-teardown-is-a-failing-report)
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
   - [a file assertion path may not escape the scenario workdir](#scenario-a-file-assertion-path-may-not-escape-the-scenario-workdir)
@@ -14405,6 +14406,38 @@ echo '{"ok": true, "name": "true"}'
 
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
+### Scenario: repeat keeps a security violation from a later iteration
+_skipped on Windows_
+#### Given
+- Fixture file `repeat_policy.atago.yaml` is created.
+
+#### Inputs
+_Fixture `repeat_policy.atago.yaml`:_
+```text
+version: "1"
+suite: {name: guarded repeat}
+permissions:
+  network:
+    allow: [allowed.example]
+runners:
+  api: {type: http, base_url: "http://denied.example"}
+scenarios:
+  - name: denied on second iteration
+    steps:
+      - run: {shell: true, command: "echo ready"}
+      - fixture: {file: source.txt, from: "${workdir}/source.txt"}
+      - http: {runner: api, method: GET, path: /}
+    teardown:
+      - run: {shell: true, command: "touch '${workdir}/source.txt'"}
+```
+#### When
+```shell
+${atago} run --repeat 2 --report json repeat_policy.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout at `$.suites[0].security_violation` equals `true`
+
 ### Scenario: security denial in teardown is a failing report
 _skipped on Windows_
 #### Given

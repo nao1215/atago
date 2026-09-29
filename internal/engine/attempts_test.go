@@ -2,12 +2,53 @@ package engine
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/nao1215/atago/internal/loader"
 )
+
+func TestEngine_RepeatPreservesLaterSecurityViolation(t *testing.T) {
+	skipOnWindows(t)
+	t.Parallel()
+	marker := filepath.ToSlash(filepath.Join(t.TempDir(), "seen.txt"))
+	src := fmt.Sprintf(`
+version: "1"
+suite: {name: guarded}
+permissions:
+  network:
+    allow: [allowed.example]
+runners:
+  api: {type: http, base_url: "http://denied.example"}
+scenarios:
+  - name: denied on second iteration
+    steps:
+      - run: {shell: true, command: "echo ready"}
+      - fixture: {file: source.txt, from: "%s"}
+      - http: {runner: api, method: GET, path: /}
+    teardown:
+      - run: {shell: true, command: "touch '%s'"}
+`, marker, marker)
+	s, err := loader.LoadBytes("t.atago.yaml", []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	eng := New()
+	eng.Repeat = 2
+	res := eng.Run(context.Background(), s, "t.atago.yaml")
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("teardown did not create marker: %v", err)
+	}
+	if got := res.Scenarios[0].Iterations; len(got) != 2 || got[0] != StatusError || got[1] != StatusError {
+		t.Fatalf("iterations = %v, want [error error]; kept result: %+v", got, res.Scenarios[0])
+	}
+	if !res.Scenarios[0].SecurityViolation || !res.SecurityViolation {
+		t.Errorf("security violation lost from repeat result: scenario=%v suite=%v", res.Scenarios[0].SecurityViolation, res.SecurityViolation)
+	}
+}
 
 // flakyOnceSpec fails while a marker file is absent, creates it, and passes
 // once it exists — deterministic flakiness in a shared scratch dir. Each
