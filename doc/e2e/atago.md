@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 717 scenarios
+86 suites · 718 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -685,7 +685,8 @@
   - [a snapshot assertion passes against a committed snapshot](#scenario-a-snapshot-assertion-passes-against-a-committed-snapshot)
   - [snapshot update creates the snapshot file](#scenario-snapshot-update-creates-the-snapshot-file)
   - [a snapshot mismatch writes the normalized actual as an artifact](#scenario-a-snapshot-mismatch-writes-the-normalized-actual-as-an-artifact)
-- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 11 scenarios
+- [atago self-hosting / snapshot normalization and round-trip](#atago-self-hosting--snapshot-normalization-and-round-trip) — 12 scenarios
+  - [a golden with repeated carriage returns matches normalized output](#scenario-a-golden-with-repeated-carriage-returns-matches-normalized-output)
   - [a workdir ending at a JSON quote is masked and replays](#scenario-a-workdir-ending-at-a-json-quote-is-masked-and-replays)
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green-1)
   - [a UUID is masked in the golden](#scenario-a-uuid-is-masked-in-the-golden)
@@ -15340,6 +15341,35 @@ cat arts/*/*/step-*-snapshot.actual.txt
 
 ## atago self-hosting / snapshot normalization and round-trip
 Source: `test/e2e/atago/snapshot_normalization.atago.yaml`
+### Scenario: a golden with repeated carriage returns matches normalized output
+_skipped on Windows_
+#### Given
+- Fixture file `repeated_cr.atago.yaml` is created.
+- Fixture file `repeated_cr.snap` is created.
+
+#### Inputs
+_Fixture `repeated_cr.atago.yaml`:_
+```text
+version: "1"
+suite: {name: repeated carriage returns}
+scenarios:
+  - name: prints two lines
+    steps:
+      - run: {shell: true, command: "printf 'hello\\nworld\\n'"}
+      - assert: {stdout: {snapshot: repeated_cr.snap}}
+```
+_Fixture `repeated_cr.snap`:_
+```text
+hello
+world
+```
+#### When
+```shell
+${atago} run repeated_cr.atago.yaml
+```
+#### Then
+- exit code is `0`
+
 ### Scenario: a workdir ending at a JSON quote is masked and replays
 _skipped on Windows_
 #### Given

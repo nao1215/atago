@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Snapshot comparison folds runs of carriage returns before a line feed in stored goldens the same way it folds captured output, so equivalent line endings do not fail verification.
 - `run --rerun-failed` rejects a `null` state file instead of treating it as an empty ledger and exiting successfully.
 - A security-policy violation raised during teardown now makes every report visibly fail, matching the non-zero exit code while leaving the scenario's passed status intact.
 - Snapshot path normalization masks a workdir or home path that ends at a closing quote, so JSON and shell-quoted output does not leave a volatile path in the golden. Prefix-sibling paths remain unchanged.
