@@ -9,6 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `run --rerun-failed` rejects a `null` state file instead of treating it as an empty ledger and exiting successfully.
 - A security-policy violation raised during teardown now makes every report visibly fail, matching the non-zero exit code while leaving the scenario's passed status intact.
 - Snapshot path normalization masks a workdir or home path that ends at a closing quote, so JSON and shell-quoted output does not leave a volatile path in the golden. Prefix-sibling paths remain unchanged.
 - Specs and YAML assertions reject malformed UTF-8 and raw control bytes with a located YAML error. The new YAML reader previously accepted these invalid documents as text.

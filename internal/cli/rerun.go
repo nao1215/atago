@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,6 +57,11 @@ func loadRerunState() (rerunState, error) {
 	}
 	if err := json.Unmarshal(data, &st); err != nil {
 		return st, err
+	}
+	// JSON null decodes into a zero-value struct without an error. Treating that
+	// as an empty ledger would make --rerun-failed report a false green result.
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		return st, fmt.Errorf("%s contains null instead of a rerun state object", rerunStatePath())
 	}
 	// Reject an unknown schema version rather than interpreting a future format
 	// under v1 assumptions: a later version may move or rename fields, and reading

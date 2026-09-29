@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 716 scenarios
+86 suites · 717 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -610,7 +610,8 @@
   - [an exit_code failure states that the command printed nothing](#scenario-an-exit_code-failure-states-that-the-command-printed-nothing)
   - [a stdout failure points at stderr when the text is there](#scenario-a-stdout-failure-points-at-stderr-when-the-text-is-there)
   - [an empty stream that ended early says so in the failure block](#scenario-an-empty-stream-that-ended-early-says-so-in-the-failure-block)
-- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 8 scenarios
+- [atago self-hosting / rerun-failed](#atago-self-hosting--rerun-failed) — 9 scenarios
+  - [a null rerun ledger is rejected instead of reading as empty](#scenario-a-null-rerun-ledger-is-rejected-instead-of-reading-as-empty)
   - [a failing run is recorded and rerun-failed selects only it](#scenario-a-failing-run-is-recorded-and-rerun-failed-selects-only-it)
   - [rerun-failed with nothing recorded is a no-op success](#scenario-rerun-failed-with-nothing-recorded-is-a-no-op-success)
   - [rerun-failed with a filter preserves the still-failing scenarios it did not run](#scenario-rerun-failed-with-a-filter-preserves-the-still-failing-scenarios-it-did-not-run)
@@ -13501,6 +13502,34 @@ ${atago} run earlyeof.atago.yaml
 
 ## atago self-hosting / rerun-failed
 Source: `test/e2e/atago/rerun.atago.yaml`
+### Scenario: a null rerun ledger is rejected instead of reading as empty
+#### Given
+- Fixture file `green.atago.yaml` is created.
+- Fixture file `.atago/last-failed.json` is created.
+
+#### Inputs
+_Fixture `green.atago.yaml`:_
+```text
+version: "1"
+suite: {name: green}
+scenarios:
+  - name: passes
+    steps:
+      - run: {shell: true, command: "exit 0"}
+      - assert: {exit_code: 0}
+```
+_Fixture `.atago/last-failed.json`:_
+```text
+null
+```
+#### When
+```shell
+${atago} run --rerun-failed green.atago.yaml
+```
+#### Then
+- exit code is `3`
+- stderr contains `contains null instead of a rerun state object`
+
 ### Scenario: a failing run is recorded and rerun-failed selects only it
 #### Given
 - Fixture file `inner.atago.yaml` is created.
