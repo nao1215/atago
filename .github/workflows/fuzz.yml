@@ -1,7 +1,7 @@
 name: Fuzz
 
 # The repository ships fuzz targets (loader, store, assert, snapshot, record,
-# ptyrun), but the push/PR test workflows only exercise their seed corpus. This job runs real mutation fuzzing on a schedule so the loader, the
+# ptyrun, yaml, diag), but the push/PR test workflows only exercise their seed corpus. This job runs real mutation fuzzing on a schedule so the loader, the
 # ${...} expander, and the JSON matcher keep getting adversarial input over
 # time — atago parses untrusted specs and arbitrary program output, so its input
 # surface is exactly where fuzzing pays off. A newly discovered crasher fails the
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   fuzz:
-    name: fuzz (${{ matrix.target }})
+    name: fuzz (${{ matrix.pkg }} ${{ matrix.target }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -43,6 +43,14 @@ jobs:
             target: FuzzGeneratePTYRoundTrip
           - pkg: ./internal/runner/ptyrun
             target: FuzzRenderScreen
+          - pkg: ./internal/runner/ptyrun
+            target: FuzzKittyGraphics
+          - pkg: ./internal/yaml
+            target: FuzzParse
+          - pkg: ./internal/diag
+            target: FuzzParse
+          - pkg: ./internal/diag
+            target: FuzzCodes
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
