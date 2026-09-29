@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 720 scenarios
+86 suites · 721 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -645,7 +645,8 @@
   - [unquoted literals keep their digits in matchers, env, and fixtures](#scenario-unquoted-literals-keep-their-digits-in-matchers-env-and-fixtures)
   - [output that lacks the literal fails instead of matching a shortened one](#scenario-output-that-lacks-the-literal-fails-instead-of-matching-a-shortened-one)
   - [a json matcher keeps YAML's typing, so true is not the text true](#scenario-a-json-matcher-keeps-yamls-typing-so-true-is-not-the-text-true)
-- [atago self-hosting / security](#atago-self-hosting--security) — 8 scenarios
+- [atago self-hosting / security](#atago-self-hosting--security) — 9 scenarios
+  - [retry keeps a security violation from an earlier attempt](#scenario-retry-keeps-a-security-violation-from-an-earlier-attempt)
   - [repeat keeps a security violation from a later iteration](#scenario-repeat-keeps-a-security-violation-from-a-later-iteration)
   - [security denial in teardown is a failing report](#scenario-security-denial-in-teardown-is-a-failing-report)
   - [declared secrets are masked in failure output](#scenario-declared-secrets-are-masked-in-failure-output)
@@ -14406,6 +14407,43 @@ echo '{"ok": true, "name": "true"}'
 
 ## atago self-hosting / security
 Source: `test/e2e/atago/security.atago.yaml`
+### Scenario: retry keeps a security violation from an earlier attempt
+_skipped on Windows_
+#### Given
+- Fixture file `retry_source.txt` is created.
+- Fixture file `retry_policy.atago.yaml` is created.
+
+#### Inputs
+_Fixture `retry_source.txt`:_
+```text
+ready
+```
+_Fixture `retry_policy.atago.yaml`:_
+```text
+version: "1"
+suite: {name: guarded retry}
+permissions:
+  network:
+    allow: [allowed.example]
+runners:
+  api: {type: http, base_url: "http://denied.example"}
+scenarios:
+  - name: denied before retry
+    steps:
+      - run: {shell: true, command: "echo ready"}
+      - fixture: {file: source.txt, from: "${workdir}/retry_source.txt"}
+      - http: {runner: api, method: GET, path: /}
+    teardown:
+      - run: {shell: true, command: "rm -f '${workdir}/retry_source.txt'"}
+```
+#### When
+```shell
+${atago} run --retry-failed 1 --report json retry_policy.atago.yaml
+```
+#### Then
+- exit code is `6`
+- stdout at `$.suites[0].security_violation` equals `true`
+
 ### Scenario: repeat keeps a security violation from a later iteration
 _skipped on Windows_
 #### Given

@@ -110,21 +110,25 @@ func (e *Engine) runRepeated(ctx context.Context, idx int, sc *spec.Scenario, rc
 // instability).
 func (e *Engine) runWithRetries(ctx context.Context, idx int, sc *spec.Scenario, rc runConfig) ScenarioResult {
 	run := e.runScenario(ctx, idx, sc, rc, 1)
+	securityViolation := run.SecurityViolation
 	attempts := 1
 	for (run.Status == StatusFailed || run.Status == StatusError) && attempts <= e.RetryFailed {
 		if ctx.Err() != nil {
 			break
 		}
 		retry := e.runScenario(ctx, idx, sc, rc, attempts+1)
+		securityViolation = securityViolation || retry.SecurityViolation
 		attempts++
 		if retry.Status == StatusPassed {
 			retry.Status = StatusFlaky
 			retry.Attempts = attempts
+			retry.SecurityViolation = securityViolation
 			return retry
 		}
 		run = retry
 	}
 	run.Attempts = attempts
+	run.SecurityViolation = securityViolation
 	return run
 }
 
