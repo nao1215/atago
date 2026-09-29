@@ -176,10 +176,6 @@ type echoSpan struct {
 	// echo is what the line discipline writes back: the sent bytes with each LF
 	// rendered as CRLF, which is what ONLCR does on the way out.
 	echo []byte
-	// sentAt is when the send was written. When the terminal could not say
-	// whether it echoes, an echo still incomplete echoSettle later is taken to
-	// be absent.
-	sentAt time.Time
 	// state is whether the echo has been found yet, and what the search
 	// turned up.
 	state echoState
@@ -203,7 +199,8 @@ type echoMode int
 const (
 	// echoModeUnknown means the platform could not say (the Windows pseudo
 	// console, or a terminal that refused the query). The echo is then looked
-	// for only at the write's offset, within echoSettle.
+	// for at the write's offset. A matching prefix stays uncertain until more
+	// bytes arrive; time alone cannot prove that it was program output.
 	echoModeUnknown echoMode = iota
 	// echoModeOn means the line discipline echoes, so the echo will arrive. It
 	// lands after whatever the program had already written when the input was
@@ -213,11 +210,6 @@ const (
 	// echoModeOff means it does not, so nothing the send causes is an echo.
 	echoModeOff
 )
-
-// echoSettle bounds how long an echo that has begun to arrive may take to
-// finish when the terminal could not say whether it echoes. It is a guess,
-// which is why it applies only then.
-const echoSettle = 200 * time.Millisecond
 
 // echoState is what is known about one send's echo.
 type echoState int
@@ -282,9 +274,9 @@ func (d *sessionDriver) locateEchoes(transcript []byte) {
 		}
 		if e.at+len(e.echo) > len(transcript) {
 			// Not enough has arrived to tell; a later scan decides. A prefix
-			// that already disagrees is decided now rather than waited on, and
-			// so is one that has stopped growing short of the echo.
-			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) || (!e.sentAt.IsZero() && time.Since(e.sentAt) > echoSettle) {
+			// that already disagrees is decided now. Waiting a fixed time
+			// cannot distinguish a late echo from the program's own output.
+			if !bytes.HasPrefix(e.echo, transcript[min(e.at, len(transcript)):]) {
 				e.state = echoAbsent
 			}
 			continue
@@ -308,18 +300,6 @@ func partialEchoAt(transcript []byte, start int, echo []byte) int {
 		}
 	}
 	return -1
-}
-
-// echoSettling reports whether some send's echo is still undecided in a way
-// only time can settle: one the terminal could not say it would produce. A
-// promised echo waits for bytes, not for the clock, so it needs no rescan.
-func (d *sessionDriver) echoSettling() bool {
-	for _, e := range d.echoes {
-		if e.mode == echoModeUnknown && e.state == echoPending && len(e.echo) > 0 {
-			return true
-		}
-	}
-	return false
 }
 
 // isEcho reports whether the transcript range [from,to) lies entirely inside
@@ -473,9 +453,7 @@ func (d *sessionDriver) waitExpect(ctx context.Context, re *regexp.Regexp, patte
 	var scannedAt time.Time
 	for {
 		grew := d.term.growth()
-		// An echo still arriving can settle as absent with no new output, so
-		// while one is settling every poll scans again.
-		if n := d.term.curLen(); n != scannedTo || d.echoSettling() {
+		if n := d.term.curLen(); n != scannedTo {
 			scannedAt = time.Now()
 			var loc []int
 			loc, scannedTo = d.scanExpect(re)
@@ -698,7 +676,7 @@ func (d *sessionDriver) send(i int, s *spec.PTYSend) *sessionOutcome {
 	if werr := d.term.typeInput(typed, times); werr != nil {
 		return d.failHard(diag.PTYFailed.Errorf("pty: send: %w", werr))
 	}
-	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent), sentAt: time.Now(), mode: mode, partial: -1})
+	d.echoes = append(d.echoes, echoSpan{at: at, echo: EchoOf(sent), mode: mode, partial: -1})
 	return nil
 }
 

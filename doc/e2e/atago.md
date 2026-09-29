@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 711 scenarios
+86 suites · 714 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -159,10 +159,12 @@
   - [file not_contains passes when the substring is absent](#scenario-file-not_contains-passes-when-the-substring-is-absent)
   - [not_contains fails when the substring is present](#scenario-not_contains-fails-when-the-substring-is-present)
   - [a shell metacharacter without shell is a load-time error](#scenario-a-shell-metacharacter-without-shell-is-a-load-time-error)
-- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 83 scenarios
+- [atago self-hosting / every diagnostic code](#atago-self-hosting--every-diagnostic-code) — 85 scenarios
   - [ATG2001 is a spec file that cannot be read](#scenario-atg2001-is-a-spec-file-that-cannot-be-read)
   - [ATG2002 is a spec file with no YAML document in it](#scenario-atg2002-is-a-spec-file-with-no-yaml-document-in-it)
   - [ATG2003 is a document that is not valid YAML](#scenario-atg2003-is-a-document-that-is-not-valid-yaml)
+  - [ATG2003 rejects invalid UTF-8 in a spec](#scenario-atg2003-rejects-invalid-utf-8-in-a-spec)
+  - [ATG2003 rejects a raw control byte in a spec](#scenario-atg2003-rejects-a-raw-control-byte-in-a-spec)
   - [ATG2004 is an explicit YAML tag](#scenario-atg2004-is-an-explicit-yaml-tag)
   - [ATG2005 is a key the schema does not define](#scenario-atg2005-is-a-key-the-schema-does-not-define)
   - [ATG2006 is a value written in a shape its key cannot take](#scenario-atg2006-is-a-value-written-in-a-shape-its-key-cannot-take)
@@ -565,7 +567,7 @@
   - [a pty drives atago running an inner spec to a green result](#scenario-a-pty-drives-atago-running-an-inner-spec-to-a-green-result)
   - [a never-matching expect fails and names the pattern in the transcript](#scenario-a-never-matching-expect-fails-and-names-the-pattern-in-the-transcript)
   - [a stable_for above the session budget is a load-time error](#scenario-a-stable_for-above-the-session-budget-is-a-load-time-error)
-- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 18 scenarios
+- [atago self-hosting / record (spec skeleton from an observed run)](#atago-self-hosting--record-spec-skeleton-from-an-observed-run) — 19 scenarios
   - [record then run round-trips green](#scenario-record-then-run-round-trips-green)
   - [refusing to overwrite without --force](#scenario-refusing-to-overwrite-without---force)
   - [record --pty refuses an existing --out before driving the session](#scenario-record---pty-refuses-an-existing---out-before-driving-the-session)
@@ -577,6 +579,7 @@
   - [argv boundaries survive spaced arguments](#scenario-argv-boundaries-survive-spaced-arguments)
   - [a shell metacharacter argument stays one token](#scenario-a-shell-metacharacter-argument-stays-one-token)
   - [record --pty records a live session and the generated spec replays green](#scenario-record---pty-records-a-live-session-and-the-generated-spec-replays-green)
+  - [record --pty replays two prompt-gated sends](#scenario-record---pty-replays-two-prompt-gated-sends)
   - [record --pty of a silent program anchors on nothing rather than on the echo](#scenario-record---pty-of-a-silent-program-anchors-on-nothing-rather-than-on-the-echo)
   - [record --pty of a no-input command yields a session-less spec that replays green](#scenario-record---pty-of-a-no-input-command-yields-a-session-less-spec-that-replays-green)
   - [a prompt with regex metacharacters is escaped in the generated expect](#scenario-a-prompt-with-regex-metacharacters-is-escaped-in-the-generated-expect)
@@ -4162,6 +4165,30 @@ ${atago} run bad.atago.yaml
 #### Then
 - exit code is `2`
 - stderr contains `ATG2003`
+
+### Scenario: ATG2003 rejects invalid UTF-8 in a spec
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2003`, `invalid UTF-8 encoding`
+
+### Scenario: ATG2003 rejects a raw control byte in a spec
+#### Given
+- Fixture file `bad.atago.yaml` is created.
+
+#### When
+```shell
+${atago} run bad.atago.yaml
+```
+#### Then
+- exit code is `2`
+- stderr contains `ATG2003`, `invalid control character in YAML`
 
 ### Scenario: ATG2004 is an explicit YAML tag
 #### Given
@@ -12664,6 +12691,21 @@ ${atago} run generated.atago.yaml
   - exit code is `0`
   - file `generated.atago.yaml` contains `- pty:`, `- send:`
 - after `${atago} run generated.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+
+### Scenario: record --pty replays two prompt-gated sends
+_skipped on Windows_
+#### When
+```shell
+# interactive (pty): ${atago} record --pty --out two.atago.yaml -- sh -c 'printf FIRST; read a; printf SECOND-$a; read b; printf DONE-$b'
+${atago} run two.atago.yaml
+```
+#### Then
+- after `interactive (pty): ${atago} record --pty --out two.atago.yaml -- sh -c 'printf FIRST; read a; printf SECOND-$a; read b; printf DONE-$b'`:
+  - exit code is `0`
+  - file `two.atago.yaml` contains `- expect:`, `- send:`, `SECOND-a`
+- after `${atago} run two.atago.yaml`:
   - exit code is `0`
   - stdout contains `1 passed`
 

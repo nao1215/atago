@@ -256,6 +256,8 @@ For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during t
 
 Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — including control-byte aliases like `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen`/`ctrl-minus` for apps that distinguish the physical `Ctrl+-` key — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). A tool that draws its interface on stderr and prints its result on stdout is testable as one step — the UI on the rendered screen, the result in the redirected file: [pty_stdout_split](examples/pty_stdout_split.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
 
+On Windows, ConPTY does not report whether it echoes input. If output after a `send` starts with the text sent, atago treats that first copy as possible terminal echo even when it arrives late; write the following `expect` against the program's response instead of the typed text alone.
+
 ### When your CLI talks to a server
 
 The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers — as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:

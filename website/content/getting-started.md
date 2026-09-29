@@ -193,6 +193,8 @@ The vocabulary covers the chords a real TUI binds, so a session never has to emb
 
 `send: {paste: "..."}` delivers text as a bracketed paste rather than as typing. A REPL or editor that enables the mode treats a pasted block as one unit — it must not run line by line, auto-indent, or fire completion — and that is a different code path from typing the same characters. atago refuses the send if the program has not enabled the mode (`ESC [?2004h`), because the markers would otherwise arrive as literal `[200~` text and surface as a puzzling failure much later; wait for the prompt with an `expect` first, since programs turn the mode on during startup. A tool that draws its interface on stderr and prints its result on stdout is testable as one step — the UI on the rendered screen, the result in the redirected file: [pty_stdout_split](https://github.com/nao1215/atago/blob/main/examples/pty_stdout_split.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only.
 
+On Windows, ConPTY does not report whether it echoes input. If output after a `send` starts with the text sent, atago treats that first copy as possible terminal echo even when it arrives late; write the following `expect` against the program's response instead of the typed text alone.
+
 ## When your CLI talks to a server
 
 The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers — as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:

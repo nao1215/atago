@@ -724,30 +724,34 @@ func TestSessionDriver_EchoIsNotAMatch(t *testing.T) {
 	}
 }
 
-// TestSessionDriver_UnfinishedEchoSettles covers the other side of an echo
-// still arriving, on a terminal that could not say whether it echoes (the
-// spans here carry echoModeUnknown): one that does not echo never completes
-// it, and the program's own copy of the sent text must then count once the
-// echo has had time to arrive, instead of blocking the expect until its
-// timeout.
-func TestSessionDriver_UnfinishedEchoSettles(t *testing.T) {
+// An incomplete matching prefix on a terminal with unknown echo state stays
+// ambiguous. The clock cannot prove whether it is terminal echo or program
+// output; counting it would let a slow echo satisfy an assertion by itself.
+func TestSessionDriver_UnfinishedUnknownEchoRemainsAmbiguous(t *testing.T) {
 	t.Parallel()
 	transcript := []byte("ready\r\nABC")
 	re := regexp.MustCompile("ABC")
 
-	recent := &sessionDriver{echoes: []echoSpan{{at: 7, echo: EchoOf([]byte("ABC\n")), sentAt: time.Now()}}}
-	recent.locateEchoes(transcript)
-	if recent.findReal(re, transcript[7:], 7) != nil {
-		t.Error("text that may still be the echo matched right after the send")
+	d := &sessionDriver{echoes: []echoSpan{{at: 7, echo: EchoOf([]byte("ABC\n")), mode: echoModeUnknown}}}
+	d.locateEchoes(transcript)
+	if d.echoes[0].state != echoPending {
+		t.Errorf("incomplete echo state = %v, want pending", d.echoes[0].state)
 	}
+	if d.findReal(re, transcript[7:], 7) != nil {
+		t.Error("ambiguous text matched as program output")
+	}
+}
 
-	settled := &sessionDriver{echoes: []echoSpan{{at: 7, echo: EchoOf([]byte("ABC\n")), sentAt: time.Now().Add(-2 * echoSettle)}}}
-	settled.locateEchoes(transcript)
-	if settled.echoes[0].state != echoAbsent {
-		t.Errorf("an echo still incomplete %s after the send is state %v, want absent", 2*echoSettle, settled.echoes[0].state)
-	}
-	if settled.findReal(re, transcript[7:], 7) == nil {
-		t.Error("the program's copy did not match once the echo had had time to arrive")
+func TestSessionDriver_UnknownEchoDoesNotBecomeProgramOutputAfterDelay(t *testing.T) {
+	t.Parallel()
+	// ConPTY cannot report the echo mode. A busy reader may receive the first
+	// bytes after the old 200 ms deadline, followed by the rest of the echo.
+	// Neither fragment is evidence that the program printed the sent text.
+	d := &sessionDriver{echoes: []echoSpan{{at: 0, echo: []byte("ABC\r\n"), mode: echoModeUnknown}}}
+	d.locateEchoes([]byte("AB"))
+	d.locateEchoes([]byte("ABC\r\n"))
+	if got := d.findReal(regexp.MustCompile("ABC"), []byte("ABC\r\n"), 0); got != nil {
+		t.Errorf("expect matched delayed terminal echo at %v", got)
 	}
 }
 
@@ -812,8 +816,7 @@ func TestSessionDriver_EchoTheTerminalReported(t *testing.T) {
 			t.Parallel()
 			d := &sessionDriver{}
 			for _, s := range tt.sends {
-				// Written long ago: the verdict must not depend on the clock.
-				d.echoes = append(d.echoes, echoSpan{at: s.at, echo: EchoOf([]byte(s.sent)), sentAt: time.Now().Add(-10 * echoSettle), mode: tt.mode})
+				d.echoes = append(d.echoes, echoSpan{at: s.at, echo: EchoOf([]byte(s.sent)), mode: tt.mode})
 			}
 			transcript := []byte(tt.transcript)
 			d.locateEchoes(transcript)
@@ -903,7 +906,7 @@ func TestDriveSession_ADelayedEchoIsNotTheProgramsAnswer(t *testing.T) {
 		delay            time.Duration
 	}{
 		// The reader got to the echo well after echoSettle.
-		"the echo arrives late": {prefix: "ready\r\n", delay: 3 * echoSettle},
+		"the echo arrives late": {prefix: "ready\r\n", delay: 600 * time.Millisecond},
 		// The program's line reached the reader in two pieces and the send was
 		// written between them.
 		"the echo follows the rest of the prompt line": {prefix: "ready", inFlight: "\r\n"},

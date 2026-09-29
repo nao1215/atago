@@ -55,6 +55,31 @@ scenarios:
           exit_code: 2
           stderr: {contains: "ATG2003"}
 
+  - name: ATG2003 rejects invalid UTF-8 in a spec
+    steps:
+      # The decoded name contains a raw 0xff byte. YAML must be Unicode text;
+      # accepting it lets a corrupt spec reach later validation as if it were valid.
+      - fixture:
+          file: bad.atago.yaml
+          base64: dmVyc2lvbjogIjEiCnN1aXRlOgogIG5hbWU6IP8Kc2NlbmFyaW9zOiBbXQo=
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: ["ATG2003", "invalid UTF-8 encoding"]
+
+  - name: ATG2003 rejects a raw control byte in a spec
+    steps:
+      # The decoded suite name contains a NUL byte.
+      - fixture:
+          file: bad.atago.yaml
+          base64: dmVyc2lvbjogIjEiCnN1aXRlOgogIG5hbWU6IGEAYgpzY2VuYXJpb3M6IFtdCg==
+      - run: {command: "${atago} run bad.atago.yaml"}
+      - assert:
+          exit_code: 2
+          stderr:
+            contains: ["ATG2003", "invalid control character in YAML"]
+
   - name: ATG2004 is an explicit YAML tag
     steps:
       - fixture:
