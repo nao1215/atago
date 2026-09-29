@@ -39,6 +39,8 @@ jobs:
             target: FuzzNormalize
           - pkg: ./internal/record
             target: FuzzGenerateRoundTrip
+          - pkg: ./internal/record
+            target: FuzzGeneratePTYRoundTrip
           - pkg: ./internal/runner/ptyrun
             target: FuzzRenderScreen
     steps:
