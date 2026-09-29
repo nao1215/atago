@@ -66,6 +66,31 @@ scenarios:
               - 'name="row [n=1]"'
               - 'name="row [n=2]"'
 
+  - name: escaped matrix name reference stays literal when row binds it
+    steps:
+      - fixture:
+          file: escaped-name.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: escaped name
+            scenarios:
+              - name: "writes $$${who} verbatim"
+                matrix:
+                  - { who: Alice }
+                  - { who: Bob }
+                steps:
+                  - run:
+                      command: echo
+      - run:
+          command: ${atago} run --report junit escaped-name.atago.yaml
+      - assert:
+          exit_code: 0
+          stdout:
+            contains:
+              - 'name="writes $$${who} verbatim [who=Alice]"'
+              - 'name="writes $$${who} verbatim [who=Bob]"'
+
   - name: stdout_to expands a matrix variable into the redirect target
     matrix:
       - { who: alice }

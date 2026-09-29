@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 718 scenarios
+86 suites · 719 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -469,9 +469,10 @@
   - [manifest describes the suite lifecycle outputs and the subject build](#scenario-manifest-describes-the-suite-lifecycle-outputs-and-the-subject-build)
   - [an assert step carries the assertion, not only its target](#scenario-an-assert-step-carries-the-assertion-not-only-its-target)
   - [explain and manifest substitute a matrix row into the step text](#scenario-explain-and-manifest-substitute-a-matrix-row-into-the-step-text)
-- [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 4 scenarios
+- [atago self-hosting / matrix scenarios](#atago-self-hosting--matrix-scenarios) — 5 scenarios
   - [matrix expands into one scenario per row](#scenario-matrix-expands-into-one-scenario-per-row)
   - [matrix without a templated name gets a deterministic suffix](#scenario-matrix-without-a-templated-name-gets-a-deterministic-suffix)
+  - [escaped matrix name reference stays literal when row binds it](#scenario-escaped-matrix-name-reference-stays-literal-when-row-binds-it)
   - [stdout_to expands a matrix variable into the redirect target \[who=alice\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whoalice)
   - [stdout_to expands a matrix variable into the redirect target \[who=bob\]](#scenario-stdout_to-expands-a-matrix-variable-into-the-redirect-target-whobob)
 - [atago self-hosting / matrix expansion boundary values](#atago-self-hosting--matrix-expansion-boundary-values) — 6 scenarios
@@ -10593,6 +10594,33 @@ ${atago} run --report junit suffix.atago.yaml
 #### Then
 - exit code is `0`
 - stdout contains `name="row [n=1]"`, `name="row [n=2]"`
+
+### Scenario: escaped matrix name reference stays literal when row binds it
+#### Given
+- Fixture file `escaped-name.atago.yaml` is created.
+
+#### Inputs
+_Fixture `escaped-name.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: escaped name
+scenarios:
+  - name: "writes $$${who} verbatim"
+    matrix:
+      - { who: Alice }
+      - { who: Bob }
+    steps:
+      - run:
+          command: echo
+```
+#### When
+```shell
+${atago} run --report junit escaped-name.atago.yaml
+```
+#### Then
+- exit code is `0`
+- stdout contains `name="writes $$${who} verbatim [who=Alice]"`, `name="writes $$${who} verbatim [who=Bob]"`
 
 ### Scenario: stdout_to expands a matrix variable into the redirect target [who=alice]
 #### When

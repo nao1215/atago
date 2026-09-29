@@ -1,5 +1,24 @@
 package spec
 
+// ExpandMatrixName substitutes live row references in a scenario name while
+// retaining escaped references verbatim. It reports whether the name uses a
+// row binding; callers append a row suffix when it does not.
+func ExpandMatrixName(s string, row map[string]string) (string, bool) {
+	referenced := false
+	name := varRef.ReplaceAllStringFunc(s, func(m string) string {
+		sub := varRef.FindStringSubmatch(m)
+		if sub[1] != "" {
+			return m
+		}
+		if v, ok := row[sub[2]]; ok {
+			referenced = true
+			return v
+		}
+		return m
+	})
+	return name, referenced
+}
+
 // ExpandRow substitutes a matrix row's bindings into s, leaving every other
 // reference exactly as written. It is display-only: the row is the one binding
 // that is part of the SPEC, so `${env:...}`, `${workdir}`, and a value a `store`
