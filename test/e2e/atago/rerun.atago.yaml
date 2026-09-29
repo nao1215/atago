@@ -4,6 +4,25 @@ suite:
   name: atago self-hosting / rerun-failed
 
 scenarios:
+  - name: a null rerun ledger is rejected instead of reading as empty
+    steps:
+      - fixture:
+          file: green.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: green}
+            scenarios:
+              - name: passes
+                steps:
+                  - run: {shell: true, command: "exit 0"}
+                  - assert: {exit_code: 0}
+      - fixture: {file: .atago/last-failed.json, content: "null\n"}
+      - run: {command: "${atago} run --rerun-failed green.atago.yaml"}
+      - assert:
+          exit_code: 3
+          stderr:
+            contains: "contains null instead of a rerun state object"
+
   - name: a failing run is recorded and rerun-failed selects only it
     steps:
       - fixture:

@@ -914,6 +914,21 @@ func TestLoadRerunState_Corrupt(t *testing.T) {
 	})
 }
 
+func TestLoadRerunState_NullIsRejected(t *testing.T) {
+	dir := t.TempDir()
+	withWorkdir(t, dir, func() {
+		if err := os.MkdirAll(rerunStateDir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(rerunStatePath(), []byte("null\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadRerunState(); err == nil {
+			t.Error("null state was treated as an empty ledger")
+		}
+	})
+}
+
 // TestRunCmd_CorruptRerunStateExitsConfig proves `run --rerun-failed` reports a
 // clean ExitConfig (not a panic or false green) when the state file is corrupt.
 func TestRunCmd_CorruptRerunStateExitsConfig(t *testing.T) {
