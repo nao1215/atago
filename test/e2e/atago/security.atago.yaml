@@ -4,6 +4,41 @@ suite:
   name: atago self-hosting / security
 
 scenarios:
+  - name: security denial in teardown is a failing report
+    skip: {os: windows}
+    steps:
+      - fixture:
+          file: teardown_policy.atago.yaml
+          content: |
+            version: "1"
+            suite: {name: guarded}
+            permissions:
+              network:
+                allow: [allowed.example]
+            runners:
+              api: {type: http, base_url: "http://denied.example"}
+            scenarios:
+              - name: passes before cleanup
+                steps:
+                  - run: {shell: true, command: "echo ok"}
+                  - assert: {stdout: {contains: ok}}
+                teardown:
+                  - http: {runner: api, method: GET, path: /}
+      - run: {command: "${atago} run --report json teardown_policy.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout:
+            json:
+              - path: "$.suites[0].security_violation"
+                equals: true
+              - path: "$.suites[0].scenarios[0].status"
+                equals: passed
+      - run: {command: "${atago} run --report junit teardown_policy.atago.yaml"}
+      - assert:
+          exit_code: 6
+          stdout:
+            contains: 'errors="1"'
+
   - name: declared secrets are masked in failure output
     steps:
       - fixture:

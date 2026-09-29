@@ -593,6 +593,50 @@ func TestRender_AllowXPass_EveryFailureSignalAgrees(t *testing.T) {
 	})
 }
 
+// A network access attempt denied in teardown leaves the scenario passed, but exits
+// with ExitSecurity. Every report must carry a failing run-level signal.
+func TestRender_SecurityViolationInTeardownIsNotGreen(t *testing.T) {
+	t.Parallel()
+	res := &engine.SuiteResult{
+		Suite: "secure", Status: engine.StatusPassed, SecurityViolation: true,
+		Scenarios: []engine.ScenarioResult{{
+			Name: "passed body", Status: engine.StatusPassed,
+			Teardown: []engine.StepResult{{Kind: "http", ErrMsg: "network policy denies host"}},
+		}},
+	}
+	checks := []struct {
+		format Format
+		want   string
+	}{
+		{FormatConsole, "FAILED  1 scenario"},
+		{FormatJSON, `"security_violation": true`},
+		{FormatJUnit, `errors="1"`},
+		{FormatTAP, "not ok 2 - secure / security policy"},
+		{FormatGHA, "::error title=secure / security policy::"},
+	}
+	for _, tc := range checks {
+		t.Run(string(tc.format), func(t *testing.T) {
+			t.Parallel()
+			if out := render(t, tc.format, res); !strings.Contains(out, tc.want) {
+				t.Errorf("%s report does not show the security failure; want %q:\n%s", tc.format, tc.want, out)
+			}
+		})
+	}
+	var doc jsonDocument
+	if err := json.Unmarshal([]byte(render(t, FormatJSON, res)), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Suites[0].Failures) != 1 || doc.Suites[0].Failures[0].Step != "security policy" {
+		t.Errorf("JSON failure bucket hides the security violation: %+v", doc.Suites[0].Failures)
+	}
+	if out := render(t, FormatTAP, res); !strings.Contains(out, "1..2\n") {
+		t.Errorf("TAP plan does not count the security point:\n%s", out)
+	}
+	if out := render(t, FormatGHA, res); !strings.Contains(out, "2 scenarios: 1 passed, 0 failed, 1 errored") {
+		t.Errorf("GHA summary does not count its security annotation:\n%s", out)
+	}
+}
+
 // renderWith is render with extra options.
 func renderWith(t *testing.T, f Format, res *engine.SuiteResult, opts ...Option) string {
 	t.Helper()
