@@ -7,6 +7,9 @@ updates:
       time: "20:00"
     open-pull-requests-limit: 10
     ignore:
+      # x/vt has no module tags. Dependabot resolves it as the x root module
+      # (v0.1.0), which does not contain the vt package. Update it manually.
+      - dependency-name: github.com/charmbracelet/x/vt
       # GHSA-2v4p-qf9q-27wj (GO-2026-6443): no 1.84 release carries the fix,
       # which is only on the 1.85 development line. Let a later release through.
       - dependency-name: google.golang.org/grpc
