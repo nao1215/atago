@@ -18,7 +18,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/mattn/go-runewidth v0.0.30
 	github.com/mattn/go-shellwords v1.0.15
-	github.com/ohler55/ojg v1.28.6
+	github.com/ohler55/ojg v1.28.7
 	github.com/rivo/uniseg v0.4.7
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/crypto v0.57.0
