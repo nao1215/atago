@@ -1,12 +1,12 @@
 module github.com/nao1215/atago
 
-go 1.26.0
+go 1.26.9
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.2
-	github.com/charmbracelet/ultraviolet v0.0.0-20260910203606-6c9e17dc7a16
-	github.com/charmbracelet/x/ansi v0.11.8
-	github.com/charmbracelet/x/vt v0.0.0-20260920004010-53e2afe73ae5
+	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
+	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/charmbracelet/x/vt v0.0.0-20261008172826-faa4adf95555
 	github.com/chromedp/cdproto v0.0.0-20260912003405-686a5c723acc
 	github.com/chromedp/chromedp v0.16.0
 	github.com/creack/pty v1.1.24
@@ -16,19 +16,19 @@ require (
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.2
 	github.com/k1LoW/grpcstub v0.26.5
 	github.com/lib/pq v1.12.3
-	github.com/mattn/go-runewidth v0.0.30
-	github.com/mattn/go-shellwords v1.0.15
-	github.com/ohler55/ojg v1.28.6
+	github.com/mattn/go-runewidth v0.0.31
+	github.com/mattn/go-shellwords v1.0.16
+	github.com/ohler55/ojg v1.28.7
 	github.com/rivo/uniseg v0.4.7
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.59.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -56,14 +56,14 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260918162117-cecb64721679 // indirect
-	modernc.org/libc v1.77.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261005182115-fad411399dd8 // indirect
+	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
