@@ -10,6 +10,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Building from source now needs Go 1.26.9 or later (was 1.26.0). Go 1.26.9 fixes standard library advisories atago reaches in `net/http`, `net/textproto`, `mime/multipart`, `crypto/tls`, `html/template` and `os` (GO-2026-6599 to GO-2026-6617). Prebuilt binaries are unaffected. Dependencies: golang.org/x/net v0.60.0 (GO-2026-6617), google.golang.org/grpc v1.84.0, modernc.org/sqlite v1.60.1, ohler55/ojg v1.28.7, mattn/go-shellwords v1.0.16. grpc v1.84.0 is no longer in the range of GO-2026-6443 since the advisory was corrected on 2026-10-06.
+- Dependencies: github.com/chromedp/chromedp v0.20.1 and github.com/chromedp/cdproto v0.157.9 (new generic action API; Chrome is now driven over a pipe instead of a websocket). The browser runner keeps the same spec format, actions, error messages and timeouts.
 
 ### Fixed
 
