@@ -52,16 +52,10 @@ func Open(cfg Config) (*Runner, error) {
 	// --no-sandbox is required to launch Chrome as root / inside many CI
 	// containers, where the setuid sandbox is unavailable.
 	opts = append(opts, chromedp.NoSandbox)
-	// CI/container hardening: in constrained CI environments headless Chrome
-	// often fails to publish its DevTools websocket within chromedp's default 20s
-	// ("websocket url timeout reached"), which flakes the browser suite.
-	// --disable-dev-shm-usage avoids the tiny /dev/shm that makes Chrome hang, and
-	// a longer WS-URL read timeout tolerates a slow cold start. Both are safe
-	// no-ops on a fast local machine.
-	opts = append(opts,
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.WSURLReadTimeout(60*time.Second),
-	)
+	// CI/container hardening: --disable-dev-shm-usage avoids the tiny /dev/shm
+	// that makes Chrome hang in constrained CI containers. It is a safe no-op on
+	// a fast local machine. A slow cold start is bounded by launchTimeout below.
+	opts = append(opts, chromedp.Flag("disable-dev-shm-usage", true))
 	if !cfg.Headless {
 		opts = append(opts, chromedp.Flag("headless", false))
 	}
@@ -79,7 +73,7 @@ func Open(cfg Config) (*Runner, error) {
 	browserCtx, browserStop := chromedp.NewContext(allocCtx)
 	// Force the browser to start now so a launch failure surfaces at Open, not on
 	// the first action.
-	if err := chromedp.Run(browserCtx); err != nil {
+	if err := launch(browserCtx); err != nil {
 		browserStop()
 		allocCancel()
 		return nil, diag.ConnectFailed.Errorf("launching headless browser: %w", err)
@@ -91,6 +85,31 @@ func Open(cfg Config) (*Runner, error) {
 		browserStop: browserStop,
 		timeout:     cfg.Timeout,
 	}, nil
+}
+
+// launchTimeout bounds how long Open waits for a cold Chrome to come up. In
+// constrained CI environments headless Chrome can be slow to answer its first
+// DevTools command, so the bound is generous; it matches the 60s WebSocket-URL
+// read timeout atago used before chromedp switched to the pipe transport.
+const launchTimeout = 60 * time.Second
+
+// launch starts the browser and opens its first tab. The browser must be
+// started with a context that has no deadline (a deadline would stop the whole
+// browser when it expires), so the launch bound is a separate timer: when it
+// fires, the caller's cancel funcs tear the half-started browser down.
+func launch(browserCtx context.Context) error {
+	done := make(chan error, 1)
+	go func() { done <- chromedp.Do(browserCtx) }()
+	timer := time.NewTimer(launchTimeout)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		return err
+	case <-timer.C:
+		// The buffered channel lets the launch goroutine finish once the
+		// caller cancels browserCtx.
+		return fmt.Errorf("browser did not start within %v", launchTimeout)
+	}
 }
 
 // splitFlag turns a bare launch-flag token into the (name, value) pair chromedp
@@ -149,7 +168,7 @@ func (r *Runner) Run(ctx context.Context, actions []spec.CDPAction, workdir stri
 	//nolint:contextcheck // runCtx is rooted at the persistent browser context rather than
 	// at ctx on purpose: the chromedp session has to outlive a single step. The caller's
 	// cancellation still reaches it through the AfterFunc above, which is what #14 asked for.
-	if err := chromedp.Run(runCtx, tasks...); err != nil {
+	if err := chromedp.Do(runCtx, tasks...); err != nil {
 		return nil, fmt.Errorf("cdp run: %w", err)
 	}
 
@@ -196,8 +215,37 @@ type shot struct {
 	buf  *[]byte
 }
 
-func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []capture, []shot, error) {
-	var tasks chromedp.Tasks
+// storeInto adapts a value-returning chromedp action into a step of the action
+// list: the value is written to *dst when the step runs, so the caller reads it
+// once the whole list has completed.
+func storeInto[T any](a chromedp.Action[T], dst *T) chromedp.Action[chromedp.Void] {
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+		v, err := a(ctx, t)
+		if err != nil {
+			return err
+		}
+		*dst = v
+		return nil
+	})
+}
+
+// attributeValueInto captures an attribute's value (empty when the attribute is
+// absent) into *dst.
+func attributeValueInto(selector, name string, dst *string) chromedp.Action[chromedp.Void] {
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+		res, err := chromedp.AttributeValue(chromedp.CSS(selector), name)(ctx, t)
+		if err != nil {
+			return err
+		}
+		*dst = res.Value
+		return nil
+	})
+}
+
+// buildTasks turns the spec's action list into chromedp steps. A selector is a
+// CSS selector matched with DOM.querySelector (chromedp.CSS, the old ByQuery).
+func buildTasks(actions []spec.CDPAction, workdir string) ([]chromedp.Action[chromedp.Void], []capture, []shot, error) {
+	var tasks []chromedp.Action[chromedp.Void]
 	var caps []capture
 	var shots []shot
 	for i, a := range actions {
@@ -205,19 +253,19 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 		case a.Navigate != "":
 			tasks = append(tasks, chromedp.Navigate(a.Navigate))
 		case a.WaitVisible != "":
-			tasks = append(tasks, chromedp.WaitVisible(a.WaitVisible, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.WaitVisible(chromedp.CSS(a.WaitVisible)))
 		case a.WaitHidden != "":
-			tasks = append(tasks, chromedp.WaitNotVisible(a.WaitHidden, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.WaitNotVisible(chromedp.CSS(a.WaitHidden)))
 		case a.Click != "":
-			tasks = append(tasks, chromedp.Click(a.Click, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.Click(chromedp.CSS(a.Click)))
 		case a.Press != nil:
 			key, err := resolveKey(a.Press.Key)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("cdp action %d: %w", i, err)
 			}
-			tasks = append(tasks, chromedp.SendKeys(a.Press.Selector, key, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.SendKeys(chromedp.CSS(a.Press.Selector), key))
 		case a.Select != nil:
-			tasks = append(tasks, chromedp.SetValue(a.Select.Selector, a.Select.Value, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.SetValue(chromedp.CSS(a.Select.Selector), a.Select.Value))
 		case a.Check != "":
 			tasks = append(tasks, setChecked(a.Check, true))
 		case a.Uncheck != "":
@@ -225,9 +273,9 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 		case a.Screenshot != nil:
 			buf := new([]byte)
 			if a.Screenshot.Selector != "" {
-				tasks = append(tasks, chromedp.Screenshot(a.Screenshot.Selector, buf, chromedp.ByQuery))
+				tasks = append(tasks, storeInto(chromedp.Screenshot(chromedp.CSS(a.Screenshot.Selector)), buf))
 			} else {
-				tasks = append(tasks, chromedp.FullScreenshot(buf, 100))
+				tasks = append(tasks, storeInto(chromedp.FullScreenshot(100), buf))
 			}
 			path, err := security.ResolveWorkdirPath("cdp.screenshot.path", workdir, a.Screenshot.Path)
 			if err != nil {
@@ -235,7 +283,7 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 			}
 			shots = append(shots, shot{path: path, buf: buf})
 		case a.SendKeys != nil:
-			tasks = append(tasks, chromedp.SendKeys(a.SendKeys.Selector, a.SendKeys.Value, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.SendKeys(chromedp.CSS(a.SendKeys.Selector), a.SendKeys.Value))
 		case a.Upload != nil:
 			// Set a file on an <input type=file> (#75). The file must exist inside the
 			// scenario workdir, so a spec cannot upload arbitrary host files.
@@ -246,7 +294,7 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 			if _, statErr := os.Stat(file); statErr != nil {
 				return nil, nil, nil, diag.StepFileUnusable.Errorf("cdp action %d: upload file %q: %w", i, a.Upload.File, statErr)
 			}
-			tasks = append(tasks, chromedp.SetUploadFiles(a.Upload.Selector, []string{file}, chromedp.ByQuery))
+			tasks = append(tasks, chromedp.SetUploadFiles(chromedp.CSS(a.Upload.Selector), []string{file}))
 		case a.Download != nil:
 			// Capture a click-triggered download into a deterministic scenario
 			// directory (#75). The destination is confined to the workdir.
@@ -263,20 +311,19 @@ func buildTasks(actions []spec.CDPAction, workdir string) (chromedp.Tasks, []cap
 			caps = append(caps, capture{str: name})
 		case a.Text != "":
 			s := new(string)
-			tasks = append(tasks, chromedp.Text(a.Text, s, chromedp.ByQuery, chromedp.NodeVisible))
+			tasks = append(tasks, storeInto(chromedp.Text(chromedp.CSS(a.Text), chromedp.NodeVisible), s))
 			caps = append(caps, capture{str: s})
 		case a.Title:
 			s := new(string)
-			tasks = append(tasks, chromedp.Title(s))
+			tasks = append(tasks, storeInto(chromedp.Title(), s))
 			caps = append(caps, capture{str: s})
 		case a.Attribute != nil:
 			s := new(string)
-			ok := new(bool)
-			tasks = append(tasks, chromedp.AttributeValue(a.Attribute.Selector, a.Attribute.Name, s, ok, chromedp.ByQuery))
+			tasks = append(tasks, attributeValueInto(a.Attribute.Selector, a.Attribute.Name, s))
 			caps = append(caps, capture{str: s})
 		case a.Eval != "":
 			j := new(json.RawMessage)
-			tasks = append(tasks, chromedp.Evaluate(a.Eval, j))
+			tasks = append(tasks, storeInto(chromedp.Evaluate[json.RawMessage](a.Eval), j))
 			caps = append(caps, capture{js: j})
 		default:
 			return nil, nil, nil, diag.InternalError.Errorf("cdp action %d sets no recognized action", i)
@@ -305,7 +352,7 @@ func jsStringLiteral(s string) string {
 // and dispatching a change event, so listeners react as they would to a click.
 // Selecting by property (not a click) keeps the action deterministic regardless
 // of the element's current state.
-func setChecked(selector string, checked bool) chromedp.Action {
+func setChecked(selector string, checked bool) chromedp.Action[chromedp.Void] {
 	sel := jsStringLiteral(selector)
 	js := fmt.Sprintf(`(() => {
 	const el = document.querySelector(%s);
@@ -314,7 +361,7 @@ func setChecked(selector string, checked bool) chromedp.Action {
 	el.dispatchEvent(new Event('change', {bubbles: true}));
 	return el.checked;
 })()`, sel, sel, checked)
-	return chromedp.Evaluate(js, nil)
+	return chromedp.Evaluate[chromedp.Void](js)
 }
 
 // pressKeys maps the small set of named keys atago supports for a press action
