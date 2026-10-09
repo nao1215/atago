@@ -21,9 +21,12 @@ jobs:
           - "macos-latest"
         go:
           # go.mod requires go >= 1.26 (chromedp, cdproto and
-          # go-json-experiment/json all declare it), and the CI uses
+          # go-json-experiment/json all declare it), pinned to the 1.26.9 patch
+          # for the standard library advisories it fixes, and the CI uses
           # GOTOOLCHAIN=local, so an older toolchain cannot build the module.
-          # Test the declared minimum and the latest release.
+          # Test the declared minimum and the latest release. The floor is an
+          # exact patch because setup-go resolves a bare "1.26" from its own
+          # manifest, which can hand out a patch below the go.mod directive.
           #
           # This is the only workflow that pins Go versions. Every other one uses
           # "stable": go.mod states the oldest Go a user may build atago from, not
@@ -36,7 +39,7 @@ jobs:
           # handing out go1.26.7 after 1.27.0 shipped, so this leg was running
           # the floor twice and two real 1.27 breakages reached main unnoticed.
           - "stable"
-          - "1.26"
+          - "1.26.9"
       fail-fast: false
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10

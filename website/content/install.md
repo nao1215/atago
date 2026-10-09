@@ -34,7 +34,7 @@ mise use -g aqua:nao1215/atago
 
 If your installed `mise` release does not see `nao1215/atago` yet, update `mise` or enable floating registries with `mise settings registry_floating=true`.
 
-The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Requires Go 1.26 or later when building from source.
+The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Requires Go 1.26.9 or later when building from source.
 
 Runs on Linux, macOS, and Windows (CI tests all three).
 
