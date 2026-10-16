@@ -19,6 +19,10 @@ updates:
     schedule:
       interval: "daily"
   # Dockerfile.goreleaser pins its base image by digest; this keeps it fresh.
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
