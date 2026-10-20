@@ -1,7 +1,7 @@
 ---
 toc: true
 title: Reference
-description: atago subcommands, scenario selection flags, snapshot updating and scrub rules, the JSON Schema for editors, shell completion, and the exit code contract.
+description: atago subcommands, scenario selection flags, snapshot updating and scrub rules, the JSON Schema for editors, the skill for coding agents, shell completion, and the exit code contract.
 ---
 
 ## Subcommands
@@ -113,6 +113,13 @@ version: "1"
 ```
 
 The report and manifest outputs have schemas too: [report.schema.json](https://github.com/nao1215/atago/blob/main/schema/report.schema.json) and [manifest.schema.json](https://github.com/nao1215/atago/blob/main/schema/manifest.schema.json).
+
+## Coding agents
+
+[skills/atago](https://github.com/nao1215/atago/tree/main/skills/atago) is an Agent Skill: a `SKILL.md` with short references for a minimal spec, the common matchers, and reading a failure. Its rule is the loop: write a spec, run `atago run`, fix until it passes. Its specs and commands run in CI.
+
+- Claude Code: copy `skills/atago` to `~/.claude/skills/atago`.
+- Codex: copy `skills/atago` to `~/.codex/skills/atago`.
 
 ## Platform support
 

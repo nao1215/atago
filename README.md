@@ -403,6 +403,10 @@ A JSON Schema lives at [schema/atago.schema.json](schema/atago.schema.json). Wit
 version: "1"
 ```
 
+## Coding agents
+
+An [Agent Skill](skills/atago/SKILL.md) for Claude Code and Codex is in `skills/atago`. Copy it to `~/.claude/skills/atago` or `~/.codex/skills/atago`.
+
 ## Shell completion
 
 `atago completion <bash|zsh|fish|powershell>` prints a completion script for your shell.
