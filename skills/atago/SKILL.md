@@ -10,7 +10,7 @@ atago runs a real program and checks what a user observes: the exit code, stdout
 ## The loop
 
 1. Look up the keys you need: https://nao1215.github.io/atago/reference/#spec-file-keys. Do not guess a key. Specs are decoded strictly, so an unknown key is an error (`ATG2005`).
-2. Start from a real run or from a recipe. `atago record --out mytool.atago.yaml -- mytool convert input.txt` runs the command once and writes a spec from what it observed. Tighten that spec.
+2. Start from a real run or from a recipe. `atago record --out mytool.atago.yaml -- mytool --version` runs the command once in a scratch directory and writes a spec from what it observed. Tighten that spec. A command that reads a local file needs a `fixture:` step that writes the file into the scenario's workdir (examples/files_and_fixtures.atago.yaml).
 3. Run the spec with `atago run`. Fix the spec or the program and run it again. Stop only when it exits 0.
 4. When the output changed on purpose, update the snapshots and review the diff (see Snapshots below).
 
@@ -63,15 +63,15 @@ The exit code says what kind of problem it is.
 
 | Code | Meaning |
 |------|---------|
-| `0` | every scenario passed (or was skipped) |
-| `1` | one or more scenarios failed |
+| `0` | no unexpected failure: every scenario passed, was skipped, or was an XFAIL (an `expect_fail:` scenario that failed as declared) |
+| `1` | one or more scenarios failed, an XPASS (an `expect_fail:` scenario that passed), or a flaky scenario that passed only on a retry |
 | `2` | spec error: YAML syntax or schema validation |
 | `3` | command-line error: unknown subcommand, bad flag, or no matching spec files |
 | `4` | execution error: a step could not be carried out |
 | `5` | internal error: a bug in atago |
 | `6` | security policy violation |
 
-- Exit 1 is a failed assertion. The report names the scenario, the step, the command, and a diff of expected and actual. It carries no code.
+- Exit 1 is a result, not an error: a failed assertion, an XPASS (unless `--allow-xpass`), or a flaky pass (unless `--allow-flaky`). The report names the scenario, the step, the command, and a diff of expected and actual. It carries no code.
 - An error carries a code such as `ATG2005`. Its first digit is the exit code. `atago explain ATG2005` says what it means and what to change. All codes: https://nao1215.github.io/atago/errors/.
 - `atago run --verbose` traces every command, its output, and each assertion verdict, for passing scenarios too.
 - `atago run --rerun-failed` runs only the scenarios that failed last time.
