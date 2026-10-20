@@ -86,7 +86,8 @@ scenarios:
             - send: "A"
             - send: " beta"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["alpha beta", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -119,7 +120,8 @@ scenarios:
             - send: "i"
             - send: "start-"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["start-alpha", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -155,7 +157,8 @@ scenarios:
             - send: "A"
             - send: " updated"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["second updated", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -190,7 +193,8 @@ scenarios:
             - send: "A"
             - send: " beta"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["alpha beta", NOR]
             - send: ":q!"
             - send: {key: enter}
       - run:
@@ -220,7 +224,8 @@ scenarios:
             - send: "i"
             - send: "first line"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["first line", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -253,7 +258,8 @@ scenarios:
             - send: "i"
             - send: "nested line"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["nested line", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -285,7 +291,8 @@ scenarios:
             - send: {key: enter}
             - send: "second"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["second", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -322,7 +329,8 @@ scenarios:
             - send: "o"
             - send: "second"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["second", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -360,7 +368,8 @@ scenarios:
             - send: "O"
             - send: "first"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["first", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -396,7 +405,8 @@ scenarios:
             - send: "A"
             - send: " beta"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["alpha beta", NOR]
             - send: "u"
             - send: ":wq"
             - send: {key: enter}
@@ -468,7 +478,8 @@ scenarios:
             - send: "c"
             - send: "BETA"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["alpha BETA gamma", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -540,7 +551,8 @@ scenarios:
             - send: "A"
             - send: " updated"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["two-start updated", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -581,7 +593,8 @@ scenarios:
             - send: "A"
             - send: " updated"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["one-start updated", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -620,13 +633,15 @@ scenarios:
             - send: "A"
             - send: " second"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["two-start second", NOR]
             - send: ":buffer-previous"
             - send: {key: enter}
             - send: "A"
             - send: " first"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["one-start first", NOR]
             - send: ":write-quit-all"
             - send: {key: enter}
       - run:
@@ -665,7 +680,8 @@ scenarios:
             - send: "A"
             - send: " beta"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["alpha beta", NOR]
             - send: ":w copy.txt"
             - send: {key: enter}
             - send: ":q!"
@@ -703,7 +719,8 @@ scenarios:
             - send: "i"
             - send: "こんにちは 世界"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["世界", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
@@ -733,7 +750,8 @@ scenarios:
             - send: "i"
             - send: "表éwide"
             - send: {key: "ctrl-["}
-            - expect: NOR
+            - expect_screen:
+                contains: ["wide", NOR]
             - send: ":wq"
             - send: {key: enter}
       - run:
