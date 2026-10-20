@@ -98,6 +98,7 @@ func skillCommands(body string) [][]string {
 func normalizeSkillOutput(s, dir string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, dir+string(filepath.Separator), "")
+	s = strings.ReplaceAll(s, filepath.ToSlash(dir)+"/", "") // atago prints spec paths with forward slashes on Windows
 	s = skillDurationRe.ReplaceAllString(s, "(<duration>)")
 	lines := strings.Split(s, "\n")
 	for i, l := range lines {
