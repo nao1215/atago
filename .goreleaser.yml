@@ -5,6 +5,9 @@ env:
 before:
   hooks:
     - go mod tidy
+    - sh -c 'GOROOT="$(go env GOROOT)" CGO_ENABLED=0 GOOS=linux go-licenses save . --save_path=third_party_licenses/linux --force'
+    - sh -c 'GOROOT="$(go env GOROOT)" CGO_ENABLED=0 GOOS=windows go-licenses save . --save_path=third_party_licenses/windows --force'
+    - sh -c 'GOROOT="$(go env GOROOT)" CGO_ENABLED=0 GOOS=darwin go-licenses save . --save_path=third_party_licenses/darwin --force'
 builds:
   - main: .
     ldflags:
@@ -33,6 +36,8 @@ archives:
       - src: internal/conpty/openconsole/LICENSE
         dst: third_party/OpenConsole
         strip_parent: true
+      - src: "third_party_licenses/{{ .Os }}/**/*"
+        dst: THIRD_PARTY_LICENSES
 # Linux system packages for apt/dnf/apk users (the same set gup and sqly ship).
 nfpms:
   - maintainer: Naohiro CHIKAMATSU <n.chika156@gmail.com>
@@ -43,6 +48,10 @@ nfpms:
       - deb
       - rpm
       - apk
+    contents:
+      - src: ./third_party_licenses/linux
+        dst: /usr/share/doc/atago/THIRD_PARTY_LICENSES
+        type: tree
 checksum:
   name_template: "checksums.txt"
 

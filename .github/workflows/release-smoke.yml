@@ -44,6 +44,8 @@ jobs:
       # local docker image build still runs here via skip_push templates, so the
       # release promises — runnable archives and a runnable GHCR image — build on
       # every PR without publishing anything.
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses/v2@v2.0.1
       - name: Build artifacts for smoke test
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:

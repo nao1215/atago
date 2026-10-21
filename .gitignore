@@ -57,3 +57,4 @@ go.work.sum
 # The Windows Terminal console host atago embeds for pty graphics on Windows.
 !internal/conpty/openconsole/*/conpty.dll
 !internal/conpty/openconsole/*/OpenConsole.exe
+/third_party_licenses/
