@@ -17,7 +17,7 @@ There is no manual upload step.
 
 ## Before tagging
 - Make sure `main` is green (build, unit tests, coverage, lint, gitleaks, and release smoke).
-- Locally you can dry-run the build with `goreleaser release --snapshot --clean`.
+- Locally you can dry-run the build with `goreleaser release --snapshot --clean`. The before hooks run `go-licenses save` to collect the dependency license texts, so go-licenses v2.0.1 must be on `PATH` (`make tools` installs it).
 
 ## Cut a release
 ```shell

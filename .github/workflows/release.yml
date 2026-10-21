@@ -54,6 +54,8 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses/v2@v2.0.1
       - name: Run GoReleaser
         id: run-goreleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
