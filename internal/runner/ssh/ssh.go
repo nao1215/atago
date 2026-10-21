@@ -119,7 +119,7 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 		// remote that ignores the kill and keeps streaming past the grace
 		// window cannot turn the read below into a data race.
 		select {
-		case <-done:
+		case runErr = <-done:
 		case <-time.After(2 * time.Second):
 		}
 		// A fired deadline is an OBSERVABLE outcome assertions can inspect —
@@ -136,7 +136,9 @@ func (r *Runner) Run(ctx context.Context, command string) (*runner.Result, error
 				TimeoutSource: timeoutSource,
 			}, nil
 		}
-		return nil, ctx.Err()
+		// The session error, if the goroutine returned in time, says how the
+		// kill ended it; keep it next to the cancellation instead of dropping it.
+		return nil, errors.Join(ctx.Err(), runErr)
 	case runErr = <-done:
 	}
 	elapsed := time.Since(start)

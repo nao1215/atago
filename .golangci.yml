@@ -82,12 +82,14 @@ linters:
       default-signifies-exhaustive: false
       # reflect.Kind has 27 members and the two switches over it are schema
       # walkers that care about four.
-      ignore-enum-types: 'reflect\.Kind$'
+      ignore-types:
+        - 'reflect\.Kind$'
       # StepNone and AssertNone are the "not exactly one action" sentinels, not
       # kinds a spec can carry. AllStepKinds and AllAssertTargets leave them out
       # for the same reason, so the switches and the coverage tests are checked
       # against one universe.
-      ignore-enum-members: 'atago/internal/(spec\.(StepNone|AssertNone))$'
+      ignore-constants:
+        - 'atago/internal/(spec\.(StepNone|AssertNone))$'
     exhaustruct_v5:
       # v5 renamed include/exclude to enforce-patterns/ignore-patterns, and it
       # checks every struct unless explicit-mode says otherwise — where v4's
