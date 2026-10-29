@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/charmbracelet/x/vt v0.1.0
-	github.com/chromedp/cdproto v0.158.3
+	github.com/chromedp/cdproto v0.158.5
 	github.com/chromedp/chromedp v0.21.0
 	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.8
