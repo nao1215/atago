@@ -166,6 +166,9 @@ func asInt(v any) (int, bool) {
 	case int:
 		return n, true
 	case int64:
+		if n < math.MinInt || n > math.MaxInt {
+			return 0, false
+		}
 		return int(n), true
 	case uint64:
 		if n > math.MaxInt32 {
@@ -173,7 +176,7 @@ func asInt(v any) (int, bool) {
 		}
 		return int(n), true
 	case float64:
-		if n != math.Trunc(n) {
+		if n != math.Trunc(n) || n < float64(math.MinInt) || n >= -float64(math.MinInt) {
 			return 0, false
 		}
 		return int(n), true

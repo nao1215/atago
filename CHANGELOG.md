@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Reject non-finite and overflowing numeric PTY send counts before converting them to integers.
+
 ### Added
 
 - An Agent Skill for coding agents under `skills/atago`: how to write a spec, run it, read a failure, and update snapshots, with links to the schema and the cookbook. Its specs and commands run in the unit tests. Copy it to `~/.claude/skills/atago` (Claude Code) or `~/.codex/skills/atago` (Codex).

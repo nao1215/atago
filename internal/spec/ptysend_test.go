@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -348,6 +349,26 @@ func TestPTYMouse_Label(t *testing.T) {
 	} {
 		if got := tc.mouse.Label(); got != tc.want {
 			t.Errorf("label = %q, want %q", got, tc.want)
+		}
+	}
+}
+
+func TestAsIntRange(t *testing.T) {
+	for _, value := range []any{math.Inf(1), math.Inf(-1), math.NaN(), -float64(math.MinInt), math.Nextafter(float64(math.MinInt), math.Inf(-1))} {
+		if got, ok := asInt(value); ok {
+			t.Errorf("asInt(%v) = %d, want rejection", value, got)
+		}
+	}
+	for _, value := range []any{int64(math.MinInt), int64(math.MaxInt), float64(math.MinInt), float64(42)} {
+		if _, ok := asInt(value); !ok {
+			t.Errorf("asInt(%v) rejected a representable integer", value)
+		}
+	}
+	if math.MaxInt == math.MaxInt32 {
+		for _, value := range []int64{math.MaxInt32 + 1, math.MinInt32 - 1} {
+			if _, ok := asInt(value); ok {
+				t.Errorf("asInt(%v) accepted an overflowing integer", value)
+			}
 		}
 	}
 }
