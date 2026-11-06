@@ -40,6 +40,8 @@ type failedEntry struct {
 // RerunStateSchemaVersion versions the last-failed state file.
 const RerunStateSchemaVersion = "1"
 
+// rerunStatePath is the location of the last-failed ledger, relative to the
+// working directory.
 func rerunStatePath() string {
 	return filepath.Join(rerunStateDir, rerunStateFile)
 }
