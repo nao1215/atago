@@ -179,6 +179,8 @@ type Runner struct {
 	// ExecPath points at a specific Chrome/Chromium binary instead of the one
 	// chromedp discovers on PATH.
 	ExecPath string `yaml:"exec_path,omitempty"`
+	// Viewport sets initial device metrics before the first CDP action.
+	Viewport *Viewport `yaml:"viewport,omitempty"`
 	// BrowserArgs is a small escape hatch of extra Chrome launch flags (each a bare
 	// flag name like "disable-gpu" or "window-size=1280,720", without the leading
 	// "--") for CI environments that need them.

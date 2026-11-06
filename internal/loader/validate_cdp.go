@@ -2,6 +2,7 @@ package loader
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/spec"
@@ -20,6 +21,8 @@ func validateCDPActions(add addFunc, where string, actions []spec.CDPAction) {
 			add(diag.ChooseExactlyOne, "%s sets multiple actions; set exactly one", aw)
 		}
 		switch {
+		case a.Viewport != nil:
+			validateViewport(add, aw+".viewport", a.Viewport)
 		case a.Press != nil:
 			if a.Press.Selector == "" || a.Press.Key == "" {
 				add(diag.RequiredKey, "%s.press requires selector and key", aw)
@@ -56,7 +59,7 @@ func validateCDPActions(add addFunc, where string, actions []spec.CDPAction) {
 func cdpActionCount(a *spec.CDPAction) int {
 	n := 0
 	for _, set := range []bool{
-		a.Navigate != "", a.WaitVisible != "", a.WaitHidden != "", a.Click != "",
+		a.Viewport != nil, a.Navigate != "", a.WaitVisible != "", a.WaitHidden != "", a.Click != "",
 		a.Press != nil, a.Select != nil, a.Check != "", a.Uncheck != "",
 		a.Screenshot != nil, a.Text != "", a.Title, a.Attribute != nil,
 		a.Eval != "", a.SendKeys != nil, a.Upload != nil, a.Download != nil,
@@ -66,4 +69,19 @@ func cdpActionCount(a *spec.CDPAction) int {
 		}
 	}
 	return n
+}
+
+func validateViewport(add addFunc, where string, v *spec.Viewport) {
+	if v == nil {
+		return
+	}
+	if v.Width < 1 || v.Width > 10000000 || v.Height < 1 || v.Height > 10000000 {
+		add(diag.NotAllowedValue, "%s width and height must be between 1 and 10000000", where)
+	}
+	if v.DeviceScaleFactor != nil {
+		scale := *v.DeviceScaleFactor
+		if scale <= 0 || math.IsNaN(scale) || math.IsInf(scale, 0) {
+			add(diag.NotAllowedValue, "%s.device_scale_factor must be finite and positive", where)
+		}
+	}
 }

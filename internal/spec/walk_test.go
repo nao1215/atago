@@ -640,6 +640,7 @@ func TestCDPActionLabel_AllVerbs(t *testing.T) {
 		a    CDPAction
 		want string
 	}{
+		{CDPAction{Viewport: &Viewport{Width: 390, Height: 844}}, "viewport 390x844"},
 		{CDPAction{Navigate: "u"}, "navigate u"},
 		{CDPAction{WaitVisible: "#a"}, "wait_visible #a"},
 		{CDPAction{WaitHidden: "#a"}, "wait_hidden #a"},

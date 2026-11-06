@@ -13,6 +13,7 @@ type CDP struct {
 // intentionally small and declarative — no conditions, loops, or expression
 // language (#50).
 type CDPAction struct {
+	Viewport    *Viewport      `yaml:"viewport,omitempty"`     // replace device metrics
 	Navigate    string         `yaml:"navigate,omitempty"`     // load a URL
 	WaitVisible string         `yaml:"wait_visible,omitempty"` // wait until a selector is visible
 	WaitHidden  string         `yaml:"wait_hidden,omitempty"`  // wait until a selector is hidden/absent
@@ -81,4 +82,13 @@ type CDPScreenshot struct {
 type CDPAttribute struct {
 	Selector string `yaml:"selector"`
 	Name     string `yaml:"name"`
+}
+
+// Viewport emulates CSS dimensions independently of Chrome's window size.
+// DeviceScaleFactor defaults to 1; Mobile defaults to false.
+type Viewport struct {
+	Width             int64    `yaml:"width"`
+	Height            int64    `yaml:"height"`
+	DeviceScaleFactor *float64 `yaml:"device_scale_factor,omitempty"`
+	Mobile            bool     `yaml:"mobile,omitempty"`
 }

@@ -69,6 +69,7 @@ func browserConn(name string, _ *store.Store, rc runConfig, conns map[string]*br
 		headless := rdef.Headless == nil || *rdef.Headless
 		return browserrunner.Open(browserrunner.Config{
 			Headless: headless,
+			Viewport: rdef.Viewport,
 			ExecPath: rdef.ExecPath,
 			Args:     rdef.BrowserArgs,
 			Timeout:  timeout,

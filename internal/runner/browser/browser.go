@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
@@ -25,6 +27,7 @@ import (
 
 // Config is the resolved configuration for a browser runner.
 type Config struct {
+	Viewport *spec.Viewport
 	// Headless runs Chrome without a visible window (default true).
 	Headless bool
 	// ExecPath, when set, launches a specific Chrome/Chromium binary instead of the
@@ -73,7 +76,7 @@ func Open(cfg Config) (*Runner, error) {
 	browserCtx, browserStop := chromedp.NewContext(allocCtx)
 	// Force the browser to start now so a launch failure surfaces at Open, not on
 	// the first action.
-	if err := launch(browserCtx); err != nil {
+	if err := launch(browserCtx, cfg.Viewport); err != nil {
 		browserStop()
 		allocCancel()
 		return nil, diag.ConnectFailed.Errorf("launching headless browser: %w", err)
@@ -97,9 +100,13 @@ const launchTimeout = 60 * time.Second
 // started with a context that has no deadline (a deadline would stop the whole
 // browser when it expires), so the launch bound is a separate timer: when it
 // fires, the caller's cancel funcs tear the half-started browser down.
-func launch(browserCtx context.Context) error {
+func launch(browserCtx context.Context, viewport *spec.Viewport) error {
+	var tasks []chromedp.Action[chromedp.Void]
+	if viewport != nil {
+		tasks = append(tasks, viewportAction(viewport))
+	}
 	done := make(chan error, 1)
-	go func() { done <- chromedp.Do(browserCtx) }()
+	go func() { done <- chromedp.Do(browserCtx, tasks...) }()
 	timer := time.NewTimer(launchTimeout)
 	defer timer.Stop()
 	select {
@@ -250,6 +257,8 @@ func buildTasks(actions []spec.CDPAction, workdir string) ([]chromedp.Action[chr
 	var shots []shot
 	for i, a := range actions {
 		switch {
+		case a.Viewport != nil:
+			tasks = append(tasks, viewportAction(a.Viewport))
 		case a.Navigate != "":
 			tasks = append(tasks, chromedp.Navigate(a.Navigate))
 		case a.WaitVisible != "":
@@ -389,4 +398,18 @@ func resolveKey(name string) (string, error) {
 		return name, nil
 	}
 	return "", diag.InputNotSupported.Errorf("unsupported press key %q (use a single character or one of Enter/Tab/Escape/Backspace/Delete/Arrow*/Space)", name)
+}
+
+// viewportAction is shared by session initialization and in-session resizing.
+func viewportAction(v *spec.Viewport) chromedp.Action[chromedp.Void] {
+	scale := 1.0
+	if v.DeviceScaleFactor != nil {
+		scale = *v.DeviceScaleFactor
+	}
+	return chromedp.Func(func(ctx context.Context, t *chromedp.Target) error {
+		_, err := cdp.Call(ctx, t, emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{
+			Width: v.Width, Height: v.Height, DeviceScaleFactor: scale, Mobile: v.Mobile,
+		})
+		return err
+	})
 }

@@ -44,6 +44,7 @@ func defBoundaries() map[reflect.Type]string {
 		reflect.TypeOf(spec.Generator{}):      "generator",
 		reflect.TypeOf(spec.Service{}):        "service",
 		reflect.TypeOf(spec.Step{}):           "step",
+		reflect.TypeOf(spec.Viewport{}):       "viewport",
 		reflect.TypeOf(spec.CDP{}):            "cdp",
 		reflect.TypeOf(spec.Query{}):          "query",
 		reflect.TypeOf(spec.GRPC{}):           "grpc",

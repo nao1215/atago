@@ -264,7 +264,7 @@ The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offli
 
 ```shell
 $ atago init --list-templates
-browser   drive a headless Chrome; assert page content (needs Chrome on PATH)
+browser   drive a headless Chrome; emulate viewports and assert page content (needs Chrome on PATH)
 cli       run a command; assert exit code/stdout/stderr (runs as-is)
 db        run SQL; assert on rows via bundled SQLite (runs as-is)
 grpc      call a unary gRPC method via server reflection (edit target first)

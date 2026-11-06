@@ -11,6 +11,7 @@ suite:
 runners:
   web:
     type: browser
+    viewport: {width: 390, height: 844}
     # headless: false   # uncomment to watch the browser while debugging
 
 scenarios:
@@ -38,3 +39,15 @@ scenarios:
           image:
             path: home.png
             format: png
+
+  - name: resize the viewport without restarting Chrome
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: 'data:text/html,<!doctype html><body style="margin:0">responsive</body>'
+            - viewport: {width: 420, height: 900, device_scale_factor: 2}
+            - eval: window.innerWidth
+            - screenshot: {path: resized.png}
+      - assert: {value: {equals: '420'}}
+      - assert: {image: {path: resized.png, width: 840}}

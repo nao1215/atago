@@ -16,6 +16,7 @@ import (
 func TestBuildTasks_NewActions(t *testing.T) {
 	t.Parallel()
 	actions := []spec.CDPAction{
+		{Viewport: &spec.Viewport{Width: 390, Height: 844}},
 		{Navigate: "https://example.com"},
 		{WaitVisible: "#a"},
 		{WaitHidden: "#spinner"},

@@ -13,6 +13,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Browser runners accept `viewport` device metrics (CSS width/height, pixel scale, mobile layout); an ordered CDP `viewport` action can resize the same session, including phone widths below Chrome's minimum window size.
+
 - An Agent Skill for coding agents under `skills/atago`: how to write a spec, run it, read a failure, and update snapshots, with links to the schema and the cookbook. Its specs and commands run in the unit tests. Copy it to `~/.claude/skills/atago` (Claude Code) or `~/.codex/skills/atago` (Codex).
 
 ### Changed

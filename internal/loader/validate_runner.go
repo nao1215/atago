@@ -49,7 +49,7 @@ func validateRunners(add addFunc, runners map[string]spec.Runner) {
 				add(diag.RequiredKey, "%s (grpc) requires a target", where)
 			}
 		case "browser":
-			// no required fields; a browser runner launches a local headless Chrome.
+			validateViewport(add, where+".viewport", r.Viewport)
 		}
 		// timeout is common to every runner type; catch a malformed value here
 		// instead of when the first step opens the connection.
@@ -80,6 +80,7 @@ func validateRunnerFields(add addFunc, where string, r *spec.Runner) {
 		{"ssh", r.InsecureHostKey, "insecure_host_key"},
 		{"grpc", r.Target != "", "target"},
 		{"grpc", r.TLS, "tls"},
+		{"browser", r.Viewport != nil, "viewport"},
 		{"browser", r.Headless != nil, "headless"},
 		{"browser", r.ExecPath != "", "exec_path"},
 		{"browser", len(r.BrowserArgs) > 0, "browser_args"},
