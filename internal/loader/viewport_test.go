@@ -2,8 +2,11 @@ package loader
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/nao1215/atago/internal/spec"
 )
 
 const viewportSpec = `version: "1"
@@ -20,19 +23,23 @@ scenarios:
 
 func TestLoadBytes_Viewport(t *testing.T) {
 	t.Parallel()
-	for _, tc := range []struct{ viewport, want string }{
-		{"{width: 390, height: 844}", ""},
-		{"{width: 420, height: 900, device_scale_factor: 2, mobile: true}", ""},
-		{"{}", "width and height"},
-		{"{width: 390}", "width and height"},
-		{"{width: 0, height: 844}", "width and height"},
-		{"{width: 390, height: -1}", "width and height"},
-		{"{width: 10000001, height: 844}", "width and height"},
-		{"{width: 390.5, height: 844}", "expected a whole number"},
-		{"{width: 390, height: 844, device_scale_factor: 0}", "finite and positive"},
-		{"{width: 390, height: 844, device_scale_factor: -1}", "finite and positive"},
-		{"{width: 390, height: 844, device_scale_factor: .inf}", "finite and positive"},
-		{"{width: 390, height: 844, device_scale_factor: .nan}", "finite and positive"},
+	scale := 2.0
+	for _, tc := range []struct {
+		viewport, want string
+		expected       spec.Viewport
+	}{
+		{viewport: "{width: 390, height: 844}", expected: spec.Viewport{Width: 390, Height: 844}},
+		{viewport: "{width: 420, height: 900, device_scale_factor: 2, mobile: true}", expected: spec.Viewport{Width: 420, Height: 900, DeviceScaleFactor: &scale, Mobile: true}},
+		{viewport: "{}", want: "width and height"},
+		{viewport: "{width: 390}", want: "width and height"},
+		{viewport: "{width: 0, height: 844}", want: "width and height"},
+		{viewport: "{width: 390, height: -1}", want: "width and height"},
+		{viewport: "{width: 10000001, height: 844}", want: "width and height"},
+		{viewport: "{width: 390.5, height: 844}", want: "expected a whole number"},
+		{viewport: "{width: 390, height: 844, device_scale_factor: 0}", want: "finite and positive"},
+		{viewport: "{width: 390, height: 844, device_scale_factor: -1}", want: "finite and positive"},
+		{viewport: "{width: 390, height: 844, device_scale_factor: .inf}", want: "finite and positive"},
+		{viewport: "{width: 390, height: 844, device_scale_factor: .nan}", want: "finite and positive"},
 	} {
 		for _, atRunner := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/runner=%v", tc.viewport, atRunner), func(t *testing.T) {
@@ -59,11 +66,8 @@ func TestLoadBytes_Viewport(t *testing.T) {
 				if !atRunner {
 					v = s.Scenarios[0].Steps[0].CDP.Actions[0].Viewport
 				}
-				if v == nil || (v.Width != 390 && v.Width != 420) || (v.Height != 844 && v.Height != 900) {
-					t.Fatalf("viewport not decoded: %+v", v)
-				}
-				if strings.Contains(tc.viewport, "mobile") && (!v.Mobile || v.DeviceScaleFactor == nil || *v.DeviceScaleFactor != 2) {
-					t.Fatalf("metrics not decoded: %+v", v)
+				if v == nil || !reflect.DeepEqual(*v, tc.expected) {
+					t.Fatalf("viewport = %+v, want %+v", v, tc.expected)
 				}
 			})
 		}
