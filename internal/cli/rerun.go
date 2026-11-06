@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/nao1215/atago/internal/diag"
 	"github.com/nao1215/atago/internal/engine"
@@ -39,6 +40,8 @@ type failedEntry struct {
 // RerunStateSchemaVersion versions the last-failed state file.
 const RerunStateSchemaVersion = "1"
 
+// rerunStatePath is the location of the last-failed ledger, relative to the
+// working directory.
 func rerunStatePath() string {
 	return filepath.Join(rerunStateDir, rerunStateFile)
 }
@@ -48,7 +51,7 @@ func rerunStatePath() string {
 // rerun" rather than failing.
 func loadRerunState() (rerunState, error) {
 	var st rerunState
-	data, err := os.ReadFile(rerunStatePath())
+	data, err := readRerunStateFile()
 	if err != nil {
 		if os.IsNotExist(err) {
 			return rerunState{SchemaVersion: RerunStateSchemaVersion}, nil
@@ -73,6 +76,37 @@ func loadRerunState() (rerunState, error) {
 			rerunStatePath(), st.SchemaVersion, RerunStateSchemaVersion)
 	}
 	return st, nil
+}
+
+// readRerunStateFile retries Windows sharing conflicts before parsing the JSON.
+func readRerunStateFile() ([]byte, error) {
+	var data []byte
+	err := retryRerunIO(func() error {
+		var err error
+		data, err = os.ReadFile(rerunStatePath())
+		return err
+	})
+	return data, err
+}
+
+// retryRerunIO lets concurrent Windows opens and renames finish. Access denied
+// can also mean a permanent permission failure, so retries have a short deadline.
+// Other errors (and every error on other platforms) return immediately.
+func retryRerunIO(operation func() error) error {
+	deadline := time.Now().Add(time.Second)
+	delay := 5 * time.Millisecond
+	for {
+		err := operation()
+		if !isTransientRerunIOError(err) {
+			return err
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return err
+		}
+		time.Sleep(min(delay, remaining))
+		delay = min(2*delay, 50*time.Millisecond)
+	}
 }
 
 // selectSet turns the recorded failures into the engine identity set consumed by
@@ -132,7 +166,24 @@ func saveRerunState(failed []failedEntry) error {
 	if err := os.MkdirAll(rerunStateDir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(rerunStatePath(), data, 0o600)
+	// Publish a complete ledger in one rename so concurrent writers cannot
+	// interleave documents and readers never see a partially written file.
+	// CreateTemp keeps the file private (0o600) and on the same filesystem.
+	tmp, err := os.CreateTemp(rerunStateDir, rerunStateFile+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return retryRerunIO(func() error {
+		return os.Rename(tmp.Name(), rerunStatePath())
+	})
 }
 
 // absClean returns a canonical form of p so --rerun-failed matches a spec
