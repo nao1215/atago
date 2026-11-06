@@ -7,16 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-
-- Console and GitHub Actions reports retain failed assertions when a later step errors, showing the step evidence in execution order.
-- Concurrent `atago run` processes now write `.atago/last-failed.json` atomically, preventing partial JSON or trailing bytes from corrupting the ledger and breaking `--rerun-failed`. On Windows, reads and atomic replacements retry sharing/access conflicts for up to about one second.
-- Reject non-finite and overflowing numeric PTY send counts before converting them to integers.
+## [0.26.0] - 2026-11-07
 
 ### Added
 
 - Browser runners accept `viewport` device metrics (CSS width/height, pixel scale, mobile layout); an ordered CDP `viewport` action can resize the same session, including phone widths below Chrome's minimum window size.
-
 - An Agent Skill for coding agents under `skills/atago`: how to write a spec, run it, read a failure, and update snapshots, with links to the schema and the cookbook. Its specs and commands run in the unit tests. Copy it to `~/.claude/skills/atago` (Claude Code) or `~/.codex/skills/atago` (Codex).
 
 ### Changed
@@ -28,6 +23,9 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Console and GitHub Actions reports retain failed assertions when a later step errors, showing the step evidence in execution order.
+- Concurrent `atago run` processes now write `.atago/last-failed.json` atomically, preventing partial JSON or trailing bytes from corrupting the ledger and breaking `--rerun-failed`. On Windows, reads and atomic replacements retry sharing/access conflicts for up to about one second.
+- Reject non-finite and overflowing numeric PTY send counts before converting them to integers.
 - `atago record` escapes C1 control characters (U+0080 to U+009F) and DEL in generated scalars, so a created file name, output line, or typed pty input carrying one no longer yields a spec that fails its own validation.
 - `atago record --pty` quotes a recorded key name that contains a YAML flow indicator, so pressing Ctrl+] records `{key: "ctrl-]"}` instead of a spec that fails to load.
 
