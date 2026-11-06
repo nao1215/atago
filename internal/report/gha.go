@@ -43,16 +43,7 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 				fmt.Fprintf(&b, "::error title=%s::%s\n",
 					ghaEscapeProp(res.Suite+" / "+sc.Name), ghaEscapeData(firstFailureMessage(sc)+" — "+oneLine(detailText(sc))))
 			case engine.StatusError:
-				// The code goes in the title, which is what GitHub renders in the
-				// annotations list; buried in the body it would only be visible to
-				// someone who already opened the annotation.
-				msg := firstErrorMessage(sc)
-				title := res.Suite + " / " + sc.Name
-				if codes := diag.Codes(msg); len(codes) > 0 {
-					title = codes[0].String() + " " + title
-				}
-				fmt.Fprintf(&b, "::error title=%s::%s\n",
-					ghaEscapeProp(title), ghaEscapeData(msg))
+				writeGHAError(&b, res.Suite, sc)
 			case engine.StatusFlaky:
 				// Green for the job, loud in the annotations (#29, #138).
 				fmt.Fprintf(&b, "::warning title=%s::%s\n",
@@ -153,4 +144,23 @@ func ghaEscapeProp(s string) string {
 	s = strings.ReplaceAll(s, ":", "%3A")
 	s = strings.ReplaceAll(s, ",", "%2C")
 	return s
+}
+
+// writeGHAError preserves all step evidence while keeping the diagnostic code
+// in the annotation title.
+func writeGHAError(b *strings.Builder, suite string, sc *engine.ScenarioResult) {
+	// The code goes in the title, which is what GitHub renders in the
+	// annotations list; buried in the body it would only be visible to
+	// someone who already opened the annotation.
+	msg := firstErrorMessage(sc)
+	title := suite + " / " + sc.Name
+	if codes := diag.Codes(msg); len(codes) > 0 {
+		title = codes[0].String() + " " + title
+	}
+	body := detailText(sc)
+	if body == "" {
+		body = msg
+	}
+	fmt.Fprintf(b, "::error title=%s::%s\n",
+		ghaEscapeProp(title), ghaEscapeData(oneLine(body)))
 }
