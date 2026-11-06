@@ -441,14 +441,18 @@ runners:
     viewport: {width: 390, height: 844}
 scenarios:
   - name: phone layout and screenshots
+    mock_servers:
+      - name: page
+        routes:
+          - method: GET
+            path: /page.html
+            header: {Content-Type: text/html}
+            body: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0;height:1200px">phone</body>'
     steps:
-      - fixture:
-          file: page.html
-          content: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0;height:1200px">phone</body>'
       - cdp:
           runner: web
           actions:
-            - navigate: 'file://${workdir}/page.html'
+            - navigate: '${page.url}/page.html'
             - eval: 'window.innerWidth'
             - screenshot: {path: phone.png}
       - assert: {value: {equals: '390'}}

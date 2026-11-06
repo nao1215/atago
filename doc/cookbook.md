@@ -2679,15 +2679,19 @@ runners:
     viewport: {width: 390, height: 844}
 scenarios:
   - name: phone at twice the pixel density
+    mock_servers:
+      - name: page
+        routes:
+          - method: GET
+            path: /page.html
+            header: {Content-Type: text/html}
+            body: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0">phone</body>'
     steps:
-      - fixture:
-          file: page.html
-          content: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0">phone</body>'
       - cdp:
           runner: web
           actions:
             - viewport: {width: 390, height: 844, device_scale_factor: 2, mobile: true}
-            - navigate: 'file://${workdir}/page.html'
+            - navigate: '${page.url}/page.html'
             - eval: window.innerWidth
             - screenshot: {path: phone.png}
       - assert: {value: {equals: '390'}}
