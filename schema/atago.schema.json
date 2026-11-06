@@ -619,6 +619,9 @@
                 ]
               },
               "description": "Extra Chrome launch flags (bare names, no leading '--'), e.g. 'disable-gpu' or 'window-size=1280,720'."
+            },
+            "viewport": {
+              "$ref": "#/$defs/viewport"
             }
           }
         }
@@ -1412,6 +1415,9 @@
                   }
                 },
                 "description": "Clicks to trigger a download and captures the file using the server-suggested filename; the captured value is the final filename."
+              },
+              "viewport": {
+                "$ref": "#/$defs/viewport"
               }
             }
           },
@@ -4238,6 +4244,36 @@
           "description": "Where the value comes from — exactly one source."
         }
       }
+    },
+    "viewport": {
+      "type": "object",
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000000
+        },
+        "device_scale_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 1
+        },
+        "mobile": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "description": "CSS viewport metrics. Replaces the previous metrics; persists across CDP steps in the scenario."
     }
   }
 }

@@ -424,3 +424,62 @@ scenarios:
 		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
 	}
 }
+
+// TestEngine_CDPViewport checks runner defaults, ordered overrides, and session
+// persistence with real layout and decoded full-page PNG dimensions.
+func TestEngine_CDPViewport(t *testing.T) {
+	if !chromeAvailable(t) {
+		t.Skip("no usable Chrome/Chromium for the browser runner")
+	}
+	res := runSpec(t, `
+version: "1"
+suite: {name: viewport}
+runners:
+  web:
+    type: browser
+    timeout: 30s
+    viewport: {width: 390, height: 844}
+scenarios:
+  - name: phone layout and screenshots
+    mock_servers:
+      - name: page
+        routes:
+          - method: GET
+            path: /page.html
+            header: {Content-Type: text/html}
+            body: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0;height:1200px">phone</body>'
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - navigate: '${page.url}/page.html'
+            - eval: 'window.innerWidth'
+            - screenshot: {path: phone.png}
+      - assert: {value: {equals: '390'}}
+      - assert: {image: {path: phone.png, width: 390, height: 1200}}
+      - cdp:
+          runner: web
+          actions:
+            - viewport: {width: 390, height: 844, device_scale_factor: 2, mobile: true}
+            - eval: 'window.innerWidth'
+            - screenshot: {path: retina.png}
+      - assert: {value: {equals: '390'}}
+      - assert: {image: {path: retina.png, width: 780, height: 2400}}
+      - cdp:
+          runner: web
+          actions:
+            - eval: 'window.devicePixelRatio'
+      - assert: {value: {equals: '2'}}
+      - cdp:
+          runner: web
+          actions:
+            - viewport: {width: 420, height: 900}
+            - eval: 'window.innerWidth'
+            - screenshot: {path: resized.png}
+      - assert: {value: {equals: '420'}}
+      - assert: {image: {path: resized.png, width: 420, height: 1200}}
+`)
+	if res.Status != StatusPassed {
+		t.Fatalf("status = %s, want passed: %+v", res.Status, res.Scenarios[0].Steps)
+	}
+}

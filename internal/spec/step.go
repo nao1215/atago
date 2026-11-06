@@ -1,5 +1,7 @@
 package spec
 
+import "fmt"
+
 // StepKind names the single action a Step carries.
 type StepKind string
 
@@ -208,6 +210,8 @@ func (s *StreamAssert) SetMatchers() []string {
 // set. The label names the action verb and, where useful, its selector/target.
 func CDPActionLabel(a CDPAction) string {
 	switch {
+	case a.Viewport != nil:
+		return fmt.Sprintf("viewport %dx%d", a.Viewport.Width, a.Viewport.Height)
 	case a.Navigate != "":
 		return "navigate " + a.Navigate
 	case a.WaitVisible != "":

@@ -48,6 +48,7 @@
   "cdp.actions[].upload": "v0.1.0",
   "cdp.actions[].upload.file": "v0.1.0",
   "cdp.actions[].upload.selector": "v0.1.0",
+  "cdp.actions[].viewport": "unreleased",
   "cdp.actions[].wait_hidden": "v0.1.0",
   "cdp.actions[].wait_visible": "v0.1.0",
   "cdp.runner": "v0.1.0",
@@ -312,6 +313,7 @@
   "runner.tls": "v0.1.0",
   "runner.type": "v0.1.0",
   "runner.user": "v0.1.0",
+  "runner.viewport": "unreleased",
   "runners": "v0.1.0",
   "scenario.description": "v0.14.0",
   "scenario.env": "v0.1.0",
@@ -437,6 +439,10 @@
   "suite.setup": "v0.2.0",
   "suite.teardown": "v0.2.0",
   "suite.timeout": "v0.3.0",
-  "version": "v0.1.0"
+  "version": "v0.1.0",
+  "viewport.device_scale_factor": "unreleased",
+  "viewport.height": "unreleased",
+  "viewport.mobile": "unreleased",
+  "viewport.width": "unreleased"
  }
 }

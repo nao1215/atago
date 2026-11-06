@@ -2667,6 +2667,56 @@ scenarios:
             contains: Welcome
 ```
 
+To test a phone-width layout, configure device metrics on the runner and use
+an ordered `viewport` action when the same session needs a different size:
+
+```yaml
+version: "1"
+suite: {name: phone viewport}
+runners:
+  web:
+    type: browser
+    viewport: {width: 390, height: 844}
+scenarios:
+  - name: phone at twice the pixel density
+    mock_servers:
+      - name: page
+        routes:
+          - method: GET
+            path: /page.html
+            header: {Content-Type: text/html}
+            body: '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><body style="margin:0">phone</body>'
+    steps:
+      - cdp:
+          runner: web
+          actions:
+            - viewport: {width: 390, height: 844, device_scale_factor: 2, mobile: true}
+            - navigate: '${page.url}/page.html'
+            - eval: window.innerWidth
+            - screenshot: {path: phone.png}
+      - assert: {value: {equals: '390'}}
+      - assert: {image: {path: phone.png, width: 780}}
+```
+
+`viewport` uses CDP `Emulation.setDeviceMetricsOverride`, so it can emulate
+widths below Chrome's minimum window width; `browser_args: [window-size=390,844]`
+does not reliably do that. Width and height are required CSS pixel dimensions
+(1–10000000). The optional `device_scale_factor` is finite and positive
+(default 1), and `mobile` defaults to false. Omitting `viewport` preserves
+Chrome's default metrics. Sharing the mapping between runner configuration and
+the action keeps initial sizing and later resizing consistent with the existing
+ordered CDP actions.
+
+The runner applies its metrics before the first action. A `viewport` action
+replaces all four metrics and persists across subsequent CDP steps in that
+scenario; omitted optional fields return to their defaults. This lets one
+session exercise responsive layout changes without restarting Chrome.
+`mobile: true` enables mobile layout behavior, not user-agent or touch emulation.
+Mobile pages need `<meta name="viewport" content="width=device-width, initial-scale=1">`
+to use the device width instead of Chrome's wider mobile layout viewport.
+Full-page screenshots include overflowing content: for a page without horizontal
+overflow, PNG width is CSS width times `device_scale_factor`.
+
 Full spec: [browser](../examples/browser.atago.yaml)
 
 ## Lay out specs for a growing suite

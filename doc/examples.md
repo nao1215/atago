@@ -130,4 +130,4 @@
 | [http](../examples/http.atago.yaml) | HTTP requests (`json:`, raw `body:`, form/multipart uploads, `body_file`), status/body assertions, token capture, `retry` polling, redirect assertions, `body_to` downloads, network allowlist |
 | [ssh](../examples/ssh.atago.yaml) | running commands on a remote host |
 | [grpc](../examples/grpc.atago.yaml) | unary gRPC calls via server reflection |
-| [browser](../examples/browser.atago.yaml) | headless-Chrome flows and screenshots |
+| [browser](../examples/browser.atago.yaml) | headless-Chrome flows, CSS viewport emulation and resizing, screenshots |
