@@ -881,6 +881,72 @@ the newest `max_log_bytes` of a service's output are retained (default 8 MiB
 
 Full spec: [services](../examples/services.atago.yaml)
 
+## Use a server's printed address as the HTTP base URL
+
+An HTTP runner's `base_url` is expanded when each HTTP step runs, so it can
+reference a value captured after a service starts. This already works in
+v0.25.2; the address does not have to be known when the YAML is loaded.
+
+For a CLI that binds port 0 and prints `Listening on http://127.0.0.1:PORT`,
+redirect stdout to a scenario-local file, wait for the complete address line,
+and capture the URL before the first HTTP step:
+
+```yaml
+version: "1"
+suite:
+  name: dynamically assigned HTTP port
+runners:
+  api:
+    type: http
+    base_url: ${api_url}
+scenarios:
+  - name: the server chooses a free port
+    skip: {os: windows}  # this recipe uses POSIX redirection and cat
+    services:
+      - name: server
+        shell: true
+        command: mytool serve --addr 127.0.0.1:0 > server.log
+        ready:
+          file: server.log
+          timeout: 10s
+    steps:
+      - run:
+          command: cat server.log
+          retry:
+            times: 50
+            interval: 100ms
+            until:
+              exit_code: 0
+              stdout:
+                matches: &address_line '(?m)^Listening on (http://127[.]0[.]0[.]1:[0-9]+)\r?\n'
+      - store:
+          name: api_url
+          from:
+            stdout:
+              matches: *address_line
+      - http:
+          runner: api
+          method: GET
+          path: /health
+      - assert:
+          status: 200
+          body: {contains: ok}
+```
+
+Adapt the command and regex to the CLI's actual output, and ensure it flushes
+the address line after binding. `ready.file` waits for nonempty output; the
+retry then waits for a full newline-terminated address, so startup chatter or
+a partially written port number cannot be mistaken for the final URL. `store`
+uses the regex's first capture group, dropping the prefix and newline. Each
+scenario has its own workdir and port, and atago stops the service at teardown.
+
+`ready.log` only gates readiness; it does not expose regex captures as variables.
+With stdout redirected, the address is in `server.log`, so use the file gate
+shown above instead. `ready.store` is a shorter alternative when the service
+publishes a file containing only the address: it captures that file's trimmed
+content directly. See [suite-wide service addresses](#hand-a-suite-wide-services-address-to-every-scenario)
+for that pattern. Neither approach requires a new runner option or a fixed port.
+
 ## Test graceful shutdown
 
 ```yaml

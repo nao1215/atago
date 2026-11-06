@@ -26,6 +26,7 @@
 | [Prove a TUI survives a window resize](cookbook.md#prove-a-tui-survives-a-window-resize) | `resize:` delivers a real size change mid-session |
 | [Test an API-client CLI without the network](cookbook.md#test-an-api-client-cli-without-the-network) | `mock_servers:` + `mock:` request asserts |
 | [Test a CLI that starts a server](cookbook.md#test-a-cli-that-starts-a-server) | `services:` with readiness probes |
+| [Use a server's printed address as the HTTP base URL](cookbook.md#use-a-servers-printed-address-as-the-http-base-url) | port 0, stdout capture, deferred `base_url` interpolation |
 | [Test graceful shutdown](cookbook.md#test-graceful-shutdown) | `signal:` steps with `wait:` |
 | [Pin a generator's whole output tree](cookbook.md#pin-a-generators-whole-output-tree) | recursive `dir:` asserts, tree snapshots |
 | [Pin output with a golden file](cookbook.md#pin-output-with-a-golden-file) | `snapshot:` + `scrub:` |
