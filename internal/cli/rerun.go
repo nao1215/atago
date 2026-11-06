@@ -132,7 +132,22 @@ func saveRerunState(failed []failedEntry) error {
 	if err := os.MkdirAll(rerunStateDir, 0o750); err != nil {
 		return err
 	}
-	return os.WriteFile(rerunStatePath(), data, 0o600)
+	// Publish a complete ledger in one rename so concurrent writers cannot
+	// interleave documents and readers never see a partially written file.
+	// CreateTemp keeps the file private (0o600) and on the same filesystem.
+	tmp, err := os.CreateTemp(rerunStateDir, rerunStateFile+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), rerunStatePath())
 }
 
 // absClean returns a canonical form of p so --rerun-failed matches a spec
