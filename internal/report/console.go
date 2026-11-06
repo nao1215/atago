@@ -56,8 +56,8 @@ func writeSummary(b *strings.Builder, color bool, c engine.Counts, total int, d 
 func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *engine.ScenarioResult) {
 	where := specSuffix(specPath)
 	switch sc.Status {
-	case engine.StatusFailed:
-		writeFailedChecks(b, color, suite, where, sc)
+	case engine.StatusFailed, engine.StatusError:
+		writeStepFailures(b, color, suite, where, sc)
 	case engine.StatusXPass:
 		// The loud one. A known bug that is no longer there means the fix landed
 		// and the scenario has to move into the suite that guards against a
@@ -69,8 +69,6 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 		// is reported as a fact rather than as a problem to act on.
 		fmt.Fprintf(b, "\n%s %s / %s%s\n", colorize(color, cYellow+cBold, "XFAIL:"), suite, sc.Name, where)
 		fmt.Fprintf(b, "\n%s\n", indent(expectFailNarrative(sc.ExpectFail, false)))
-	case engine.StatusError:
-		writeErroredSteps(b, color, suite, where, sc)
 	case engine.StatusPassed, engine.StatusSkipped:
 		// No failure block: there is nothing to explain about a green scenario,
 		// and a gated one is already named in the summary counts.
@@ -93,9 +91,9 @@ func writeDetail(b *strings.Builder, color bool, suite, specPath string, sc *eng
 	}
 }
 
-// writeFailedChecks prints one FAILED block per failing check of a failed
-// scenario.
-func writeFailedChecks(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
+// writeStepFailures prints failed checks and execution errors in step order,
+// even when a later error determines the scenario verdict.
+func writeStepFailures(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
 	var lastRun *runner.Result
 	for _, step := range sc.Steps {
 		// Track the most recent run result BEFORE rendering this step's
@@ -120,13 +118,6 @@ func writeFailedChecks(b *strings.Builder, color bool, suite, where string, sc *
 				}
 			}
 		}
-	}
-}
-
-// writeErroredSteps prints one ERROR block per step that carries an error
-// message.
-func writeErroredSteps(b *strings.Builder, color bool, suite, where string, sc *engine.ScenarioResult) {
-	for _, step := range sc.Steps {
 		if step.ErrMsg == "" {
 			continue
 		}

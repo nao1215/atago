@@ -1,0 +1,23 @@
+E
+
+FAILED: a failed assertion before a store error / the assertion fails, then the store errors  (repro.atago.yaml)
+
+Step:
+  assert stdout json
+
+Command:
+  echo '{"jobs": []}'
+
+Expected:
+  $.jobs length == 1
+
+Actual:
+  $.jobs length == 0
+
+Hint:
+  length at $.jobs was 0, expected 1
+
+ERROR: a failed assertion before a store error / the assertion fails, then the store errors  (repro.atago.yaml)
+  step 2 (store): ATG4502: JSON path "$.jobs[0]" selected 0 values, want exactly 1
+
+FAILED  1 scenario: 0 passed, 0 failed, 1 errored, 0 skipped (TIME)

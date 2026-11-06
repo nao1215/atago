@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Console and GitHub Actions reports retain failed assertions when a later step errors, showing the step evidence in execution order.
+
 - Reject non-finite and overflowing numeric PTY send counts before converting them to integers.
 
 ### Added
