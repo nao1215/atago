@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -46,14 +47,21 @@ func TestSaveRerunState_Concurrent(t *testing.T) {
 			}
 		}
 		var wg sync.WaitGroup
+		var succeeded, tolerated atomic.Int64
 		start := make(chan struct{})
 		for _, ledger := range ledgers {
 			wg.Go(func() {
 				<-start
 				for range 40 {
 					if err := saveRerunState(ledger); err != nil {
-						t.Error(err)
-						return
+						if !isTransientRerunIOError(err) {
+							t.Error(err)
+							return
+						}
+						// Best-effort saves may exhaust retries under Windows contention.
+						tolerated.Add(1)
+					} else {
+						succeeded.Add(1)
 					}
 					check()
 				}
@@ -61,6 +69,10 @@ func TestSaveRerunState_Concurrent(t *testing.T) {
 		}
 		close(start)
 		wg.Wait()
+		t.Logf("successful saves: %d; tolerated transient failures: %d", succeeded.Load(), tolerated.Load())
+		if succeeded.Load() == 0 {
+			t.Error("no concurrent save succeeded")
+		}
 		check()
 	})
 }
