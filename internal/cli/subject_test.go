@@ -151,6 +151,11 @@ func TestBuildSubjects_ProfileEnvExpandsHostReferences(t *testing.T) {
 // coverage loss above went unnoticed: the run was green and the directory
 // stayed empty.
 func TestBuildSubjects_ProfileEnvUnsetReferenceFailsTheRun(t *testing.T) {
+	// Setenv registers cleanup that restores both the value and its presence.
+	t.Setenv("ATAGO_TEST_SURELY_UNSET_VAR", "")
+	if err := os.Unsetenv("ATAGO_TEST_SURELY_UNSET_VAR"); err != nil {
+		t.Fatal(err)
+	}
 	cmd := copyCommand(t)
 	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \""+cmd+"\"\n"+
 		"profiles:\n  cover:\n    env:\n      GOCOVERDIR: \"${env:ATAGO_TEST_SURELY_UNSET_VAR}\"\n")
