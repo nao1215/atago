@@ -109,6 +109,61 @@ scenarios:
       - assert:
           exit_code: 1
 
+  - name: a profile env takes the caller's environment through ${env:NAME}
+    skip:
+      os: windows
+    steps:
+      - fixture:
+          file: src/mytool
+          mode: "0755"
+          content: |
+            #!/bin/sh
+            echo "mytool ${MARK:-plain}"
+      - fixture:
+          file: atago.project.yaml
+          content: |
+            subject:
+              name: mytool
+              artifact: bin/mytool
+              build:
+                shell: true
+                command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+            profiles:
+              cover:
+                env:
+                  # The coverage recipe's shape: GOCOVERDIR: "${env:GOCOVERDIR}".
+                  MARK: "$${env:ATAGO_E2E_HOST_MARK}/unit"
+      - fixture:
+          file: spec.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: inner
+            scenarios:
+              - name: sees the expanded value
+                steps:
+                  - run:
+                      command: mytool
+                  - assert:
+                      stdout:
+                        equals: "mytool from-host/unit\n"
+      - run:
+          command: ${atago} run --profile cover spec.atago.yaml
+          env:
+            ATAGO_E2E_HOST_MARK: from-host
+      - assert:
+          exit_code: 0
+          stdout:
+            contains: "1 passed"
+      # Unset, the reference has nothing to expand to. The run stops before
+      # any scenario and names the key, instead of handing the literal text on.
+      - run:
+          command: ${atago} run --profile cover spec.atago.yaml
+      - assert:
+          exit_code: { not: 0 }
+          stderr:
+            contains: "profiles.cover.env.MARK refers to ${env:ATAGO_E2E_HOST_MARK}, which is not set"
+
   - name: an unknown profile names the ones that exist
     skip:
       os: windows

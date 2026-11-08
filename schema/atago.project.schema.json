@@ -65,7 +65,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Environment layered into the build and into every spec under the manifest while this profile is active. This is where a coverage run passes GOCOVERDIR or LLVM_PROFILE_FILE — atago knows nothing about either; merging the raw profiles afterwards stays a toolchain job."
+            "description": "Environment layered into the build and into every spec under the manifest while this profile is active. Values take ${env:NAME} from the caller's environment, so GOCOVERDIR: \"${env:GOCOVERDIR}\" passes the caller's directory on; a reference to an unset variable fails the run before any scenario. This is where a coverage run passes GOCOVERDIR or LLVM_PROFILE_FILE — atago knows nothing about either; merging the raw profiles afterwards stays a toolchain job."
           }
         }
       },

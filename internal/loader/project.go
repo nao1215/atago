@@ -226,7 +226,9 @@ type Profile struct {
 	// build command is unreadable and unpredictable.
 	Build *Build `yaml:"build,omitempty"`
 	// Env is layered into every spec under the manifest while the profile is
-	// active, the same way the manifest's own env is.
+	// active, the same way the manifest's own env is. Values take ${env:NAME}
+	// from the caller's environment; a reference to an unset variable fails
+	// the run before any scenario.
 	Env map[string]string `yaml:"env,omitempty"`
 }
 

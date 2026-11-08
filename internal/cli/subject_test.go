@@ -117,6 +117,57 @@ func TestBuildSubjects_UnknownProfileNamesWhatExists(t *testing.T) {
 	}
 }
 
+// TestBuildSubjects_ProfileEnvExpandsHostReferences pins what the cookbook's
+// coverage recipe relies on: a profile's env takes ${env:NAME} the same way the
+// manifest's own env does. Passed through verbatim, GOCOVERDIR reached the
+// instrumented binary as the literal text "${env:GOCOVERDIR}" and every
+// coverage file was silently lost. An escaped $${...} stays literal.
+func TestBuildSubjects_ProfileEnvExpandsHostReferences(t *testing.T) {
+	cmd := copyCommand(t)
+	t.Setenv("ATAGO_TEST_COVER_DIR", "/tmp/cover")
+	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \""+cmd+"\"\n"+
+		"profiles:\n  cover:\n    env:\n      GOCOVERDIR: \"${env:ATAGO_TEST_COVER_DIR}\"\n      NESTED: \"${env:ATAGO_TEST_COVER_DIR}/unit\"\n      LITERAL: \"$${env:ATAGO_TEST_COVER_DIR}\"\n")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "go.mod"), []byte("module x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	built, err := buildSubjects(context.Background(), []string{path}, "cover", t.TempDir(), io.Discard)
+	if err != nil {
+		t.Fatalf("buildSubjects: %v", err)
+	}
+	want := map[string]string{
+		"GOCOVERDIR": "/tmp/cover",
+		"NESTED":     "/tmp/cover/unit",
+		"LITERAL":    "${env:ATAGO_TEST_COVER_DIR}",
+	}
+	for k, v := range want {
+		if got := built[0].Env[k]; got != v {
+			t.Errorf("profile env %s = %q, want %q", k, got, v)
+		}
+	}
+}
+
+// TestBuildSubjects_ProfileEnvUnsetReferenceFailsTheRun refuses a reference
+// nothing can expand. Handing the literal text to the binary is how the
+// coverage loss above went unnoticed: the run was green and the directory
+// stayed empty.
+func TestBuildSubjects_ProfileEnvUnsetReferenceFailsTheRun(t *testing.T) {
+	cmd := copyCommand(t)
+	path := subjectTree(t, "subject:\n  name: mytool\n  artifact: bin/mytool\n  build:\n    shell: true\n    command: \""+cmd+"\"\n"+
+		"profiles:\n  cover:\n    env:\n      GOCOVERDIR: \"${env:ATAGO_TEST_SURELY_UNSET_VAR}\"\n")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "go.mod"), []byte("module x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := buildSubjects(context.Background(), []string{path}, "cover", t.TempDir(), io.Discard)
+	if err == nil {
+		t.Fatal("an unset ${env:...} in a profile env must fail the run")
+	}
+	for _, want := range []string{"profiles.cover.env.GOCOVERDIR", "env:ATAGO_TEST_SURELY_UNSET_VAR"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should name %q", err, want)
+		}
+	}
+}
+
 // TestBuildSubjects_ProfileWithNoSubjectAnywhere refuses a --profile that
 // cannot mean anything, rather than running as if it had been ignored.
 func TestBuildSubjects_ProfileWithNoSubjectAnywhere(t *testing.T) {

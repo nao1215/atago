@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/nao1215/atago/internal/loader"
 	runnercmd "github.com/nao1215/atago/internal/runner/cmd"
 	"github.com/nao1215/atago/internal/spec"
+	"github.com/nao1215/atago/internal/store"
 )
 
 // defaultBuildTimeout bounds a subject build when the manifest sets none. A
@@ -96,8 +99,18 @@ func buildOne(ctx context.Context, proj *loader.Project, profile, scratch string
 			// question a spec author should have to answer.
 			build = prof.Build
 		}
-		for k, v := range prof.Env {
-			env[k] = v
+		// Expanded like the manifest's own env, so ${env:GOCOVERDIR} carries
+		// the caller's directory. Nothing else is in scope before any scenario
+		// runs, so a reference that does not resolve is refused here: passed on
+		// as literal text it fails nowhere and the coverage is silently lost.
+		vars := store.New()
+		for _, k := range slices.Sorted(maps.Keys(prof.Env)) {
+			v := prof.Env[k]
+			if missing := vars.Unresolved(v); len(missing) > 0 {
+				return builtSubject{}, fmt.Errorf("%s: profiles.%s.env.%s refers to ${%s}, which is not set",
+					proj.Path, profile, k, missing[0])
+			}
+			env[k] = vars.Expand(v)
 		}
 	}
 
