@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 721 scenarios
+86 suites · 722 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -749,9 +749,10 @@
   - [a line selector composes with contains](#scenario-a-line-selector-composes-with-contains)
   - [a line selector composes with a regex](#scenario-a-line-selector-composes-with-a-regex)
   - [stderr carries the same matcher semantics as stdout](#scenario-stderr-carries-the-same-matcher-semantics-as-stdout)
-- [atago self-hosting / subject builds](#atago-self-hosting--subject-builds) — 7 scenarios
+- [atago self-hosting / subject builds](#atago-self-hosting--subject-builds) — 8 scenarios
   - [the built artifact resolves by bare name from a spec](#scenario-the-built-artifact-resolves-by-bare-name-from-a-spec)
   - [a profile swaps the build and adds environment](#scenario-a-profile-swaps-the-build-and-adds-environment)
+  - [a profile env takes the caller's environment through ${env:NAME}](#scenario-a-profile-env-takes-the-callers-environment-through-envname)
   - [an unknown profile names the ones that exist](#scenario-an-unknown-profile-names-the-ones-that-exist)
   - [an artifact nothing can execute is refused](#scenario-an-artifact-nothing-can-execute-is-refused)
   - [a failing build stops the run and carries the build output](#scenario-a-failing-build-stops-the-run-and-carries-the-build-output)
@@ -16613,6 +16614,61 @@ ${atago} run spec.atago.yaml
   - exit code is `0`
 - after `${atago} run spec.atago.yaml`:
   - exit code is `1`
+
+### Scenario: a profile env takes the caller's environment through ${env:NAME}
+_skipped on Windows_
+#### Given
+- Fixture file `src/mytool` is created.
+- Fixture file `atago.project.yaml` is created.
+- Fixture file `spec.atago.yaml` is created.
+- Environment variables are set: ATAGO_E2E_HOST_MARK.
+
+#### Inputs
+_Fixture `src/mytool`:_
+```text
+#!/bin/sh
+echo "mytool ${MARK:-plain}"
+```
+_Fixture `atago.project.yaml`:_
+```text
+subject:
+  name: mytool
+  artifact: bin/mytool
+  build:
+    shell: true
+    command: "cp src/mytool $${artifact} && chmod +x $${artifact}"
+profiles:
+  cover:
+    env:
+      # The coverage recipe's shape: GOCOVERDIR: "${env:GOCOVERDIR}".
+      MARK: "$${env:ATAGO_E2E_HOST_MARK}/unit"
+```
+_Fixture `spec.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: inner
+scenarios:
+  - name: sees the expanded value
+    steps:
+      - run:
+          command: mytool
+      - assert:
+          stdout:
+            equals: "mytool from-host/unit\n"
+```
+#### When
+```shell
+${atago} run --profile cover spec.atago.yaml
+${atago} run --profile cover spec.atago.yaml
+```
+#### Then
+- after `${atago} run --profile cover spec.atago.yaml`:
+  - exit code is `0`
+  - stdout contains `1 passed`
+- after `${atago} run --profile cover spec.atago.yaml`:
+  - exit code is not `0`
+  - stderr contains `profiles.cover.env.MARK refers to ${env:ATAGO_E2E_HOST_MARK}, which is not set`
 
 ### Scenario: an unknown profile names the ones that exist
 _skipped on Windows_
