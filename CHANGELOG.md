@@ -7,9 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-11-08
+
+### Changed
+
+- Dependencies: chromedp v0.21.1, cdproto v0.159.1, ojg v1.28.9, sqlite v1.61.1, action-misspell v1.30.4, action-actionlint v1.81.1, CodeQL v4.39.2.
+
 ### Fixed
 
-- A profile's `env` in `atago.project.yaml` now expands `${env:NAME}`, as the manifest's own `env` does. Before, `GOCOVERDIR: "${env:GOCOVERDIR}"`, the coverage recipe in the cookbook and the reference, reached the binary as that literal text, so a coverage run passed and wrote no coverage data. A reference to an unset variable now fails the run and names the key.
+- Profile `env` values now expand `${env:NAME}` instead of passing literal text to child processes. Unset references fail the run and identify the key.
 
 ## [0.26.0] - 2026-11-07
 
