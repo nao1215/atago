@@ -153,7 +153,7 @@ func TestBuildSubjects_ProfileEnvExpandsHostReferences(t *testing.T) {
 func TestBuildSubjects_ProfileEnvUnsetReferenceFailsTheRun(t *testing.T) {
 	// Setenv registers cleanup that restores both the value and its presence.
 	t.Setenv("ATAGO_TEST_SURELY_UNSET_VAR", "")
-	if err := os.Unsetenv("ATAGO_TEST_SURELY_UNSET_VAR"); err != nil {
+	if err := os.Unsetenv("ATAGO_TEST_SURELY_UNSET_VAR"); err != nil { //nolint:forbidigo // Serial test; t.Setenv above restores the original environment.
 		t.Fatal(err)
 	}
 	cmd := copyCommand(t)
