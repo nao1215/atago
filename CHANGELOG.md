@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Building from source now needs Go 1.26.11 or later (was 1.26.10). Go 1.26.11 fixes the `net/http` advisory GO-2026-6859, which govulncheck finds reachable from atago on the earlier patch.
+
 ## [0.26.1] - 2026-11-08
 
 ### Changed

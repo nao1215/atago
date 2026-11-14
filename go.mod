@@ -1,6 +1,6 @@
 module github.com/nao1215/atago
 
-go 1.26.10
+go 1.26.11
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.4
