@@ -43,5 +43,5 @@ func configureCancellation(ctx context.Context, cmd *exec.Cmd) {
 // ptyrun.killTree; both are fire-and-forget, because the only failure worth
 // distinguishing — the process is already gone — needs no handling.
 func killTree(ctx context.Context, pid int) {
-	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() // #nosec G204 -- fixed argv, pid from our own child
 }

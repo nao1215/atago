@@ -102,5 +102,5 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 // pty session never leaks a running child. ctx must outlive the cancellation
 // that triggered the teardown; see the caller.
 func killTree(ctx context.Context, pid int) {
-	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+	_ = exec.CommandContext(ctx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() // #nosec G204 -- fixed argv, pid from our own child
 }

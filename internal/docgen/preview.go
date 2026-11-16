@@ -178,7 +178,7 @@ func snapshotPreview(kind, snap, specDir string) previewBlock {
 	if err != nil {
 		return previewBlock{label: label}
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // committed snapshot golden, path confined to the spec dir
+	data, err := os.ReadFile(path) // #nosec G304 -- committed snapshot golden, path confined to the spec dir
 	if err != nil {
 		return previewBlock{label: label}
 	}

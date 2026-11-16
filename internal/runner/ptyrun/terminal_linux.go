@@ -70,7 +70,7 @@ func openTerminalPair() (master, tty *os.File, err error) {
 	}
 
 	name := "/dev/pts/" + strconv.Itoa(index)
-	tty, err = os.OpenFile(name, os.O_RDWR|syscall.O_NOCTTY, 0) //nolint:gosec // the path is /dev/pts/ plus an integer the kernel just gave us
+	tty, err = os.OpenFile(name, os.O_RDWR|syscall.O_NOCTTY, 0) // #nosec G304 -- the path is /dev/pts/ plus an integer the kernel just gave us
 	if err != nil {
 		return nil, nil, err
 	}

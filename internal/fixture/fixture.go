@@ -69,7 +69,7 @@ func Write(f *spec.Fixture, workdir, specDir string) error {
 		if !filepath.IsAbs(src) {
 			src = filepath.Join(specDir, src)
 		}
-		read, rerr := os.ReadFile(src) //nolint:gosec // src is the author-declared fixture source
+		read, rerr := os.ReadFile(src) // #nosec G304 -- src is the author-declared fixture source
 		if rerr != nil {
 			return fmt.Errorf("fixture %q: copy from %q: %w", f.File, f.From, rerr)
 		}

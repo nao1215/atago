@@ -71,7 +71,7 @@ func EnsureSandboxHome(workdir string) (map[string]string, error) {
 	home := filepath.Join(workdir, SandboxHomeDirName)
 	vars, dirs := SandboxHomeVars(runtime.GOOS, home)
 	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0o755); err != nil { //nolint:gosec // the sandbox home lives inside the scenario workdir
+		if err := os.MkdirAll(d, 0o755); err != nil { // #nosec G301 -- the sandbox home lives inside the scenario workdir
 			return nil, diag.SandboxSetupFailed.Errorf("sandbox_home: %w", err)
 		}
 	}

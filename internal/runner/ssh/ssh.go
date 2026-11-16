@@ -208,7 +208,7 @@ func hostKeyCallback(knownHosts string, insecure bool) (ssh.HostKeyCallback, err
 		if !insecure {
 			return nil, diag.RunnerConfigIncomplete.Errorf("ssh runner requires known_hosts to verify the host key; set insecure_host_key: true to connect without verification (test/lab only)")
 		}
-		return ssh.InsecureIgnoreHostKey(), nil //nolint:gosec // opt-in via insecure_host_key: disables checking for test infra
+		return ssh.InsecureIgnoreHostKey(), nil // #nosec G106 -- opt-in via insecure_host_key: disables checking for test infra
 	}
 	cb, err := knownhosts.New(knownHosts)
 	if err != nil {

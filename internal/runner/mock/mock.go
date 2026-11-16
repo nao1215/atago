@@ -206,7 +206,7 @@ func routePayload(rt *spec.MockRoute, specDir string) (body []byte, contentType 
 		if err != nil {
 			return nil, "", err
 		}
-		b, err := os.ReadFile(abs) //nolint:gosec // confined to the spec directory above
+		b, err := os.ReadFile(abs) // #nosec G304 -- confined to the spec directory above
 		if err != nil {
 			return nil, "", diag.MockServerFailed.Errorf("route %s %s: %w", rt.Method, rt.Path, err)
 		}

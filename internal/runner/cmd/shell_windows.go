@@ -98,7 +98,7 @@ func shellPath() string {
 // isRegularFile reports whether path exists and is a file, so a directory named
 // cmd.exe cannot be selected as the interpreter.
 func isRegularFile(path string) bool {
-	//nolint:gosec // G703: the path is %SystemRoot%\System32\cmd.exe, COMSPEC, or the operator's own ATAGO_SHELL — machine configuration, not spec input — and Stat only reads metadata.
+	// #nosec G703 -- the path is %SystemRoot%\System32\cmd.exe, COMSPEC, or the operator's own ATAGO_SHELL — machine configuration, not spec input — and Stat only reads metadata.
 	fi, err := os.Stat(path)
 	return err == nil && fi.Mode().IsRegular()
 }

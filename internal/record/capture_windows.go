@@ -151,7 +151,7 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 // never leaks a running child (#194).
 func killTree(pid int) {
 	// A fire-and-forget teardown; Background is the honest context here.
-	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+	_ = exec.CommandContext(context.Background(), "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid)).Run() // #nosec G204 -- fixed argv, pid from our own child
 }
 
 // enableVTOutput turns on ENABLE_VIRTUAL_TERMINAL_PROCESSING for the developer's

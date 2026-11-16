@@ -412,7 +412,7 @@ func parseInt(s string) (int64, bool) {
 		if u > 1<<63 {
 			return 0, false
 		}
-		return -int64(u), true //nolint:gosec // bounded just above
+		return -int64(u), true // #nosec G115 -- bounded just above
 	}
 	if u > math.MaxInt64 {
 		return 0, false

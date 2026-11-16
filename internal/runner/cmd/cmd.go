@@ -46,7 +46,7 @@ func (r *Runner) Run(ctx context.Context, run *spec.Run, workdir string) (*runne
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // executing user-declared commands is the purpose of atago
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- executing user-declared commands is the purpose of atago
 	if run.ShellEnabled() {
 		// On Windows this hands cmd.exe the raw command line (see
 		// ConfigureShell); Go's default argv escaping follows MSVCRT rules that
@@ -277,7 +277,7 @@ func stdinReader(run *spec.Run, workdir string) (io.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
-		data, err := os.ReadFile(abs) //nolint:gosec // confined to the scenario workdir above
+		data, err := os.ReadFile(abs) // #nosec G304 -- confined to the scenario workdir above
 		if err != nil {
 			return nil, diag.SandboxSetupFailed.Errorf("run.stdin.file: %w", err)
 		}

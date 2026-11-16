@@ -26,7 +26,7 @@ func checkPDF(p *spec.PDFAssert, env Env) *CheckResult {
 	if err != nil {
 		return &CheckResult{Desc: fmt.Sprintf("assert pdf %q", p.Path), Hint: err.Error()}
 	}
-	data, rerr := os.ReadFile(path) //nolint:gosec // path is confined to the workdir above
+	data, rerr := os.ReadFile(path) // #nosec G304 -- path is confined to the workdir above
 	if rerr != nil {
 		return &CheckResult{
 			Desc:     fmt.Sprintf("assert pdf %q", p.Path),

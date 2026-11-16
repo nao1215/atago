@@ -54,7 +54,7 @@ func (e *Error) Error() string {
 
 // Load reads and validates the spec file at path.
 func Load(path string) (*spec.Spec, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path comes from user-specified spec args
+	data, err := os.ReadFile(path) // #nosec G304 -- path comes from user-specified spec args
 	if err != nil {
 		return nil, &Error{Path: path, Kind: KindValidation, Code: diag.SpecUnreadable, Msg: err.Error()}
 	}

@@ -19,7 +19,7 @@ type processCmd struct {
 }
 
 func newProcessCmd(ctx context.Context, name string, args []string) *processCmd {
-	c := exec.CommandContext(ctx, name, args...) //nolint:gosec // executing user-declared service commands is the purpose of atago
+	c := exec.CommandContext(ctx, name, args...) // #nosec G204 -- executing user-declared service commands is the purpose of atago
 	c.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	// On scenario-context cancellation, signal the whole group (not just the
 	// leader) and force-kill if it lingers past WaitDelay.

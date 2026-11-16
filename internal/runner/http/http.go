@@ -235,7 +235,7 @@ func (r *Runner) encodeBody(h *spec.HTTP) (io.Reader, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		data, err := os.ReadFile(path) //nolint:gosec // path is confined to the workdir above
+		data, err := os.ReadFile(path) // #nosec G304 -- path is confined to the workdir above
 		if err != nil {
 			return nil, "", diag.StepFileUnusable.Errorf("reading http.body_file %q: %w", h.BodyFile, err)
 		}
@@ -276,7 +276,7 @@ func (r *Runner) encodeMultipart(form map[string]string, files []spec.FilePart) 
 		if err != nil {
 			return nil, "", err
 		}
-		data, err := os.ReadFile(path) //nolint:gosec // path is confined to the workdir above
+		data, err := os.ReadFile(path) // #nosec G304 -- path is confined to the workdir above
 		if err != nil {
 			return nil, "", diag.StepFileUnusable.Errorf("reading http.files %q: %w", f.Path, err)
 		}

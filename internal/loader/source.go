@@ -25,7 +25,7 @@ type Source struct {
 // locator for it. The spec is identical to what Load returns; the extra Source
 // exposes authored line/column positions.
 func LoadWithSource(path string) (*spec.Spec, *Source, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path comes from user-specified spec args
+	data, err := os.ReadFile(path) // #nosec G304 -- path comes from user-specified spec args
 	if err != nil {
 		return nil, nil, &Error{Path: path, Kind: KindValidation, Msg: err.Error()}
 	}
