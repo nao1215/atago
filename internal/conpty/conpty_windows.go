@@ -154,7 +154,7 @@ func start(api consoleAPI, flags uint32, commandLine, workDir string, env []stri
 	// value as the documented Win32 idiom), sized as one handle.
 	if err := attrList.Update(
 		windows.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
-		unsafe.Pointer(hpc), //nolint:govet,gosec // Win32 ConPTY idiom: the HPCON handle value IS the attribute payload (a by-value handle, not a Go pointer, so it is GC-safe)
+		unsafe.Pointer(hpc), /* #nosec G103 -- Win32 ConPTY idiom: the HPCON handle value IS the attribute payload (a by-value handle, not a Go pointer, so it is GC-safe) */ //nolint:govet
 		unsafe.Sizeof(hpc),
 	); err != nil {
 		attrList.Delete()

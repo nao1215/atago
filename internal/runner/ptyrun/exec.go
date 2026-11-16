@@ -50,7 +50,7 @@ func runSessionExec(ctx context.Context, e *spec.PTYExec, dir string, env []stri
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(runCtx, name, args...) //nolint:gosec // the spec author's declared command is the point
+	cmd := exec.CommandContext(runCtx, name, args...) // #nosec G204 -- the spec author's declared command is the point
 	if e.ShellEnabled() {
 		// Same reason the cmd runner does it: on Windows the argv above would be
 		// re-escaped with MSVCRT quoting rules cmd.exe does not follow, so an

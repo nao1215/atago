@@ -38,7 +38,7 @@ func checkImage(im *spec.ImageAssert, env Env) *CheckResult {
 		path = filepath.Join(env.Workdir, im.Path)
 	}
 
-	data, err := os.ReadFile(path) //nolint:gosec // path is the user-declared assertion target
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the user-declared assertion target
 	if err != nil {
 		return &CheckResult{
 			Desc:     fmt.Sprintf("assert image %q", im.Path),
@@ -204,10 +204,10 @@ func checkImageAlpha(im *spec.ImageAssert, img image.Image) *CheckResult {
 // path is used verbatim.
 func readBaselineImage(baseline string, env Env) ([]byte, error) {
 	if filepath.IsAbs(baseline) {
-		return os.ReadFile(baseline) //nolint:gosec // path is the user-declared baseline
+		return os.ReadFile(baseline) // #nosec G304 -- path is the user-declared baseline
 	}
 	specPath := filepath.Join(env.SpecDir, baseline)
-	data, err := os.ReadFile(specPath) //nolint:gosec // path is the user-declared baseline
+	data, err := os.ReadFile(specPath) // #nosec G304 -- path is the user-declared baseline
 	// Only a missing committed baseline falls through. A golden that exists but
 	// cannot be read (permissions, a directory in its place) is an error worth
 	// reporting, not a reason to silently compare against a same-named workdir
@@ -221,7 +221,7 @@ func readBaselineImage(baseline string, env Env) ([]byte, error) {
 	if resolveErr != nil {
 		return nil, resolveErr
 	}
-	workData, workErr := os.ReadFile(workPath) //nolint:gosec // path is confined to the workdir
+	workData, workErr := os.ReadFile(workPath) // #nosec G304 -- path is confined to the workdir
 	if workErr != nil {
 		// Report the spec-directory miss: a committed baseline is the common
 		// case, and its path is the one the author most likely mistyped.

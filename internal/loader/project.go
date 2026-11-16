@@ -95,7 +95,7 @@ func LoadProject(path string) (*Project, error) {
 	if abs, aerr := filepath.Abs(path); aerr == nil {
 		path = abs
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // path is the manifest atago itself located
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the manifest atago itself located
 	if err != nil {
 		return nil, &Error{Path: path, Kind: KindValidation, Code: diag.SpecUnreadable, Msg: err.Error()}
 	}

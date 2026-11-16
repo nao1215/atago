@@ -108,7 +108,7 @@ func loadOpenConsole() (consoleAPI, error) {
 	}
 	return consoleAPI{
 		create: func(size windows.Coord, in, out windows.Handle, flags uint32, hpc *windows.Handle) error {
-			r, _, _ := create.Call(uintptr(coordArg(size)), uintptr(in), uintptr(out), uintptr(flags), uintptr(unsafe.Pointer(hpc))) //nolint:gosec // Win32 out-parameter: the callee writes the HPCON through this pointer during the call
+			r, _, _ := create.Call(uintptr(coordArg(size)), uintptr(in), uintptr(out), uintptr(flags), uintptr(unsafe.Pointer(hpc))) // #nosec G103 -- Win32 out-parameter: the callee writes the HPCON through this pointer during the call
 			return hresult(r)
 		},
 		resize: func(hpc windows.Handle, size windows.Coord) error {
@@ -121,15 +121,15 @@ func loadOpenConsole() (consoleAPI, error) {
 
 // coordArg packs a COORD the way the Win32 ABI passes one by value.
 func coordArg(c windows.Coord) uint32 {
-	return uint32(uint16(c.X)) | uint32(uint16(c.Y))<<16 //nolint:gosec // a bit-for-bit reinterpretation of the two int16 fields, which termDim keeps positive
+	return uint32(uint16(c.X)) | uint32(uint16(c.Y))<<16 // #nosec G115 -- a bit-for-bit reinterpretation of the two int16 fields, which termDim keeps positive
 }
 
 // hresult turns a failed HRESULT into an error.
 func hresult(r uintptr) error {
-	if int32(r) >= 0 { //nolint:gosec // an HRESULT is a 32-bit value; the sign bit is the failure bit
+	if int32(r) >= 0 { // #nosec G115 -- an HRESULT is a 32-bit value; the sign bit is the failure bit
 		return nil
 	}
-	return fmt.Errorf("HRESULT 0x%08x: %w", uint32(r), syscall.Errno(r&0xffff)) //nolint:gosec // an HRESULT is a 32-bit value
+	return fmt.Errorf("HRESULT 0x%08x: %w", uint32(r), syscall.Errno(r&0xffff)) // #nosec G115 -- an HRESULT is a 32-bit value
 }
 
 // installOpenConsole writes conpty.dll and OpenConsole.exe to a versioned
@@ -154,7 +154,7 @@ func installOpenConsole() (string, error) {
 }
 
 func installFile(path string, content []byte) error {
-	if have, err := os.ReadFile(path); err == nil && bytes.Equal(have, content) { //nolint:gosec // path is atago's own cache directory
+	if have, err := os.ReadFile(path); err == nil && bytes.Equal(have, content) { // #nosec G304 -- path is atago's own cache directory
 		return nil
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
@@ -173,7 +173,7 @@ func installFile(path string, content []byte) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		_ = os.Remove(tmp.Name())
 		// Another atago may have installed the same file and be running it.
-		if have, rerr := os.ReadFile(path); rerr == nil && bytes.Equal(have, content) { //nolint:gosec // path is atago's own cache directory
+		if have, rerr := os.ReadFile(path); rerr == nil && bytes.Equal(have, content) { // #nosec G304 -- path is atago's own cache directory
 			return nil
 		}
 		return err

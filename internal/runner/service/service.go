@@ -306,7 +306,7 @@ func (p *Proc) waitFile(ctx context.Context, path, store string, timeout time.Du
 	if store == "" {
 		return "", nil
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // path is the user-declared ready file under the scenario workdir
+	data, err := os.ReadFile(path) // #nosec G304 -- path is the user-declared ready file under the scenario workdir
 	if err != nil {
 		return "", diag.StepFileUnusable.Errorf("read ready file %q: %w", path, err)
 	}

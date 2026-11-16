@@ -159,7 +159,7 @@ non-goal for now — write those steps by hand.
 		}
 		fmt.Fprintf(stderr, "wrote %s\n", golden)
 	}
-	if err := os.WriteFile(*out, generated, 0o644); err != nil { //nolint:gosec // a spec file the user asked for
+	if err := os.WriteFile(*out, generated, 0o644); err != nil { // #nosec G306 -- a spec file the user asked for
 		fmt.Fprintf(stderr, "atago record: %v\n", err)
 		return ExitExec
 	}
@@ -221,7 +221,7 @@ func recordPTY(cmdArgs []string, shell bool, out string, force bool, timeout tim
 			return ExitExec
 		}
 	}
-	if err := os.WriteFile(out, generated, 0o644); err != nil { //nolint:gosec // a spec file the user asked for
+	if err := os.WriteFile(out, generated, 0o644); err != nil { // #nosec G306 -- a spec file the user asked for
 		fmt.Fprintf(stderr, "atago record: %v\n", err)
 		return ExitExec
 	}

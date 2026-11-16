@@ -37,7 +37,7 @@ type processCmd struct {
 }
 
 func newProcessCmd(ctx context.Context, name string, args []string) *processCmd {
-	c := exec.CommandContext(ctx, name, args...) //nolint:gosec // executing user-declared service commands is the purpose of atago
+	c := exec.CommandContext(ctx, name, args...) // #nosec G204 -- executing user-declared service commands is the purpose of atago
 	c.WaitDelay = 5 * time.Second
 	p := &processCmd{cmd: c, teardown: context.WithoutCancel(ctx)}
 	// On scenario-context cancellation, tear down the whole tree, not just the
@@ -71,13 +71,13 @@ func (p *processCmd) started() error {
 	if _, err := windows.SetInformationJobObject(
 		job,
 		uint32(windows.JobObjectExtendedLimitInformation),
-		uintptr(unsafe.Pointer(&info)), //nolint:gosec // documented x/sys pattern: pass the struct address to a uintptr-typed syscall arg
+		uintptr(unsafe.Pointer(&info)), // #nosec G103 -- documented x/sys pattern: pass the struct address to a uintptr-typed syscall arg
 		uint32(unsafe.Sizeof(info)),
 	); err != nil {
 		_ = windows.CloseHandle(job)
 		return err
 	}
-	h, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(p.cmd.Process.Pid)) //nolint:gosec // pid fits a uint32 on Windows
+	h, err := windows.OpenProcess(windows.PROCESS_SET_QUOTA|windows.PROCESS_TERMINATE, false, uint32(p.cmd.Process.Pid)) // #nosec G115 -- pid fits a uint32 on Windows
 	if err != nil {
 		_ = windows.CloseHandle(job)
 		return err
@@ -112,7 +112,7 @@ func (p *processCmd) killTree() {
 	// kill time, so it reaps descendants even one spawned in the window between
 	// Start and the job assignment. Mirrors the pty runner's killTree.
 	if p.cmd.Process != nil {
-		_ = exec.CommandContext(p.teardown, "taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run() //nolint:gosec // fixed argv, pid from our own child
+		_ = exec.CommandContext(p.teardown, "taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run() // #nosec G204 -- fixed argv, pid from our own child
 	}
 	// Release the job. Its KILL_ON_JOB_CLOSE is crash-insurance (if atago dies
 	// without a clean teardown); the taskkill above already stopped the tree.

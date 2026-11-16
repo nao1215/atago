@@ -1,0 +1,12 @@
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - Dockerfile.goreleaser
+    statement: >-
+      The published image is a CI base image; the README tells users to build
+      FROM it and install git, jq or their own CLI, which needs root. GitLab
+      CI also writes reports into the job's checkout as the image user.
+  - id: DS-0026
+    paths:
+      - Dockerfile.goreleaser
+    statement: The image runs the atago CLI once per job; there is no long-running service to health-check.

@@ -35,7 +35,7 @@ func extractValue(sp *spec.Store, current *runner.Result, workdir string) (strin
 		if err != nil {
 			return "", fmt.Errorf("store %q: %w", sp.Name, err)
 		}
-		data, err := os.ReadFile(path) //nolint:gosec // path is the user-declared store source, confined to the workdir
+		data, err := os.ReadFile(path) // #nosec G304 -- path is the user-declared store source, confined to the workdir
 		if err != nil {
 			return "", fmt.Errorf("store %q: %w", sp.Name, err)
 		}

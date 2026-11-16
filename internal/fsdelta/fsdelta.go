@@ -154,7 +154,7 @@ func withMode(content string, d fs.DirEntry) string {
 
 // hashFile returns the hex SHA-256 of a file's content.
 func hashFile(path string) (string, error) {
-	f, err := os.Open(path) //nolint:gosec // scanning the scenario workdir is the purpose
+	f, err := os.Open(path) // #nosec G304 -- scanning the scenario workdir is the purpose
 	if err != nil {
 		return "", err
 	}

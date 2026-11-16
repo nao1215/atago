@@ -46,14 +46,14 @@ func CapturePTY(command string, shell bool, in, out *os.File, timeout time.Durat
 	// Background: the child is bounded by the timeout below (a killed process
 	// group), not by context cancellation, so a plain Background satisfies the
 	// context-aware exec contract without a redundant second deadline.
-	cmd := exec.CommandContext(context.Background(), name, args...) //nolint:gosec // recording the user's declared command is the purpose
+	cmd := exec.CommandContext(context.Background(), name, args...) // #nosec G204 -- recording the user's declared command is the purpose
 	cmd.Env = os.Environ()
 	// A fresh session and controlling terminal so the child owns the pty and a
 	// stray descendant does not keep it open past the child's exit.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 
 	rows, cols := terminalSize(out)
-	master, tty, err := ptyrun.OpenTerminal(uint16(rows), uint16(cols)) //nolint:gosec // geometry is bounded by terminalSize
+	master, tty, err := ptyrun.OpenTerminal(uint16(rows), uint16(cols)) // #nosec G115 -- geometry is bounded by terminalSize
 	if err != nil {
 		return PTYRecording{}, fmt.Errorf("record --pty: start %q: %w", command, err)
 	}

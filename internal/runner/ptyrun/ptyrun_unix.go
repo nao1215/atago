@@ -31,7 +31,7 @@ func Run(ctx context.Context, p *spec.PTY, workdir string, env []string) (*runne
 	// cancel); Cancel is overridden so that cancellation kills the whole process
 	// group (Setsid), not only the direct child. The session-budget timeout is
 	// driveSession's job — it kills via proc.kill on abort.
-	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // the spec author's declared command is the subject under test
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- the spec author's declared command is the subject under test
 	cmd.Cancel = func() error {
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	}

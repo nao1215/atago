@@ -257,7 +257,7 @@ func text(r *rng, k Kind, n int) string {
 		case Unicode:
 			rg := unicodeRanges[r.intn(len(unicodeRanges))]
 			span := int(rg[1]-rg[0]) + 1
-			b.WriteRune(rg[0] + rune(r.intn(span))) //nolint:gosec // the draw is below span, a range width inside the BMP, so the sum is a valid rune
+			b.WriteRune(rg[0] + rune(r.intn(span))) // #nosec G115 -- the draw is below span, a range width inside the BMP, so the sum is a valid rune
 		case Int, Bool, OneOf:
 			return ""
 		}
@@ -305,7 +305,7 @@ func Seed(userSeed int, parts ...string) uint64 {
 		h ^= '\x00'
 		h *= prime64
 	}
-	h ^= uint64(userSeed) //nolint:gosec // a spec's seed is an identifier, not a quantity; wraparound is fine
+	h ^= uint64(userSeed) // #nosec G115 -- a spec's seed is an identifier, not a quantity; wraparound is fine
 	r := &rng{state: h}
 	return r.next()
 }
@@ -338,5 +338,5 @@ func (r *rng) intn(n int) int {
 	// for the ranges a spec can ask for (a string length, a small integer
 	// range, a list index), which is far below anything a test could observe,
 	// and a rejection loop would cost determinism nothing but clarity.
-	return int((r.next() >> 1) % uint64(n)) //nolint:gosec // n > 1, and the shift keeps the value below 2^63
+	return int((r.next() >> 1) % uint64(n)) // #nosec G115 -- n > 1, and the shift keeps the value below 2^63
 }

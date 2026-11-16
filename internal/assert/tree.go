@@ -119,7 +119,7 @@ func walkTree(dirPath string, ignore []string) ([]treeEntry, error) {
 // hashFile streams the file's raw bytes into sha256 — byte-exact by design,
 // so CRLF differences ARE differences (documented on DirAssert.Snapshot).
 func hashFile(p string) (string, error) {
-	f, err := os.Open(p) //nolint:gosec // confined under the asserted workdir directory
+	f, err := os.Open(p) // #nosec G304 -- confined under the asserted workdir directory
 	if err != nil {
 		return "", err
 	}
