@@ -34,9 +34,9 @@ atago's own `snapshot:` assertion is used by the self-hosted specs (for example 
 
 [`internal/report/property_test.go`](../internal/report/property_test.go) uses [rapid](https://github.com/flyingmutant/rapid) to generate whole runs: one to three suites, any mix of the seven scenario statuses, and names assembled from the characters each format has to escape (XML metacharacters, TAP's `#` and backslash, newlines, control bytes, wide runes). For every run it checks that
 
-- the JSON report lists each scenario in order with its exact name and status, and `failures[]` holds exactly the failed, errored and xpass scenarios,
+- the JSON report lists each scenario in order with its exact name and status, and `failures[]` holds exactly the failed, errored and xpass scenarios and the failing checks a flaky `--repeat` fold kept,
 - the JUnit counters match the run and add up across suites, and an XML-legal name comes back unchanged,
-- the TAP plan and points match the run one to one, and a TAP 14 harness reads back the right directive and the original description,
+- the TAP plan and points match the run one to one, no raw control byte reaches the stream, and a TAP 14 harness reads back the right directive and the original description,
 - the GHA notice and the console summary carry the same tally.
 
 The properties run in `make test` with rapid's default 100 cases. A failure prints the seed and a shrunk counterexample; rerun it with `go test ./internal/report -run <Name> -rapid.seed=<seed>`, or search longer with `-rapid.checks=10000`.

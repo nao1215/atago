@@ -55,10 +55,17 @@ jobs:
           go-version-file: go.mod
       - name: Install gremlins
         run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+      # gremlins v0.6.0 runs a plain `git diff --merge-base` and treats each
+      # hunk's added lines as one contiguous range starting after the leading
+      # context, so with the default 3 lines of context a second edit further
+      # down the same hunk falls outside that range and is never mutated.
+      # Zero context makes every run of added lines its own hunk.
       - name: Mutate the lines this pull request changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: gremlins unleash --diff "$BASE_SHA" --workers 2 --timeout-coefficient 10 --output mutation.json .
+        run: |
+          git config diff.context 0
+          gremlins unleash --diff "$BASE_SHA" --workers 2 --timeout-coefficient 10 --output mutation.json .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

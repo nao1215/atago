@@ -62,8 +62,14 @@ func genScenario(t *rapid.T, label string) engine.ScenarioResult {
 	case engine.StatusSkipped:
 		sc.SkipReason = genName(t, label+"-skip")
 	case engine.StatusFlaky:
+		// Two shapes reach the report: a retry that recovered keeps the
+		// passing attempt, and a --repeat fold keeps the failing iteration's
+		// steps, whose failures JSON still lists.
 		sc.Attempts = 2
 		sc.Steps = pass
+		if rapid.Bool().Draw(t, label+"-flaky-repeat") {
+			sc.Steps = fail
+		}
 	case engine.StatusXFail:
 		sc.ExpectFail = &spec.ExpectFail{Reason: genName(t, label+"-reason")}
 		sc.Steps = fail
@@ -138,6 +144,19 @@ func tally(results []*engine.SuiteResult) map[engine.Status]int {
 	return c
 }
 
+// failedChecks counts the failing checks in a scenario's steps.
+func failedChecks(sc engine.ScenarioResult) int {
+	n := 0
+	for _, st := range sc.Steps {
+		for _, c := range st.Checks {
+			if !c.OK {
+				n++
+			}
+		}
+	}
+	return n
+}
+
 func renderAll(t *rapid.T, f Format, results []*engine.SuiteResult, opts ...Option) string {
 	var b bytes.Buffer
 	if err := Render(&b, f, results, opts...); err != nil {
@@ -156,8 +175,8 @@ func total(c map[engine.Status]int) int {
 
 // TestProperty_JSONRoundTripsEveryScenario: the JSON document lists every
 // scenario of every suite, in order, with its exact name and status, and its
-// failures[] holds exactly the failed, errored and xpass scenarios plus one
-// entry for a security violation.
+// failures[] holds exactly the failed, errored and xpass scenarios, the failing
+// checks a flaky --repeat fold kept, and one entry for a security violation.
 func TestProperty_JSONRoundTripsEveryScenario(t *testing.T) {
 	t.Parallel()
 	rapid.Check(t, func(t *rapid.T) {
@@ -183,8 +202,12 @@ func TestProperty_JSONRoundTripsEveryScenario(t *testing.T) {
 					t.Fatalf("suite %d scenario %d = %q/%s, want %q/%s",
 						i, j, got.Scenarios[j].Name, got.Scenarios[j].Status, sc.Name, sc.Status)
 				}
-				if sc.Status == engine.StatusFailed || sc.Status == engine.StatusError || sc.Status == engine.StatusXPass {
+				switch sc.Status {
+				case engine.StatusFailed, engine.StatusError, engine.StatusXPass:
 					failures++
+				case engine.StatusFlaky:
+					failures += failedChecks(sc)
+				case engine.StatusPassed, engine.StatusSkipped, engine.StatusXFail:
 				}
 			}
 			if got.SecurityViolation != res.SecurityViolation {
@@ -356,6 +379,15 @@ func TestProperty_TAPPointsMatchTheRun(t *testing.T) {
 			}
 		}
 		out := renderAll(t, FormatTAP, results, WithLoadFailures(lfs...))
+		// Checked byte by byte rather than against tapFlatten, which the
+		// renderer shares: a raw control byte from a generated name must never
+		// reach the stream, wherever it would land. Tab is whitespace TAP
+		// allows in a description and is kept on purpose.
+		for i := 0; i < len(out); i++ {
+			if c := out[i]; (c < 0x20 && c != '\n' && c != '\t') || c == 0x7f {
+				t.Fatalf("raw control byte %#x at offset %d:\n%q", c, i, out)
+			}
+		}
 		if !strings.Contains(out, "\n1.."+strconv.Itoa(len(want))+"\n") {
 			t.Fatalf("plan is not 1..%d:\n%s", len(want), out)
 		}
