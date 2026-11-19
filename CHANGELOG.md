@@ -15,6 +15,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 - CI scans the repository with gosec and Trivy on every pull request (Trivy covers dependency vulnerabilities, committed secrets and misconfigurations, and also runs daily). Workflow actions are recorded in `.github/workflows/actions.lock`, which CI verifies against the pinned commits.
 - Building from source now needs Go 1.26.11 or later (was 1.26.10). Go 1.26.11 fixes the `net/http` advisory GO-2026-6859, which govulncheck finds reachable from atago on the earlier patch.
+- Dependencies: google.golang.org/grpc v1.85.0, chromedp v0.24.0, cdproto v0.160.5, modernc.org/sqlite v1.62.0, k1LoW/grpcstub v0.26.6, jhump/protoreflect/v2 v2.0.1, charmbracelet/x/ansi v0.11.10, go-sql-driver/mysql v1.10.2, mattn/go-shellwords v1.0.17, golang.org/x/image v0.48.0.
+- CI runs govulncheck v1.10.0 and himorime v0.6.0, and the README shows Gitleaks, govulncheck and tested-with-atago badges.
 
 ## [0.26.1] - 2026-11-08
 
