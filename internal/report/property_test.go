@@ -384,6 +384,8 @@ func TestProperty_TAPPointsMatchTheRun(t *testing.T) {
 				wantDirective = "SKIP"
 			case engine.StatusXFail, engine.StatusXPass:
 				wantDirective = "TODO"
+			case engine.StatusPassed, engine.StatusFailed, engine.StatusError, engine.StatusFlaky:
+				wantDirective = ""
 			}
 			gotDirective, _, _ := strings.Cut(p.directive, " ")
 			if p.directive == "" {
