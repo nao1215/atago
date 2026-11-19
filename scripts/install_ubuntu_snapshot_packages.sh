@@ -19,7 +19,7 @@ codename="$(sed -n 's/^VERSION_CODENAME=//p' /etc/os-release)"
 # though nothing installed from them: security.ubuntu.com refused connections
 # for whole runs (sqlite3 failed all three attempts on 2026-11-19) and the
 # archive mirror once stalled one `apt-get update` until the job's 20-minute
-# timeout cancelled it. A private source list keeps those hosts out of the
+# timeout canceled it. A private source list keeps those hosts out of the
 # install entirely and leaves the runner's own apt configuration untouched.
 sources_dir=/etc/apt/atago-snapshot.d
 sudo mkdir -p "$sources_dir"
@@ -51,7 +51,10 @@ apt_options=(
 # retried as well. Each network phase also has a deadline: a transfer that
 # trickles along never trips the connection timeout, and without a deadline it
 # holds the step until the job timeout. Packages are unpacked only after every
-# file is on disk, so a deadline never interrupts dpkg.
+# file is on disk, so a deadline never interrupts dpkg. A healthy run updates
+# and downloads in about ten seconds each. Three attempts at 90 + 150 seconds
+# plus the 10-second kill grace and the 15 + 30 second waits come to 825
+# seconds, which leaves the install room inside the step's 15-minute timeout.
 #
 # `apt-get update` alone exits 0 when some indexes fail ("Some index files
 # failed to download. They have been ignored"), and an install against that
@@ -59,8 +62,8 @@ apt_options=(
 # often it is retried. --error-on=any makes a partial update a failure, and the
 # retry repeats the update rather than the install alone.
 fetch_once() {
-	sudo timeout --kill-after=10 120 apt-get "${apt_options[@]}" update --error-on=any &&
-		sudo timeout --kill-after=10 240 apt-get "${apt_options[@]}" install -y --no-install-recommends --download-only "$@"
+	sudo timeout --kill-after=10 90 apt-get "${apt_options[@]}" update --error-on=any &&
+		sudo timeout --kill-after=10 150 apt-get "${apt_options[@]}" install -y --no-install-recommends --download-only "$@"
 }
 
 for attempt in 1 2 3; do
@@ -69,8 +72,8 @@ for attempt in 1 2 3; do
 		exit 0
 	fi
 	if [ "$attempt" -lt 3 ]; then
-		echo "atago: apt update + download of '$*' failed or passed its deadline (attempt $attempt/3); retrying in $((attempt * 20))s" >&2
-		sleep $((attempt * 20))
+		echo "atago: apt update + download of '$*' failed or passed its deadline (attempt $attempt/3); retrying in $((attempt * 15))s" >&2
+		sleep $((attempt * 15))
 	fi
 done
 echo "atago: apt update + download of '$*' failed three times against snapshot $snapshot_id" >&2

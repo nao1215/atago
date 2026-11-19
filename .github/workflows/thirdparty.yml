@@ -529,7 +529,7 @@ jobs:
       - name: Install ${{ matrix.program.name }} onto PATH
         # A hung download should fail this step with a clear name rather than
         # hold the job until its 20-minute timeout cancels it. The apt script
-        # bounds each of its three attempts, so 15 minutes covers its worst case.
+        # bounds its three attempts to 825 seconds, so 15 minutes covers its worst case.
         timeout-minutes: 15
         run: |
           set -e
