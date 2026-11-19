@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.26.2] - 2026-11-19
+
 ### Security
 
 - Update golang.org/x/crypto to v0.59.0 for GO-2026-5932.
