@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR supersedes its older run; pushes to main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   smoke:
     name: Release smoke
@@ -26,6 +31,32 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "stable"
+          # The shared setup-go cache is saved by whichever job finishes first
+          # and holds host-only build output, so the six cross-compiled targets
+          # below always compiled from scratch (3m8s of a 5m31s job). This job
+          # keeps its own cache instead: restored on every run, saved only from
+          # main so PRs cannot evict or poison it.
+          cache: false
+
+      - name: Locate Go caches
+        id: go-env
+        run: |
+          {
+            echo "version=$(go env GOVERSION)"
+            echo "gocache=$(go env GOCACHE)"
+            echo "gomodcache=$(go env GOMODCACHE)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the cross-compile cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.go-env.outputs.gocache }}
+            ${{ steps.go-env.outputs.gomodcache }}
+          key: ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-
 
       - name: Install Syft (SBOM generator)
         uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
@@ -51,6 +82,15 @@ jobs:
         with:
           version: "v2.16.0"
           args: release --snapshot --clean --skip=publish,sign
+
+      - name: Save the cross-compile cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.go-env.outputs.gocache }}
+            ${{ steps.go-env.outputs.gomodcache }}
+          key: ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
 
       # Not just "does an archive exist": verifies every hash in checksums.txt,
       # requires a valid SPDX SBOM per archive, checks archive layout for all

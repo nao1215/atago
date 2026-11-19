@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR supersedes its older run; pushes to main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
@@ -66,12 +71,45 @@ jobs:
       - name: Build atago
         run: go build -o ./dist/atago .
 
+      # Building caddy and sqly from source took 78s of this job on every run.
+      # The binaries depend only on the pinned versions and the Go toolchain,
+      # so they are cached under a key made of exactly those, restored on every
+      # run and saved only from main.
+      - name: Locate the tool cache
+        id: tools
+        run: |
+          {
+            echo "bin=$RUNNER_TEMP/atago-ci-tools/bin"
+            echo "key=$RUNNER_OS-representative-tools-$(go env GOVERSION)-caddy-v2.11.4-sqly-v0.27.3"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore pinned representative programs
+        id: tools-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.tools.outputs.bin }}
+          key: ${{ steps.tools.outputs.key }}
+
       - name: Install pinned representative programs
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        env:
+          GOBIN: ${{ steps.tools.outputs.bin }}
         run: |
           set -e
           go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
           go install github.com/nao1215/sqly@v0.27.3
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Save pinned representative programs
+        if: steps.tools-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.tools.outputs.bin }}
+          key: ${{ steps.tools.outputs.key }}
+
+      - name: Put the pinned programs on PATH
+        env:
+          TOOLS_BIN: ${{ steps.tools.outputs.bin }}
+        run: echo "$TOOLS_BIN" >> "$GITHUB_PATH"
 
       - name: Run the caddy suite (self-hosted web server, awesome-selfhosted)
         run: ./dist/atago run ./test/e2e/thirdparty/caddy
@@ -146,11 +184,46 @@ jobs:
       # REPL (built on nao1215/prompt) that only starts when stdin is a TTY. A
       # pinned sqly runs the pty specs that send a query and quit with EOF and
       # assert the result — exercising the ConPTY send path end to end.
-      - name: Install pinned sqly for the interactive pty check
+      #
+      # Building sqly from source took 101s of this job, the longest step of
+      # every PR's Windows leg. The binary depends only on the pinned version
+      # and the Go toolchain, so it is cached under exactly that key, restored
+      # on every run and saved only from main.
+      - name: Locate the tool cache
+        id: tools
         shell: bash
         run: |
-          go install github.com/nao1215/sqly@v0.27.3
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          {
+            echo "bin=$(cygpath -w "$RUNNER_TEMP/atago-ci-tools/bin")"
+            echo "key=$RUNNER_OS-windows-tools-$(go env GOVERSION)-sqly-v0.27.3"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore pinned sqly
+        id: tools-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.tools.outputs.bin }}
+          key: ${{ steps.tools.outputs.key }}
+
+      - name: Install pinned sqly for the interactive pty check
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          GOBIN: ${{ steps.tools.outputs.bin }}
+        run: go install github.com/nao1215/sqly@v0.27.3
+
+      - name: Save pinned sqly
+        if: steps.tools-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.tools.outputs.bin }}
+          key: ${{ steps.tools.outputs.key }}
+
+      - name: Put pinned sqly on PATH
+        shell: bash
+        env:
+          TOOLS_BIN: ${{ steps.tools.outputs.bin }}
+        run: echo "$TOOLS_BIN" >> "$GITHUB_PATH"
 
       # --parallel 1 keeps the concurrent ConPTY sessions from starving each
       # other; --retry-failed absorbs the residual readline-prompt race (see the

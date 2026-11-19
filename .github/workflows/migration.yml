@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR supersedes its older run; pushes to main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   parity:
     # Fixed distro for the same reason thirdparty.yml uses one: a pinned tool
