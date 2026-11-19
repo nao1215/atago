@@ -91,13 +91,14 @@ jobs:
           key: ${{ steps.tools.outputs.key }}
 
       - name: Install pinned representative programs
+        timeout-minutes: 10
         if: steps.tools-cache.outputs.cache-hit != 'true'
         env:
           GOBIN: ${{ steps.tools.outputs.bin }}
         run: |
           set -e
-          go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
-          go install github.com/nao1215/sqly@v0.27.3
+          bash ./scripts/retry.sh go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
+          bash ./scripts/retry.sh go install github.com/nao1215/sqly@v0.27.3
 
       - name: Save pinned representative programs
         if: steps.tools-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -206,11 +207,12 @@ jobs:
           key: ${{ steps.tools.outputs.key }}
 
       - name: Install pinned sqly for the interactive pty check
+        timeout-minutes: 10
         if: steps.tools-cache.outputs.cache-hit != 'true'
         shell: bash
         env:
           GOBIN: ${{ steps.tools.outputs.bin }}
-        run: go install github.com/nao1215/sqly@v0.27.3
+        run: bash ./scripts/retry.sh go install github.com/nao1215/sqly@v0.27.3
 
       - name: Save pinned sqly
         if: steps.tools-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'

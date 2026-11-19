@@ -462,6 +462,44 @@ func TestThirdParty_InstallersArePinned(t *testing.T) {
 	}
 }
 
+// workflowGoInstallRe matches a `go install` command (not the backquoted
+// mention in a comment), with whatever precedes it on the line.
+var workflowGoInstallRe = regexp.MustCompile(`(?m)^(.*)\bgo install [A-Za-z"]`)
+
+// TestWorkflows_DownloadsRetry guards every workflow against a single dropped
+// download failing a run. proxy.golang.org reset one module download of the
+// third-party matrix on 2026-11-19 and the rerun went green, so each `go
+// install` must go through scripts/retry.sh and each curl must retry on its own.
+func TestWorkflows_DownloadsRetry(t *testing.T) {
+	if _, err := os.Stat("scripts/retry.sh"); err != nil {
+		t.Fatalf("scripts/retry.sh: %v", err)
+	}
+	files, err := filepath.Glob(".github/workflows/*.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		for _, m := range workflowGoInstallRe.FindAllStringSubmatch(string(data), -1) {
+			if strings.HasPrefix(strings.TrimSpace(m[1]), "#") {
+				continue
+			}
+			if !strings.HasSuffix(m[1], "bash ./scripts/retry.sh ") {
+				t.Errorf("%s: %q runs go install without scripts/retry.sh", f, strings.TrimSpace(m[0]))
+			}
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "curl ") && !strings.Contains(trimmed, "--retry ") {
+				t.Errorf("%s: %q downloads without --retry", f, trimmed)
+			}
+		}
+	}
+}
+
 // windowsSpecsTSV is the single source of truth for which self-hosted E2E
 // targets run on Windows and under which shell. Both Windows CI legs (e2e.yml
 // and e2e-cross.yml) expand it through scripts/windows_specs.sh.

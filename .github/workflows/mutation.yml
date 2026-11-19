@@ -62,7 +62,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Install gremlins
-        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+        timeout-minutes: 5
+        run: bash ./scripts/retry.sh go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
       # gremlins v0.6.0 runs a plain `git diff --merge-base` and treats each
       # hunk's added lines as one contiguous range starting after the leading
       # context, so with the default 3 lines of context a second edit further
@@ -118,7 +119,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Install gremlins
-        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+        timeout-minutes: 5
+        run: bash ./scripts/retry.sh go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
       - name: Mutate the package
         env:
           PKG: ${{ matrix.pkg }}
