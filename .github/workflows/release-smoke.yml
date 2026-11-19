@@ -35,7 +35,9 @@ jobs:
           # and holds host-only build output, so the six cross-compiled targets
           # below always compiled from scratch (3m8s of a 5m31s job). This job
           # keeps its own cache instead: restored on every run, saved only from
-          # main so PRs cannot evict or poison it.
+          # main so PRs cannot evict or poison it. The key is the Go version
+          # and go.sum, not the commit, and main saves only when that exact key
+          # is missing, so pushes to main do not pile up a new entry each.
           cache: false
 
       - name: Locate Go caches
@@ -48,14 +50,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Restore the cross-compile cache
+        id: go-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ${{ steps.go-env.outputs.gocache }}
             ${{ steps.go-env.outputs.gomodcache }}
-          key: ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-
 
       - name: Install Syft (SBOM generator)
@@ -84,13 +86,13 @@ jobs:
           args: release --snapshot --clean --skip=publish,sign
 
       - name: Save the cross-compile cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.go-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ${{ steps.go-env.outputs.gocache }}
             ${{ steps.go-env.outputs.gomodcache }}
-          key: ${{ runner.os }}-release-smoke-${{ steps.go-env.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
       # Not just "does an archive exist": verifies every hash in checksums.txt,
       # requires a valid SPDX SBOM per archive, checks archive layout for all
