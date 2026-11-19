@@ -299,6 +299,22 @@ func TestRender_GHA(t *testing.T) {
 	}
 }
 
+// TestRender_GHA_SingleScenarioTallyIsSingular: the gha notice words its count
+// the way the console summary does, so a run of one scenario reads
+// "1 scenario", not "1 scenarios", in both.
+func TestRender_GHA_SingleScenarioTallyIsSingular(t *testing.T) {
+	t.Parallel()
+	one := &engine.SuiteResult{Suite: "one", Status: engine.StatusPassed, Scenarios: []engine.ScenarioResult{
+		{Name: "p", Status: engine.StatusPassed, Steps: []engine.StepResult{{Kind: "assert", Checks: []*assert.CheckResult{{OK: true}}}}},
+	}}
+	want := "1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped"
+	for _, f := range []Format{FormatGHA, FormatConsole} {
+		if out := render(t, f, one); !strings.Contains(out, want) {
+			t.Errorf("%s summary lacks %q:\n%s", f, want, out)
+		}
+	}
+}
+
 func TestRender_TAP(t *testing.T) {
 	t.Parallel()
 	var b bytes.Buffer
