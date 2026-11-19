@@ -57,7 +57,7 @@ jobs:
 
       - name: Install Hugo
         run: |
-          curl -fsSL -o "${RUNNER_TEMP}/hugo.tar.gz" \
+          curl -fsSL --retry 3 --retry-all-errors -o "${RUNNER_TEMP}/hugo.tar.gz" \
             "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz"
           echo "${HUGO_SHA256}  ${RUNNER_TEMP}/hugo.tar.gz" | sha256sum --check -
           tar -C "${RUNNER_TEMP}" -xzf "${RUNNER_TEMP}/hugo.tar.gz" hugo
@@ -69,7 +69,7 @@ jobs:
 
       - name: Index the site with Pagefind
         run: |
-          curl -fsSL -o "${RUNNER_TEMP}/pagefind.tar.gz" \
+          curl -fsSL --retry 3 --retry-all-errors -o "${RUNNER_TEMP}/pagefind.tar.gz" \
             "https://github.com/Pagefind/pagefind/releases/download/v${PAGEFIND_VERSION}/pagefind-v${PAGEFIND_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           echo "${PAGEFIND_SHA256}  ${RUNNER_TEMP}/pagefind.tar.gz" | sha256sum --check -
           tar -C "${RUNNER_TEMP}" -xzf "${RUNNER_TEMP}/pagefind.tar.gz" pagefind

@@ -8,7 +8,7 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 zip="$tmpdir/awscliv2.zip"
-curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${ver}.zip" -o "$zip"
+curl -fsSL --retry 3 --retry-all-errors "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${ver}.zip" -o "$zip"
 echo "${sha256}  ${zip}" | sha256sum -c -
 unzip -q "$zip" -d "$tmpdir"
 

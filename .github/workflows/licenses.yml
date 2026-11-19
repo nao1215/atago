@@ -57,7 +57,8 @@ jobs:
       # Pinned so a classifier update cannot change the verdict on its own.
       # Installed before GOOS is set: the tool itself runs on the runner.
       - name: Install go-licenses
-        run: go install github.com/google/go-licenses/v2@v2.0.1
+        timeout-minutes: 5
+        run: bash ./scripts/retry.sh go install github.com/google/go-licenses/v2@v2.0.1
 
       # . is what ships: the main package of each goreleaser build for
       # a CLI (for example ".", or "./cmd/<name>"), "./..." for a library.

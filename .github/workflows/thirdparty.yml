@@ -45,13 +45,13 @@ jobs:
         program:
           - name: caddy
             dir: ./test/e2e/thirdparty/caddy
-            install: go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
+            install: bash ./scripts/retry.sh go install github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.4
           - name: pushgateway
             dir: ./test/e2e/thirdparty/pushgateway
-            install: go install github.com/prometheus/pushgateway@v1.11.3
+            install: bash ./scripts/retry.sh go install github.com/prometheus/pushgateway@v1.11.3
           - name: webhook
             dir: ./test/e2e/thirdparty/webhook
-            install: go install github.com/adnanh/webhook@v0.0.0-20260212225928-857e708f87a6
+            install: bash ./scripts/retry.sh go install github.com/adnanh/webhook@v0.0.0-20260212225928-857e708f87a6
           # Ubuntu-packaged tools are always installed from a pinned noble
           # snapshot so their versions do not drift with runner-image refreshes
           # or moving apt repositories.
@@ -66,19 +66,19 @@ jobs:
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh sqlite3
           - name: fzf
             dir: ./test/e2e/thirdparty/fzf
-            install: go install github.com/junegunn/fzf@v0.74.0
+            install: bash ./scripts/retry.sh go install github.com/junegunn/fzf@v0.74.0
           # fx tags releases without a leading v, so the module has no semver
           # tag to pin; the pseudo-version below is the pin, resolved once and
           # verified by the Go checksum database like every other module here.
           - name: fx
             dir: ./test/e2e/thirdparty/fx
-            install: go install github.com/antonmedv/fx@v0.0.0-20260511101514-bb2c34476500
+            install: bash ./scripts/retry.sh go install github.com/antonmedv/fx@v0.0.0-20260511101514-bb2c34476500
           - name: helix
             dir: ./test/e2e/thirdparty/helix
             install: |
               ver="25.07.1"
               sha256="3f08e63ecd388fff657ad39722f88bb03dcf326f1f2da2700d99e1dc40ab2e8b"
-              curl -fsSL "https://github.com/helix-editor/helix/releases/download/${ver}/helix-${ver}-x86_64-linux.tar.xz" -o helix.tar.xz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/helix-editor/helix/releases/download/${ver}/helix-${ver}-x86_64-linux.tar.xz" -o helix.tar.xz
               echo "${sha256}  helix.tar.xz" | sha256sum -c -
               tar -xJf helix.tar.xz -C "$HOME"
               echo "HELIX_RUNTIME=$HOME/helix-${ver}-x86_64-linux/runtime" >> "$GITHUB_ENV"
@@ -88,13 +88,13 @@ jobs:
             install: |
               ver="0.63.1"
               sha256="8e033bc78c8e192dee9510e951f6c9e154289b7198d22c924ed1d0a951b0dac1"
-              curl -fsSL "https://github.com/jesseduffield/lazygit/releases/download/v${ver}/lazygit_${ver}_linux_x86_64.tar.gz" -o lazygit.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/jesseduffield/lazygit/releases/download/v${ver}/lazygit_${ver}_linux_x86_64.tar.gz" -o lazygit.tar.gz
               echo "${sha256}  lazygit.tar.gz" | sha256sum -c -
               tar -xzf lazygit.tar.gz lazygit
               install lazygit "$(go env GOPATH)/bin/lazygit"
           - name: gum
             dir: ./test/e2e/thirdparty/gum
-            install: go install github.com/charmbracelet/gum@v0.17.0
+            install: bash ./scripts/retry.sh go install github.com/charmbracelet/gum@v0.17.0
           # htop drives the pty runner's alternate-screen rendering and named
           # function keys.
           - name: htop
@@ -107,7 +107,7 @@ jobs:
             install: |
               ver="26.5.6"
               sha256="1031a02560d053301537195a6661d227c15cb4ce5c30481050b31e2b88681bff"
-              curl -fsSL "https://github.com/sxyazi/yazi/releases/download/v${ver}/yazi-x86_64-unknown-linux-musl.zip" -o yazi.zip
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/sxyazi/yazi/releases/download/v${ver}/yazi-x86_64-unknown-linux-musl.zip" -o yazi.zip
               echo "${sha256}  yazi.zip" | sha256sum -c -
               unzip -q yazi.zip
               install "yazi-x86_64-unknown-linux-musl/yazi" "yazi-x86_64-unknown-linux-musl/ya" "$(go env GOPATH)/bin/"
@@ -116,18 +116,18 @@ jobs:
             install: bash ./scripts/install_ubuntu_snapshot_packages.sh redis-server redis-tools
           - name: hugo
             dir: ./test/e2e/thirdparty/hugo
-            install: go install github.com/gohugoio/hugo@v0.164.0
+            install: bash ./scripts/retry.sh go install github.com/gohugoio/hugo@v0.164.0
           - name: restic
             dir: ./test/e2e/thirdparty/restic
-            install: go install github.com/restic/restic/cmd/restic@v0.19.1
+            install: bash ./scripts/retry.sh go install github.com/restic/restic/cmd/restic@v0.19.1
           - name: rclone
             dir: ./test/e2e/thirdparty/rclone
-            install: go install github.com/rclone/rclone@v1.74.4
+            install: bash ./scripts/retry.sh go install github.com/rclone/rclone@v1.74.4
           - name: minio
             dir: ./test/e2e/thirdparty/minio
             install: |
-              go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
-              go install github.com/minio/mc@RELEASE.2025-07-21T05-28-08Z
+              bash ./scripts/retry.sh go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
+              bash ./scripts/retry.sh go install github.com/minio/mc@RELEASE.2025-07-21T05-28-08Z
           # The AWS CLI is driven against a local MinIO S3 endpoint (#32): a
           # cloud CLI tested with no cloud account, fully offline. minio is the
           # server; the AWS CLI itself comes from the official pinned v2 bundle
@@ -135,7 +135,7 @@ jobs:
           - name: awscli
             dir: ./test/e2e/thirdparty/awscli
             install: |
-              go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
+              bash ./scripts/retry.sh go install github.com/minio/minio@RELEASE.2025-07-18T21-56-31Z
               bash ./scripts/install_awscli_pinned.sh
           # The pty scenarios exercise the real CPython REPL.
           - name: python
@@ -187,13 +187,13 @@ jobs:
           - name: age
             dir: ./test/e2e/thirdparty/age
             install: |
-              go install filippo.io/age/cmd/age@v1.3.1
-              go install filippo.io/age/cmd/age-keygen@v1.3.1
+              bash ./scripts/retry.sh go install filippo.io/age/cmd/age@v1.3.1
+              bash ./scripts/retry.sh go install filippo.io/age/cmd/age-keygen@v1.3.1
           # kustomize renders Kubernetes manifests offline and deterministically
           # (build/create/edit); go-installed from the kustomize module.
           - name: kustomize
             dir: ./test/e2e/thirdparty/kustomize
-            install: go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
+            install: bash ./scripts/retry.sh go install sigs.k8s.io/kustomize/kustomize/v5@v5.8.1
           # kubectx and kubens switch kubectl contexts and namespaces. The specs
           # drive throwaway kubeconfigs in the scenario workdir and never reach a
           # cluster, and fzf is installed so the interactive picker scenario runs
@@ -201,14 +201,14 @@ jobs:
           - name: kubectx
             dir: ./test/e2e/thirdparty/kubectx
             install: |
-              go install github.com/ahmetb/kubectx/cmd/kubectx@v0.11.0
-              go install github.com/ahmetb/kubectx/cmd/kubens@v0.11.0
-              go install github.com/junegunn/fzf@v0.74.0
+              bash ./scripts/retry.sh go install github.com/ahmetb/kubectx/cmd/kubectx@v0.11.0
+              bash ./scripts/retry.sh go install github.com/ahmetb/kubectx/cmd/kubens@v0.11.0
+              bash ./scripts/retry.sh go install github.com/junegunn/fzf@v0.74.0
           # actionlint statically lints GitHub Actions workflows offline; the
           # specs disable shellcheck so results do not depend on its presence.
           - name: actionlint
             dir: ./test/e2e/thirdparty/actionlint
-            install: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+            install: bash ./scripts/retry.sh go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           # bats-core runs Bash test files and reports TAP. It is a shell
           # program, so it comes from the release tarball pinned by version and
           # SHA256; install.sh lays bin/, libexec/ and lib/ under the prefix, and
@@ -218,7 +218,7 @@ jobs:
             install: |
               ver="1.11.1"
               sha256="5c57ed9616b78f7fd8c553b9bae3c7c9870119edd727ec17dbd1185c599f79d9"
-              curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${ver}.tar.gz" -o bats-core.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/bats-core/bats-core/archive/refs/tags/v${ver}.tar.gz" -o bats-core.tar.gz
               echo "${sha256}  bats-core.tar.gz" | sha256sum -c -
               tar -xzf bats-core.tar.gz
               "./bats-core-${ver}/install.sh" "$(go env GOPATH)"
@@ -231,7 +231,7 @@ jobs:
             install: |
               ver="0.28.1"
               sha256="400d835466429a5fe6c77a62775a9173729d61dd43e05dfa893e8cf6cb511783"
-              curl -fsSL "https://github.com/shellspec/shellspec/archive/refs/tags/${ver}.tar.gz" -o shellspec.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/shellspec/shellspec/archive/refs/tags/${ver}.tar.gz" -o shellspec.tar.gz
               echo "${sha256}  shellspec.tar.gz" | sha256sum -c -
               tar -xzf shellspec.tar.gz -C "$HOME"
               ln -sf "$HOME/shellspec-${ver}/shellspec" "$(go env GOPATH)/bin/shellspec"
@@ -246,7 +246,7 @@ jobs:
               # exists to exercise a fixed third-party contract.
               sha="10e96bfc473c7459a447fbbda12164745a72fd37"
               git init -q "$HOME/.rbenv"
-              git -C "$HOME/.rbenv" fetch -q --depth 1 https://github.com/rbenv/rbenv.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.rbenv" fetch -q --depth 1 https://github.com/rbenv/rbenv.git "$sha"
               git -C "$HOME/.rbenv" checkout -q FETCH_HEAD
               ln -sf "$HOME/.rbenv/bin/rbenv" "$(go env GOPATH)/bin/rbenv"
           # git-secrets scans for patterns that must never be committed, and
@@ -258,7 +258,7 @@ jobs:
             install: |
               sha="ad82d68ee924906a0401dfd48de5057731a9bc84"
               git init -q "$HOME/.git-secrets"
-              git -C "$HOME/.git-secrets" fetch -q --depth 1 https://github.com/awslabs/git-secrets.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.git-secrets" fetch -q --depth 1 https://github.com/awslabs/git-secrets.git "$sha"
               git -C "$HOME/.git-secrets" checkout -q FETCH_HEAD
               ln -sf "$HOME/.git-secrets/git-secrets" "$(go env GOPATH)/bin/git-secrets"
           # getoptions generates POSIX-shell option parsers. Pinned by commit
@@ -270,7 +270,7 @@ jobs:
             install: |
               sha="139d121807db67f632b412b2a00ece851df73203"
               git init -q "$HOME/.getoptions"
-              git -C "$HOME/.getoptions" fetch -q --depth 1 https://github.com/ko1nksm/getoptions.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.getoptions" fetch -q --depth 1 https://github.com/ko1nksm/getoptions.git "$sha"
               git -C "$HOME/.getoptions" checkout -q FETCH_HEAD
               make -C "$HOME/.getoptions" build
               ln -sf "$HOME/.getoptions/bin/gengetoptions" "$(go env GOPATH)/bin/gengetoptions"
@@ -283,7 +283,7 @@ jobs:
             install: |
               sha="777e8edb65482b036e0275a895d4cb6be8511c7d"
               git init -q "$HOME/.shdotenv"
-              git -C "$HOME/.shdotenv" fetch -q --depth 1 https://github.com/ko1nksm/shdotenv.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.shdotenv" fetch -q --depth 1 https://github.com/ko1nksm/shdotenv.git "$sha"
               git -C "$HOME/.shdotenv" checkout -q FETCH_HEAD
               make -C "$HOME/.shdotenv" build
               ln -sf "$HOME/.shdotenv/shdotenv" "$(go env GOPATH)/bin/shdotenv"
@@ -295,7 +295,7 @@ jobs:
             install: |
               sha="63c0e77aaf18b72c839b1113c1e2f9514413643b"
               git init -q "$HOME/.git-open"
-              git -C "$HOME/.git-open" fetch -q --depth 1 https://github.com/paulirish/git-open.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.git-open" fetch -q --depth 1 https://github.com/paulirish/git-open.git "$sha"
               git -C "$HOME/.git-open" checkout -q FETCH_HEAD
               ln -sf "$HOME/.git-open/git-open" "$(go env GOPATH)/bin/git-open"
           # git-extras is a collection of git subcommands. Pinned by commit and
@@ -308,7 +308,7 @@ jobs:
             install: |
               sha="dbf68bac59af47cd1adfa0b2317391c8315f8fad"
               git init -q "$HOME/.git-extras"
-              git -C "$HOME/.git-extras" fetch -q --depth 1 https://github.com/tj/git-extras.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.git-extras" fetch -q --depth 1 https://github.com/tj/git-extras.git "$sha"
               git -C "$HOME/.git-extras" checkout -q FETCH_HEAD
               make -C "$HOME/.git-extras" install PREFIX="$(go env GOPATH)"
           # transcrypt encrypts chosen files inside a git repository, using the
@@ -319,7 +319,7 @@ jobs:
             install: |
               sha="1b59c8e505c0f0eb396dce4d36274a12a446e2d6"
               git init -q "$HOME/.transcrypt"
-              git -C "$HOME/.transcrypt" fetch -q --depth 1 https://github.com/elasticdog/transcrypt.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.transcrypt" fetch -q --depth 1 https://github.com/elasticdog/transcrypt.git "$sha"
               git -C "$HOME/.transcrypt" checkout -q FETCH_HEAD
               ln -sf "$HOME/.transcrypt/transcrypt" "$(go env GOPATH)/bin/transcrypt"
           # nb keeps notes as git repositories. Pinned by commit; it is a single
@@ -330,7 +330,7 @@ jobs:
             install: |
               sha="a1e007dc191b7d821b14773978e720b67b6034d2"
               git init -q "$HOME/.nb-src"
-              git -C "$HOME/.nb-src" fetch -q --depth 1 https://github.com/xwmx/nb.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.nb-src" fetch -q --depth 1 https://github.com/xwmx/nb.git "$sha"
               git -C "$HOME/.nb-src" checkout -q FETCH_HEAD
               ln -sf "$HOME/.nb-src/nb" "$(go env GOPATH)/bin/nb"
           # mommy wraps a command and comments on how it went. Pinned by commit
@@ -341,7 +341,7 @@ jobs:
             install: |
               sha="2426f9174970d563315d11eeb559e006856448ef"
               git init -q "$HOME/.mommy"
-              git -C "$HOME/.mommy" fetch -q --depth 1 https://github.com/FWDekker/mommy.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.mommy" fetch -q --depth 1 https://github.com/FWDekker/mommy.git "$sha"
               git -C "$HOME/.mommy" checkout -q FETCH_HEAD
               make -C "$HOME/.mommy" build
               # mommy finds its own man page the way man does — by looking
@@ -357,7 +357,7 @@ jobs:
             install: |
               sha="f00f759f3d8d405468d0071310a91b8f5a9c3798"
               git init -q "$HOME/.asdf-vm"
-              git -C "$HOME/.asdf-vm" fetch -q --depth 1 https://github.com/asdf-vm/asdf.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.asdf-vm" fetch -q --depth 1 https://github.com/asdf-vm/asdf.git "$sha"
               git -C "$HOME/.asdf-vm" checkout -q FETCH_HEAD
               echo "$HOME/.asdf-vm/bin" >> "$GITHUB_PATH"
           # pyenv, pinned by commit. The suite covers only what pyenv does that
@@ -368,7 +368,7 @@ jobs:
             install: |
               sha="a71a378dacd210f5673550ff923715bf4d04324f"
               git init -q "$HOME/.pyenv-src"
-              git -C "$HOME/.pyenv-src" fetch -q --depth 1 https://github.com/pyenv/pyenv.git "$sha"
+              bash ./scripts/retry.sh git -C "$HOME/.pyenv-src" fetch -q --depth 1 https://github.com/pyenv/pyenv.git "$sha"
               git -C "$HOME/.pyenv-src" checkout -q FETCH_HEAD
               echo "$HOME/.pyenv-src/bin" >> "$GITHUB_PATH"
           # curl from the pinned Ubuntu snapshot. This is the one suite whose
@@ -389,9 +389,9 @@ jobs:
           - name: sops
             dir: ./test/e2e/thirdparty/sops
             install: |
-              go install github.com/getsops/sops/v3/cmd/sops@v3.13.2
-              go install filippo.io/age/cmd/age@v1.3.1
-              go install filippo.io/age/cmd/age-keygen@v1.3.1
+              bash ./scripts/retry.sh go install github.com/getsops/sops/v3/cmd/sops@v3.13.2
+              bash ./scripts/retry.sh go install filippo.io/age/cmd/age@v1.3.1
+              bash ./scripts/retry.sh go install filippo.io/age/cmd/age-keygen@v1.3.1
           # aqua is a declarative CLI version manager; the suite runs a real
           # `aqua install` from a local registry + local HTTP file server (python3
           # ships on the runner) and its offline surface. v2.61.0 raised its
@@ -399,14 +399,14 @@ jobs:
           # with this repo's current Go setup while still testing a recent aqua.
           - name: aqua
             dir: ./test/e2e/thirdparty/aqua
-            install: go install github.com/aquaproj/aqua/v2/cmd/aqua@v2.60.2
+            install: bash ./scripts/retry.sh go install github.com/aquaproj/aqua/v2/cmd/aqua@v2.60.2
           # ecspresso deploys ECS services. The suite renders offline AND runs a
           # real deploy against moto (an in-memory AWS mock, pip-installed) with
           # the same pinned AWS CLI v2 bundle observing the ECS state.
           - name: ecspresso
             dir: ./test/e2e/thirdparty/ecspresso
             install: |
-              go install github.com/kayac/ecspresso/v2/cmd/ecspresso@v2.8.5
+              bash ./scripts/retry.sh go install github.com/kayac/ecspresso/v2/cmd/ecspresso@v2.8.5
               pipx install 'moto[server]==5.2.2'
               bash ./scripts/install_awscli_pinned.sh
           - name: terraform
@@ -414,7 +414,7 @@ jobs:
             install: |
               ver="1.12.2"
               sha256="1eaed12ca41fcfe094da3d76a7e9aa0639ad3409c43be0103ee9f5a1ff4b7437"
-              curl -fsSL "https://releases.hashicorp.com/terraform/${ver}/terraform_${ver}_linux_amd64.zip" -o terraform.zip
+              curl -fsSL --retry 3 --retry-all-errors "https://releases.hashicorp.com/terraform/${ver}/terraform_${ver}_linux_amd64.zip" -o terraform.zip
               echo "${sha256}  terraform.zip" | sha256sum -c -
               unzip -o terraform.zip terraform
               install terraform "$(go env GOPATH)/bin/terraform"
@@ -422,19 +422,19 @@ jobs:
           - name: coredns
             dir: ./test/e2e/thirdparty/coredns
             install: |
-              go install github.com/coredns/coredns@v1.14.6
+              bash ./scripts/retry.sh go install github.com/coredns/coredns@v1.14.6
               bash ./scripts/install_ubuntu_snapshot_packages.sh bind9-dnsutils
           - name: nats
             dir: ./test/e2e/thirdparty/nats
             install: |
-              go install github.com/nats-io/nats-server/v2@v2.14.3
-              go install github.com/nats-io/natscli/nats@v0.4.0
+              bash ./scripts/retry.sh go install github.com/nats-io/nats-server/v2@v2.14.3
+              bash ./scripts/retry.sh go install github.com/nats-io/natscli/nats@v0.4.0
           - name: mailpit
             dir: ./test/e2e/thirdparty/mailpit
-            install: go install github.com/axllent/mailpit@v1.30.4
+            install: bash ./scripts/retry.sh go install github.com/axllent/mailpit@v1.30.4
           - name: transfersh
             dir: ./test/e2e/thirdparty/transfersh
-            install: go install github.com/dutchcoders/transfer.sh@v1.6.1
+            install: bash ./scripts/retry.sh go install github.com/dutchcoders/transfer.sh@v1.6.1
           # Gotify compiles its web UI into the binary, so `go install` cannot
           # build it; pinned release zip + SHA256. Gotify publishes no checksum
           # sidecars, so this SHA was recorded from a verified download
@@ -444,7 +444,7 @@ jobs:
             install: |
               ver="2.9.1"
               sha256="34707b68f6e2b1be69458a7974e9d0e1acbfaa7a95d7349eed9219c9f215c4b3"
-              curl -fsSL "https://github.com/gotify/server/releases/download/v${ver}/gotify-linux-amd64.zip" -o gotify.zip
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/gotify/server/releases/download/v${ver}/gotify-linux-amd64.zip" -o gotify.zip
               echo "${sha256}  gotify.zip" | sha256sum -c -
               unzip -o gotify.zip gotify-linux-amd64
               install gotify-linux-amd64 "$(go env GOPATH)/bin/gotify"
@@ -457,7 +457,7 @@ jobs:
             install: |
               ver="13.1.0"
               sha256="4f562bb224b8bb758b47789381babb284cb41687da8d714f2ff0e118e945e775"
-              curl -fsSL "https://dl.grafana.com/oss/release/grafana-${ver}.linux-amd64.tar.gz" -o grafana.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://dl.grafana.com/oss/release/grafana-${ver}.linux-amd64.tar.gz" -o grafana.tar.gz
               echo "${sha256}  grafana.tar.gz" | sha256sum -c -
               tar -xzf grafana.tar.gz -C "$HOME"
               echo "GF_PATHS_HOME=$HOME/grafana-${ver}" >> "$GITHUB_ENV"
@@ -470,8 +470,8 @@ jobs:
           - name: openfga
             dir: ./test/e2e/thirdparty/openfga
             install: |
-              go install github.com/openfga/cli/cmd/fga@v0.7.21-0.20260811061028-cef729e5d1a4
-              go install github.com/openfga/openfga/cmd/openfga@v1.18.3
+              bash ./scripts/retry.sh go install github.com/openfga/cli/cmd/fga@v0.7.21-0.20260811061028-cef729e5d1a4
+              bash ./scripts/retry.sh go install github.com/openfga/openfga/cmd/openfga@v1.18.3
           # Prometheus cannot be `go install`ed (its go.mod uses replace
           # directives), so the official release tarball provides prometheus
           # and promtool. Unlike the `go install` legs (whose module downloads
@@ -485,7 +485,7 @@ jobs:
             install: |
               ver="3.13.0"
               sha256="744d93324cc024d82089921737bd797474d7f1e5dbbfd1c6b387bad258538cb9"
-              curl -fsSL "https://github.com/prometheus/prometheus/releases/download/v${ver}/prometheus-${ver}.linux-amd64.tar.gz" -o prometheus.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/prometheus/prometheus/releases/download/v${ver}/prometheus-${ver}.linux-amd64.tar.gz" -o prometheus.tar.gz
               echo "${sha256}  prometheus.tar.gz" | sha256sum -c -
               tar -xzf prometheus.tar.gz
               install "prometheus-${ver}.linux-amd64/prometheus" "prometheus-${ver}.linux-amd64/promtool" "$(go env GOPATH)/bin/"
@@ -498,7 +498,7 @@ jobs:
             install: |
               ver="1.26.4"
               sha256="0faa36d151918f8f7d6e0f3ae67597d1c338583d695add146ac393109d0fc44a"
-              curl -fsSL "https://dl.gitea.com/gitea/${ver}/gitea-${ver}-linux-amd64" -o gitea
+              curl -fsSL --retry 3 --retry-all-errors "https://dl.gitea.com/gitea/${ver}/gitea-${ver}-linux-amd64" -o gitea
               echo "${sha256}  gitea" | sha256sum -c -
               install gitea "$(go env GOPATH)/bin/gitea"
           # ntfy cannot be `go install`ed either (replace directives); pinned
@@ -509,7 +509,7 @@ jobs:
             install: |
               ver="2.25.0"
               sha256="628bc8d3ad73778484ae1c6116e7745ef5fa414619567e6b4c2581927c355b1e"
-              curl -fsSL "https://github.com/binwiederhier/ntfy/releases/download/v${ver}/ntfy_${ver}_linux_amd64.tar.gz" -o ntfy.tar.gz
+              curl -fsSL --retry 3 --retry-all-errors "https://github.com/binwiederhier/ntfy/releases/download/v${ver}/ntfy_${ver}_linux_amd64.tar.gz" -o ntfy.tar.gz
               echo "${sha256}  ntfy.tar.gz" | sha256sum -c -
               tar -xzf ntfy.tar.gz
               install "ntfy_${ver}_linux_amd64/ntfy" "$(go env GOPATH)/bin/"
@@ -530,6 +530,11 @@ jobs:
         # A hung download should fail this step with a clear name rather than
         # hold the job until its 20-minute timeout cancels it. The apt script
         # bounds its three attempts to 825 seconds, so 15 minutes covers its worst case.
+        # Every go install, git fetch and cargo install goes through
+        # scripts/retry.sh (three attempts, 10 + 20 second waits) and every curl
+        # carries --retry, because a module proxy or release CDN that drops one
+        # request (proxy.golang.org reset the kustomize download on 2026-11-19)
+        # answers the next one.
         timeout-minutes: 15
         run: |
           set -e

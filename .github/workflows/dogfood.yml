@@ -50,15 +50,16 @@ jobs:
         run: go build -o ./dist/atago .
 
       - name: Install ${{ matrix.tool.name }} onto PATH
+        timeout-minutes: 15
         run: |
           set -e
           case "${{ matrix.tool.name }}" in
             truss)
-              cargo install truss-image --version 0.11.5 --locked
+              bash ./scripts/retry.sh cargo install truss-image --version 0.11.5 --locked
               echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
               ;;
             *)
-              go install "${{ matrix.tool.module }}"
+              bash ./scripts/retry.sh go install "${{ matrix.tool.module }}"
               echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
               ;;
           esac
