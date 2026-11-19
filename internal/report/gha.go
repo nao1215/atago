@@ -115,8 +115,8 @@ func writeGHA(w io.Writer, results []*engine.SuiteResult, allowXPass bool, loadF
 			plural.Count(snapsUpdated, "snapshot", "snapshots"))))
 	}
 	fmt.Fprintf(&b, "::notice title=atago::%s\n", ghaEscapeData(fmt.Sprintf(
-		"%d scenarios: %d passed, %d failed, %d errored, %d skipped%s%s%s",
-		total, agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
+		"%s: %d passed, %d failed, %d errored, %d skipped%s%s%s",
+		plural.Count(total, "scenario", "scenarios"), agg.Passed, agg.Failed, agg.Errored, agg.Skipped,
 		flakySuffix(agg)+expectFailSuffix(agg), loadFailureSuffix(len(loadFailures))+emptySelectionSuffix(emptySelection),
 		snapshotSuffix(snapsUpdated))))
 	_, err := io.WriteString(w, b.String())

@@ -10,6 +10,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - TAP output now escapes backslashes as well as `#` in point descriptions and directive reasons, as TAP 14 asks producers to. A failing scenario named `bug \# SKIP` was written `not ok 1 - s / bug \\# SKIP`, which a TAP 14 harness reads as a SKIP directive, so the failure was counted as skipped.
+- The `--report gha` summary notice says "1 scenario" for a run of one scenario, as the console summary does, instead of "1 scenarios".
 
 ## [0.26.2] - 2026-11-19
 
