@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- TAP output now escapes backslashes as well as `#` in point descriptions and directive reasons, as TAP 14 asks producers to. A failing scenario named `bug \# SKIP` was written `not ok 1 - s / bug \\# SKIP`, which a TAP 14 harness reads as a SKIP directive, so the failure was counted as skipped.
+
 ## [0.26.2] - 2026-11-19
 
 ### Security

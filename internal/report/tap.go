@@ -155,10 +155,15 @@ func tapDescription(suite, name string) string {
 	return tapInline(suite + " / " + name)
 }
 
-// tapInline flattens a string to a single line and escapes `#` so it cannot be
-// misread as the start of a TAP directive.
+// tapInline flattens a string to a single line and escapes it the way TAP 14
+// asks a producer to: `\` becomes `\\` and `#` becomes `\#`. Escaping the
+// backslash too matters, because a harness reads `\\` as a literal backslash;
+// with only the hash escaped, a name ending in a backslash before `#` would
+// leave that `#` unescaped and start a directive.
+var tapEscaper = strings.NewReplacer(`\`, `\\`, "#", `\#`)
+
 func tapInline(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(tapFlatten(s), "#", "\\#"))
+	return strings.TrimSpace(tapEscaper.Replace(tapFlatten(s)))
 }
 
 // tapFlatten collapses a string onto one clean line — newlines and CRs become
