@@ -36,6 +36,11 @@ defaults:
     # spec targets and `go run` invocation are written once.
     shell: bash
 
+# A new push to a PR supersedes its older run; pushes to main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   e2e:
     name: e2e (${{ matrix.os }})
