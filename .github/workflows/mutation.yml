@@ -38,6 +38,14 @@ concurrency:
 
 env:
   GREMLINS_VERSION: v0.6.0
+  # Address-space cap per process, in KiB (4 GiB). Some mutants turn a loop
+  # that appends into an endless one (internal/security's masker writes "***"
+  # forever when its inner bound is negated). Uncapped, two such test binaries
+  # fill the runner's memory long before the per-mutant timeout, and the
+  # runner is shut down mid-job with no log. Capped, the binary dies with
+  # "out of memory" within a second and gremlins records the mutant as killed.
+  # The unit tests of every package here pass well under this cap.
+  MUTANT_MEMORY_KIB: "4194304"
 
 jobs:
   diff:
@@ -65,6 +73,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git config diff.context 0
+          ulimit -v "$MUTANT_MEMORY_KIB"
           gremlins unleash --diff "$BASE_SHA" --workers 2 --timeout-coefficient 10 --output mutation.json .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -113,7 +122,9 @@ jobs:
       - name: Mutate the package
         env:
           PKG: ${{ matrix.pkg }}
-        run: gremlins unleash --workers 2 --timeout-coefficient 10 --output "mutation-${PKG}.json" "./internal/${PKG}"
+        run: |
+          ulimit -v "$MUTANT_MEMORY_KIB"
+          gremlins unleash --workers 2 --timeout-coefficient 10 --output "mutation-${PKG}.json" "./internal/${PKG}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
