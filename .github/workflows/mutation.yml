@@ -1,0 +1,115 @@
+name: Mutation
+
+# Mutation testing rewrites one expression at a time (a comparison, an
+# arithmetic operator, an increment) and checks that some test fails. A mutant
+# that survives marks logic no assertion looks at. It reruns the package tests
+# once per mutant, so it is too slow for every pull request:
+#
+# - Weekly, each package below is mutated in full, one job per package so the
+#   timeout follows that package's own test time. The list holds the packages
+#   that compute something (the report formats, assertions, the spec loader and
+#   YAML, snapshots, expansion, the security policy); the process runners, the
+#   engine and the CLI wiring are left out because their tests start real
+#   processes and terminals, which makes a run per mutant take hours.
+# - On a pull request, only the lines it changes are mutated. gremlins compares
+#   the paths `git diff` prints with the files it mutates as given, so this run
+#   starts from the module root; started from ./internal/<pkg> it finds 0 mutants.
+#
+# The scores are measured, not gated: doc/testing.md records the first full run.
+on:
+  schedule:
+    # 03:00 UTC on Sundays, clear of the daily fuzz (04:00) and E2E (05:00) runs.
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - .github/workflows/mutation.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GREMLINS_VERSION: v0.6.0
+
+jobs:
+  diff:
+    name: mutation (changed lines)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install gremlins
+        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+      - name: Mutate the lines this pull request changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: gremlins unleash --diff "$BASE_SHA" --workers 2 --timeout-coefficient 10 --output mutation.json .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-diff
+          path: mutation.json
+          if-no-files-found: ignore
+
+  package:
+    name: mutation (${{ matrix.pkg }})
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        pkg:
+          - artifact
+          - assert
+          - assertdesc
+          - diag
+          - explain
+          - fixture
+          - fsdelta
+          - generator
+          - loader
+          - manifest
+          - plural
+          - report
+          - scrub
+          - security
+          - snapshot
+          - spec
+          - store
+          - yaml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install gremlins
+        run: go install "github.com/go-gremlins/gremlins/cmd/gremlins@${GREMLINS_VERSION}"
+      - name: Mutate the package
+        env:
+          PKG: ${{ matrix.pkg }}
+        run: gremlins unleash --workers 2 --timeout-coefficient 10 --output "mutation-${PKG}.json" "./internal/${PKG}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: mutation-${{ matrix.pkg }}
+          path: mutation-${{ matrix.pkg }}.json
+          if-no-files-found: ignore
