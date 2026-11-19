@@ -1,6 +1,6 @@
 # atago Behavior Specs
 ## Summary
-86 suites · 722 scenarios
+86 suites · 723 scenarios
 ## Contents
 - [atago self-hosting / cross-platform no-shell argv tokenization (#154)](#atago-self-hosting--cross-platform-no-shell-argv-tokenization-154) — 5 scenarios
   - [a single-quoted JSON argument survives tokenization](#scenario-a-single-quoted-json-argument-survives-tokenization)
@@ -600,10 +600,11 @@
   - [an errored step is counted as an error, not a failure, across formats](#scenario-an-errored-step-is-counted-as-an-error-not-a-failure-across-formats)
   - [a failed teardown surfaces in junit, tap, and gha without changing the verdict](#scenario-a-failed-teardown-surfaces-in-junit-tap-and-gha-without-changing-the-verdict)
   - [a snapshot rewrite is reported by the console and every machine format](#scenario-a-snapshot-rewrite-is-reported-by-the-console-and-every-machine-format)
-- [atago self-hosting / reports](#atago-self-hosting--reports) — 10 scenarios
+- [atago self-hosting / reports](#atago-self-hosting--reports) — 11 scenarios
   - [JUnit report is XML with a testsuite and testcase](#scenario-junit-report-is-xml-with-a-testsuite-and-testcase)
   - [GitHub Actions annotations are emitted on failure](#scenario-github-actions-annotations-are-emitted-on-failure)
   - [TAP report is a numbered TAP 13 stream with ok / not ok points](#scenario-tap-report-is-a-numbered-tap-13-stream-with-ok--not-ok-points)
+  - [TAP escapes a backslash before a hash so a name cannot forge a SKIP](#scenario-tap-escapes-a-backslash-before-a-hash-so-a-name-cannot-forge-a-skip)
   - [failure artifacts are written and referenced in the JSON report](#scenario-failure-artifacts-are-written-and-referenced-in-the-json-report)
   - [a multi-line snapshot failure renders a unified diff with hunks](#scenario-a-multi-line-snapshot-failure-renders-a-unified-diff-with-hunks)
   - [a failure names the command it was observed under](#scenario-a-failure-names-the-command-it-was-observed-under)
@@ -13321,6 +13322,33 @@ ${atago} run --report tap mixed.atago.yaml
 - stdout line `1` equals an exact value
 - stdout line `2` equals an exact value
 - stdout contains `ok 1 - sample / good`, `not ok 2 - sample / bad`
+
+### Scenario: TAP escapes a backslash before a hash so a name cannot forge a SKIP
+#### Given
+- Fixture file `hash.atago.yaml` is created.
+
+#### Inputs
+_Fixture `hash.atago.yaml`:_
+```text
+version: "1"
+suite:
+  name: sample
+scenarios:
+  - name: 'bug \# SKIP'
+    steps:
+      - run:
+          command: echo Bob
+      - assert:
+          stdout:
+            contains: Alice
+```
+#### When
+```shell
+${atago} run --report tap hash.atago.yaml
+```
+#### Then
+- exit code is `1`
+- stdout contains `not ok 1 - sample / bug \\\# SKIP`
 
 ### Scenario: failure artifacts are written and referenced in the JSON report
 #### Given
