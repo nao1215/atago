@@ -438,6 +438,20 @@ These suites run real programs of every shape: the author's Go tools (atago test
 
 atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity of fire prevention. A test runner should do the same job: catch the sparks so a project never catches fire.
 
+## Testing
+
+| Technique | Bug class caught here |
+|---|---|
+| [Unit tests](doc/testing.md#unit-tests) | Wrong results from one package |
+| [Self-hosted E2E](doc/testing.md#self-hosted-e2e) | Behavior a user of the binary sees |
+| [Third-party E2E](doc/testing.md#third-party-e2e) | Spec features that break on real programs |
+| [Snapshots](doc/testing.md#snapshots) | Unreviewed changes to rendered output |
+| [Differential migrations](doc/testing.md#differential-migrations) | Drift from what Bats and ShellSpec do |
+| [Generated properties](doc/testing.md#generated-properties) | Report formats that disagree, miscount, or let a name forge structure |
+| [Fuzzing](doc/testing.md#fuzzing) | Panics and broken invariants on malformed specs and output |
+| [Mutation testing](doc/testing.md#mutation-testing) | Logic no assertion looks at |
+| [Benchmarks](doc/testing.md#benchmarks) | Slowdowns between the base and the head |
+
 ## Contributing
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions are not only about code: a GitHub Star also motivates development.
