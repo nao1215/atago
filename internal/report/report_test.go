@@ -326,6 +326,38 @@ func TestRender_TAP(t *testing.T) {
 	}
 }
 
+// TestRender_TAP_BackslashBeforeHashCannotForgeADirective: TAP 14 reads `\\` as
+// a literal backslash and `\#` as a literal hash, and the first unescaped `#`
+// starts the directive. A failing scenario named `bug \# SKIP` must therefore be
+// written `bug \\\# SKIP`; escaping only the hash gives `bug \\# SKIP`, which a
+// harness reads as the description `bug \` plus a SKIP directive and so counts
+// the failure as skipped. The same applies to a skip reason after the directive.
+func TestRender_TAP_BackslashBeforeHashCannotForgeADirective(t *testing.T) {
+	t.Parallel()
+	results := []*engine.SuiteResult{{
+		Suite:  `s\`,
+		Status: engine.StatusFailed,
+		Scenarios: []engine.ScenarioResult{
+			{Name: `bug \# SKIP`, Status: engine.StatusFailed, Steps: []engine.StepResult{{Kind: "assert",
+				Checks: []*assert.CheckResult{{OK: false, Desc: "assert exit_code is 0", Expected: "0", Actual: "1"}}}}},
+			{Name: "skipped", Status: engine.StatusSkipped, SkipReason: `C:\# windows`},
+		},
+	}}
+	var b bytes.Buffer
+	if err := Render(&b, FormatTAP, results); err != nil {
+		t.Fatal(err)
+	}
+	out := b.String()
+	for _, want := range []string{
+		`not ok 1 - s\\ / bug \\\# SKIP` + "\n",
+		`ok 2 - s\\ / skipped # SKIP C:\\\# windows` + "\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("TAP output missing %q\n%s", want, out)
+		}
+	}
+}
+
 // flakyResults builds a suite whose single scenario failed once and then passed
 // on retry (#29).
 //

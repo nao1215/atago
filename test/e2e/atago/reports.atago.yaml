@@ -92,6 +92,31 @@ scenarios:
               - "ok 1 - sample / good"
               - "not ok 2 - sample / bad"
 
+  - name: TAP escapes a backslash before a hash so a name cannot forge a SKIP
+    steps:
+      - fixture:
+          file: hash.atago.yaml
+          content: |
+            version: "1"
+            suite:
+              name: sample
+            scenarios:
+              - name: 'bug \# SKIP'
+                steps:
+                  - run:
+                      command: echo Bob
+                  - assert:
+                      stdout:
+                        contains: Alice
+      - run:
+          command: ${atago} run --report tap hash.atago.yaml
+      - assert:
+          exit_code: 1
+          stdout:
+            # TAP 14 reads \\ as a backslash and \# as a hash, so the point
+            # stays a failure with no directive.
+            contains: 'not ok 1 - sample / bug \\\# SKIP'
+
   - name: failure artifacts are written and referenced in the JSON report
     steps:
       - fixture:
