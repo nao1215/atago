@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A service with `ready.file` and `ready.store` now retries reading the ready file until `ready.timeout` instead of failing on the first read error. On Windows a sharing violation while the service renames the file into place or a scanner holds it open failed the scenario with ATG4004, and a file caught before its content was written was bound as an empty value. A timeout now names the last read error.
+
 ## [0.26.3] - 2026-11-19
 
 ### Fixed
