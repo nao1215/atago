@@ -43,7 +43,7 @@ atago run --report junit specs/                                   # or run a who
 
 If the server or the platform is the system under test, use runn or venom. In atago the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
-The [feature-by-feature comparison](/comparison/) lists the versions compared and its sources. The [migration guide](/migrate/) maps Bats and ShellSpec constructs to atago one to one, and CI runs both the originals and the migrations.
+The [feature-by-feature comparison](/comparison/) lists the versions compared and its sources. The [migration guide](/migrate/) shows example mappings from Bats and ShellSpec constructs to atago, and CI runs both the originals and the migrations.
 
 ## Record a run
 

@@ -4,23 +4,11 @@ title: Migrating from Bats or ShellSpec
 description: Side-by-side mappings from Bats and ShellSpec tests to atago specs. Every pair on this page is committed to the repository and both sides run in CI, so the guide cannot drift from what actually works.
 ---
 
-Bats and ShellSpec are mature, well-designed frameworks, and if they fit your
-suite there is no reason to leave. This guide is for one specific situation:
-the thing under test is a compiled binary and the shell code around it
-exists only to run that binary and inspect what happened. That layer is
-atago's job, and the mappings below show what each familiar construct becomes.
+This guide is for suites where the thing under test is a compiled binary and the shell code exists only to run it and inspect the result. If Bats or ShellSpec already fits your suite, there is no reason to move.
 
-Everything on this page is executable. The original Bats and ShellSpec suites
-live at [test/e2e/migration](https://github.com/nao1215/atago/blob/main/test/e2e/migration/)
-next to the migrated atago specs, and the
-[MigrationParity workflow](https://github.com/nao1215/atago/blob/main/.github/workflows/migration.yml)
-runs all three on every pull request and on every push to `main`: the
-originals under pinned Bats-core v1.14.0
-and ShellSpec 0.28.1, the migrations under the freshly built atago binary.
-A snippet you read here is an excerpt of a file CI ran.
+The original Bats and ShellSpec suites live at [test/e2e/migration](https://github.com/nao1215/atago/blob/main/test/e2e/migration/) next to the migrated atago specs. The [MigrationParity workflow](https://github.com/nao1215/atago/blob/main/.github/workflows/migration.yml) runs all three on every pull request and push to `main`: the originals under pinned Bats-core v1.14.0 and ShellSpec 0.28.1, the migrations under the freshly built atago binary. Every snippet here is an excerpt of a file CI ran.
 
-For a feature-by-feature table (including what Bats and ShellSpec do that
-atago does not), see the [comparison](/comparison/).
+The [comparison](/comparison/) has a feature-by-feature table, including what Bats and ShellSpec do that atago does not.
 
 ## The cheat sheet
 
@@ -41,7 +29,7 @@ atago does not), see the [comparison](/comparison/).
 
 ## Exit codes, stdout, stderr
 
-The everyday assertions translate one to one. In Bats:
+In Bats:
 
 ```bash
 @test "an exact exit code" {
@@ -68,7 +56,7 @@ In ShellSpec:
   End
 ```
 
-In atago, each becomes a scenario with a `run:` step and declarative asserts
+In atago, each is a scenario with a `run:` step and asserts
 ([basics.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/basics.atago.yaml)):
 
 ```yaml
@@ -96,8 +84,7 @@ In atago, each becomes a scenario with a `run:` step and declarative asserts
             contains: world
 ```
 
-stderr is a separate stream. Bats needs `run --separate-stderr`; ShellSpec has
-`The error`; atago always captures the two streams independently:
+Bats needs `run --separate-stderr` to see stderr and ShellSpec has `The error`. atago captures the two streams of a `run` step separately; a `pty:` step records one terminal transcript as stdout.
 
 ```bash
 @test "stderr contains" {
@@ -120,7 +107,7 @@ stderr is a separate stream. Bats needs `run --separate-stderr`; ShellSpec has
             contains: warn
 ```
 
-## setup/teardown become fixtures — and file cleanup disappears
+## setup/teardown become fixtures
 
 A Bats `setup()` writes input files and `teardown()` removes them:
 
@@ -162,12 +149,7 @@ ShellSpec does the same with `BeforeEach`/`AfterEach` helpers:
   End
 ```
 
-In atago the setup is a declarative `fixture:` step, and for scratch files
-there is no teardown to write: every scenario runs in its own temp workdir
-that atago removes. (`teardown:` steps do exist — they are for external state
-a workdir cannot carry away, like database rows or remote resources; see
-[the cookbook](/cookbook/#clean-up-external-state-even-when-a-step-fails).)
-From
+In atago the setup is a `fixture:` step, and scratch files need no teardown because every scenario runs in its own temp workdir that atago removes. `teardown:` steps exist for external state such as database rows or remote resources ([cookbook](/cookbook/#clean-up-external-state-even-when-a-step-fails)). From
 [fixtures_and_files.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/fixtures_and_files.atago.yaml):
 
 ```yaml
@@ -196,7 +178,7 @@ From
 
 ## jq pipelines become JSONPath matchers
 
-Both Bats and ShellSpec suites commonly shell out to `jq`:
+Bats and ShellSpec suites often shell out to `jq`:
 
 ```bash
 @test "json output asserted via jq, value captured and reused" {
@@ -240,8 +222,7 @@ atago asserts JSON by path without an external tool, and `store:` replaces the
 
 ## Parameterized tests become a matrix
 
-Bats has no built-in parameterization, so the same test is written once per
-case (or generated with `bats_test_function`):
+Bats has no built-in parameterization, so the test is written once per case (or generated with `bats_test_function`):
 
 ```bash
 @test "greets Alice in en" {
@@ -255,8 +236,7 @@ case (or generated with `bats_test_function`):
 }
 ```
 
-ShellSpec's `Parameters` block — a genuinely nice feature — feeds positional
-parameters into one example:
+ShellSpec's `Parameters` block feeds positional parameters into one example:
 
 ```sh
   Parameters
@@ -271,8 +251,7 @@ parameters into one example:
   End
 ```
 
-atago's `matrix:` expands one template scenario into one concrete scenario per
-row, each key available as `${name}`
+atago's `matrix:` expands one template into a scenario per row, with each key available as `${name}`
 ([matrix.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/matrix.atago.yaml)):
 
 ```yaml
@@ -293,10 +272,7 @@ row, each key available as `${name}`
 
 ## Polling loops become retry
 
-Waiting for an async result is a hand-written loop in shell. The probed
-command here is stateful, like a service warming up — the first attempt
-creates a marker and prints "waiting", the second prints "ready" — so the
-loop genuinely iterates:
+In shell, waiting for an async result is a hand-written loop. The probed command here is stateful, like a service warming up: the first attempt creates a marker and prints "waiting", the second prints "ready".
 
 ```bash
 @test "poll until the command reports ready" {
@@ -312,9 +288,7 @@ loop genuinely iterates:
 }
 ```
 
-atago re-runs the same stateful command until an `until:` assertion passes,
-with the attempt budget and interval declared — the first attempt prints
-"waiting", the retry sees "ready"
+atago re-runs the command until the `until:` assertion passes, within the declared attempts and interval
 ([retry.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/retry.atago.yaml)):
 
 ```yaml
@@ -335,10 +309,9 @@ with the attempt budget and interval declared — the first attempt prints
             contains: ready
 ```
 
-(Bats' own `BATS_TEST_RETRIES` re-runs the whole test on failure — useful, but
-a different tool: it is for flaky tests, not for polling.)
+Bats' `BATS_TEST_RETRIES` re-runs the whole test on failure, which is meant for flaky tests rather than polling.
 
-## skip and tags become declarative gates
+## skip and tags become gates
 
 Bats skips imperatively and tags with comments:
 
@@ -394,13 +367,11 @@ without running anything
             contains: ok
 ```
 
-The CI parity workflow runs the tag filters too: `bats --filter-tags smoke`
-and `atago run --tag smoke` select the same test on both sides.
+The parity workflow also runs `bats --filter-tags smoke` and `atago run --tag smoke`.
 
 ## Hand-maintained goldens become snapshots
 
-Neither Bats nor ShellSpec ships snapshot testing, so a golden compare is
-written by hand and refreshed by editing the file:
+Neither Bats nor ShellSpec ships snapshot testing, so a golden compare is written by hand and refreshed by editing the file:
 
 ```bash
 @test "stdout matches the committed golden file" {
@@ -416,10 +387,7 @@ written by hand and refreshed by editing the file:
   End
 ```
 
-atago's `snapshot:` matcher compares against the same kind of committed file,
-but normalizes ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF so
-the golden is stable across machines — and `atago snapshot update` refreshes
-every intentionally changed golden in one command
+atago's `snapshot:` compares against a committed file after normalizing ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF, so the golden is stable across machines. `atago snapshot update` refreshes every changed golden in one command
 ([snapshot.atago.yaml](https://github.com/nao1215/atago/blob/main/test/e2e/migration/snapshot.atago.yaml)):
 
 ```yaml
@@ -433,44 +401,27 @@ every intentionally changed golden in one command
             snapshot: snapshots/greeting.txt
 ```
 
-## What has no source to migrate from
+## Features with no Bats or ShellSpec counterpart
 
-Some atago features have no Bats/ShellSpec counterpart, so after the port they
-are simply new capability: `pty:` sessions for interactive prompts and TUIs,
-`expect_screen:`/`screen:` asserts on the rendered terminal frame, `changes:`
-for the exact set of files a command touched, `mock_servers:` for offline API
-simulation, `services:` with readiness probes, and `atago record` to turn a
-real run into a first spec. The [cookbook](/cookbook/) has a runnable recipe
-for each.
+After the port you also get `pty:` sessions for interactive prompts and TUIs, `expect_screen:`/`screen:` asserts on the rendered terminal frame, `changes:` for the exact set of files a command touched, `mock_servers:` for offline API simulation, `services:` with readiness probes, and `atago record` to turn a real run into a first spec. The [cookbook](/cookbook/) has a runnable recipe for each.
 
 ## What should stay where it is
 
-Migrate the black-box layer, not everything. Bats and ShellSpec remain the
-right tool for what they were built for:
+Keep these in Bats or ShellSpec:
 
-- Unit tests of shell functions. Both frameworks run shell code
-  in-process and assert on it directly. atago only ever executes a program,
-  so it cannot see inside your shell scripts.
-- Mocking shell internals. ShellSpec's function and command mocks have no
-  atago equivalent — atago's mocks are external HTTP servers, a different
-  axis.
-- Coverage of shell scripts. ShellSpec measures kcov coverage for shell
-  code; a black-box runner cannot.
+- Unit tests of shell functions. Both frameworks run shell code in-process; atago only executes programs and cannot see inside your scripts.
+- Mocking shell internals. ShellSpec's function and command mocks have no atago equivalent; atago's mocks are external HTTP servers.
+- Coverage of shell scripts. ShellSpec measures it with kcov; a black-box runner cannot.
 
-If your repository has both kinds of tests, keeping ShellSpec for the shell
-library and moving the CLI contract tests to atago is a reasonable end state —
-it is exactly how atago's own third-party suites were migrated.
+A repository with both kinds of tests can keep ShellSpec for the shell library and move the CLI contract tests to atago. atago's own third-party suites were migrated that way.
 
 ## Migrate incrementally
 
-Both runners coexist happily in one CI job, so port one file at a time:
+Both runners can share one CI job, so port one file at a time:
 
 ```shell
 bats test/                       # the suite you are migrating from
 atago run ./specs                # the part that has moved
 ```
 
-Start by recording a real run (`atago record -- mytool ...`) instead of
-writing YAML from scratch, then tighten the generated spec with the mappings
-above. [Use it in CI](/ci/) shows the GitHub Actions wiring, including
-`--report junit` if your CI already consumes Bats' JUnit output.
+Start by recording a real run (`atago record -- mytool ...`) and tighten the generated spec with the mappings above. [Use it in CI](/ci/) shows the GitHub Actions wiring, including `--report junit` if your CI already reads Bats' JUnit output.
