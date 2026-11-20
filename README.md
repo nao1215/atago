@@ -21,7 +21,7 @@
   <img src="./doc/img/atago-logo.jpg" alt="atago logo" width="400" />
 </p>
 
-atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary — in any language — and asserts what a user observes. No test code, no shell DSL.
+atago tests real CLI behavior from plain YAML: commands, files, snapshots, services, and interactive terminals. It runs your actual binary, written in any language, and asserts what a user observes. You write no test code and no shell DSL.
 
 Documentation: https://nao1215.github.io/atago/
 
@@ -29,8 +29,7 @@ Documentation: https://nao1215.github.io/atago/
 
 ## First run
 
-No install, no fictional binary — if you have Go, paste this. It records a real
-run of a command you already have, then replays it as a test:
+If you have Go, paste this. It records a real run of a command you already have and replays it as a test:
 
 ```shell
 go run github.com/nao1215/atago@latest record --out demo.atago.yaml -- git --version
@@ -43,12 +42,7 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (4ms)
 ```
 
-`record` runs `git --version` once and writes a spec from what it observed — the
-exit code, the version line on stdout, an empty stderr (a tool that writes a
-diagnostic there gets that first line anchored instead). `run` replays it. Open
-`demo.atago.yaml` and you have a real test you can tighten, not YAML you wrote
-from scratch. (Swap `git --version` for any command you have: `go version`,
-`jq --version`, `ls -la`.)
+`record` runs `git --version` once and writes a spec from what it observed: the exit code, the version line on stdout, and an empty stderr (when a tool writes a diagnostic there, the spec anchors its first line instead). `run` replays it. Open `demo.atago.yaml` to tighten the checks. Any command works in place of `git --version`, such as `go version`, `jq --version`, or `ls -la`.
 
 Then point it at your own tool:
 
@@ -60,19 +54,17 @@ atago run --report junit specs/                                   # or run a who
 
 ## Why atago?
 
-Pick the tool that owns your layer:
-
 | You are testing | Use |
 |-----------------|-----|
-| An HTTP/gRPC API server — scenario-based API testing | [runn](https://github.com/k1LoW/runn) |
-| A whole platform — integration suites across HTTP, gRPC, Kafka, databases, and more | [venom](https://github.com/ovh/venom) |
-| Shell functions and scripts — BDD-style unit tests | [ShellSpec](https://shellspec.info/) |
-| Bash scripts — TAP-style tests | [Bats](https://github.com/bats-core/bats-core) |
-| A CLI product — exit codes, output, generated files, snapshots, interactive prompts and TUIs | atago |
+| An HTTP/gRPC API server (scenario-based API testing) | [runn](https://github.com/k1LoW/runn) |
+| A whole platform (integration suites across HTTP, gRPC, Kafka, databases, and more) | [venom](https://github.com/ovh/venom) |
+| Shell functions and scripts (BDD-style unit tests) | [ShellSpec](https://shellspec.info/) |
+| Bash scripts (TAP-style tests) | [Bats](https://github.com/bats-core/bats-core) |
+| A CLI product: exit codes, output, generated files, snapshots, interactive prompts and TUIs | atago |
 
-If the server or the platform is the system under test, use runn or venom. atago points the other way: the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
+If the server or the platform is the system under test, use runn or venom. In atago the CLI is the product, and HTTP, database, SSH, gRPC, browser, and mock servers appear only as peers your CLI talks to.
 
-A [feature-by-feature comparison](https://nao1215.github.io/atago/comparison/) states the versions compared and its sources, and the [migration guide](https://nao1215.github.io/atago/migrate/) maps Bats and ShellSpec constructs to atago one-to-one — every mapping runs in CI, originals and migrations both.
+The [feature-by-feature comparison](https://nao1215.github.io/atago/comparison/) lists the versions compared and its sources. The [migration guide](https://nao1215.github.io/atago/migrate/) maps Bats and ShellSpec constructs to atago one to one, and CI runs both the originals and the migrations.
 
 ## Install
 
@@ -105,35 +97,23 @@ aqua i
 mise use -g aqua:nao1215/atago
 ```
 
-If your installed `mise` release does not see `nao1215/atago` yet, update `mise` or enable floating registries with `mise settings registry_floating=true`.
+If your `mise` does not see `nao1215/atago` yet, update `mise` or enable floating registries with `mise settings registry_floating=true`.
 
-The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Requires Go 1.26.11 or later when building from source.
+The [release page](https://github.com/nao1215/atago/releases) has prebuilt archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Building from source requires Go 1.26.11 or later.
 
-Runs on Linux, macOS, and Windows. CI tests all three: the unit suite on every OS, and the self-hosted spec suite on Linux, macOS, and Windows — the last both under the native `cmd.exe` and under a POSIX shell. Almost everything behaves identically; [Platform support](https://nao1215.github.io/atago/reference/#platform-support) is the short list of what does not, and why.
+CI runs the unit suite and the self-hosted spec suite on Linux, macOS, and Windows; on Windows the spec suite runs under both the native `cmd.exe` and a POSIX shell. [Platform support](https://nao1215.github.io/atago/reference/#platform-support) lists the few behaviors that differ and why.
 
 ## Getting started
 
-### Start from a real run
+### Record an interactive session
 
-You don't write the first spec — your tool does. `atago record -- <command>` runs it once and generates a spec from what it observed (exit code, output, created files):
-
-```shell
-$ atago record --out mytool.atago.yaml -- mytool convert input.txt
-recorded: exit 0, 2 lines of stdout, 1 file created
-wrote mytool.atago.yaml
-$ atago run mytool.atago.yaml
-.
-
-PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
-```
-
-Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY). On POSIX a password prompt (a line-mode read with echo off) becomes an `${env:...}` placeholder automatically; a TUI's raw mode also disables echo, but its keystrokes are recorded literally, so convert a password typed into a TUI's own password field to `${env:...}` by hand. On Windows — where a ConPTY exposes no echo state — every secret send needs the same hand conversion. A `--pty` session is bounded by `--timeout` (default 30s): if the program never exits, atago kills it, writes whatever was captured, and fails instead of hanging forever:
+`atago record --pty -- <command>` records an interactive tool in a real terminal (a ConPTY on Windows). You drive one session by hand, and atago writes a `pty:` step that replays your keystrokes as expect/send pairs. On POSIX, a password typed at an echo-off line-mode prompt becomes an `${env:...}` placeholder. A TUI's raw mode also turns echo off, but its keystrokes are recorded literally, so replace a password typed into a TUI's own field with `${env:...}` by hand; on Windows, where ConPTY exposes no echo state, do that for every secret. `--timeout` (default 30s) bounds the session: if the program never exits, atago kills it, writes what it captured, and fails.
 
 ```shell
 $ atago record --pty --out wizard.atago.yaml -- mytool init
 ```
 
-Prefer a blank template? `atago init` scaffolds one. Either way, the shape is always the same: declare a command, run it, assert on what it produced.
+`atago init` scaffolds a blank spec instead. Every spec has the same shape: run a command, then assert on what it produced.
 
 ### 1. Check exit code, stdout, and stderr
 
@@ -155,7 +135,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`; the `*.atago.yml` spelling is accepted too). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip, `f` flaky, `x` XFAIL, `X` XPASS):
+`atago run` takes spec files and directories, searched recursively for `*.atago.yaml` (or `*.atago.yml`). Each scenario runs in its own temporary directory, and progress prints one character per scenario (`.` pass, `F` fail, `E` error, `s` skip, `f` flaky, `x` XFAIL, `X` XPASS):
 
 ```shell
 $ atago run ./specs
@@ -164,9 +144,9 @@ $ atago run ./specs
 PASSED  12 scenarios: 12 passed, 0 failed, 0 errored, 0 skipped (1.4s)
 ```
 
-Scenarios run concurrently by default (`--parallel N`, defaulting to four per CPU, since a scenario spends most of its time waiting on the program it runs; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
+Scenarios run concurrently, four per CPU by default, because a scenario spends most of its time waiting on its program. `--parallel N` changes the count and `--parallel 1` serializes. Workdirs are isolated but the host network is shared, so two scenarios that each start a background `service:` need distinct ports.
 
-When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
+When a check fails, atago prints what was expected and what happened, with a colorized unified diff for multi-line output:
 
 ```text
 FAILED: demo / greeting matches its golden  (demo.atago.yaml)
@@ -194,7 +174,7 @@ FAILED  1 scenario: 0 passed, 1 failed, 0 errored, 0 skipped (3ms)
 
 ### 2. Check generated files and snapshots
 
-`fixture:` writes input files into the isolated workdir; `file:`/`dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file (volatile details like temp paths, UUIDs, and timestamps are normalized). A fixture's source is one of `content:` (inline text), `base64:` (inline bytes), `from:` (copy an existing file), or `symlink:` (link to a target):
+`fixture:` writes input files into the workdir, `file:` and `dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file with temp paths, UUIDs, and timestamps normalized. A fixture's source is one of `content:` (inline text), `base64:` (inline bytes), `from:` (copy an existing file), or `symlink:` (link to a target):
 
 ```yaml
 scenarios:
@@ -212,23 +192,17 @@ scenarios:
             snapshot: snapshots/generate.txt   # record/refresh with `atago snapshot update`
 ```
 
-See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests.
+See [files_and_fixtures](examples/files_and_fixtures.atago.yaml), [snapshot](examples/snapshot.atago.yaml), and [dir_tree](examples/dir_tree.atago.yaml) for whole-tree golden manifests. Other checks:
 
-`count`/`min_count`/`max_count` say how MANY times a `contains` or `matches` matcher occurs — the duplicate-output bug a presence check passes — and `size`/`min_size`/`max_size` bound a file's byte count, composing with the content matchers or standing alone (`size: 0` pins "created but deliberately empty"). See [count_and_size](examples/count_and_size.atago.yaml).
-
-`deterministic: {}` re-runs a command and requires byte-identical output — the same-input-same-output property that catches map-iteration order leaking into a report, which every loose matcher passes on every run. See [deterministic](examples/deterministic.atago.yaml).
-
-`suite.env` can carry a value `suite.setup` captured — the ephemeral address a suite-wide service published through `ready: {store:}` — so every scenario is pointed at a stub server without a shell wrapper exporting it. See [suite_env_from_setup](examples/suite_env_from_setup.atago.yaml).
-
-An `atago.project.yaml` beside your specs configures the whole directory at once — shared `env:`, shared `defaults:`, and `fixtures_dir:` for a committed corpus every spec reads as `${fixtures}`. See [project_manifest](examples/project_manifest.atago.yaml).
-
-The same manifest can declare the binary under test: `subject:` builds it once before the suite runs and puts it first on `PATH`, so specs call it by name, and `profiles:` (`--profile cover`) swap in an instrumented build. A build is just a command, so this works for any language.
-
-`expect_fail:` pins a known bug you have not fixed yet without painting CI red: the scenario runs on every commit, an expected failure is XFAIL (green), and the day it starts passing the run turns red so the spec gets promoted. See [expect_fail](examples/expect_fail.atago.yaml).
+- `count`, `min_count`, and `max_count` say how many times a `contains` or `matches` matcher occurs, which catches duplicated output that a presence check passes. `size`, `min_size`, and `max_size` bound a file's byte count, with or without content matchers; `size: 0` pins a file that is created but empty. See [count_and_size](examples/count_and_size.atago.yaml).
+- `deterministic: {}` runs a command again and requires byte-identical output. It catches map iteration order leaking into a report, which loose matchers pass on every run. See [deterministic](examples/deterministic.atago.yaml).
+- `suite.env` can carry a value that `suite.setup` captured, such as the address a suite-wide service published through `ready: {store:}`, so every scenario reaches a stub server without a shell wrapper exporting it. See [suite_env_from_setup](examples/suite_env_from_setup.atago.yaml).
+- An `atago.project.yaml` beside your specs configures the whole directory: shared `env:` and `defaults:`, and `fixtures_dir:` for a committed corpus that every spec reads as `${fixtures}`. Its `subject:` builds the binary under test once before the suite runs and puts it first on `PATH`, and `profiles:` (`--profile cover`) swap in an instrumented build. The build is a command, so any language works. See [project_manifest](examples/project_manifest.atago.yaml).
+- `expect_fail:` keeps a known, unfixed bug in CI without turning it red. The scenario runs on every commit and an expected failure counts as XFAIL (green); when it starts passing, the run fails so you promote the spec. See [expect_fail](examples/expect_fail.atago.yaml).
 
 ### 3. Drive interactive prompts and TUIs
 
-A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:
+A `pty` step runs the command in a real pseudo-terminal and drives it with expect/send pairs, so wizards, REPLs, and TTY-detection branches need no `expect(1)` script:
 
 ```yaml
 scenarios:
@@ -244,7 +218,7 @@ scenarios:
           exit_code: 0
 ```
 
-For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during the session, and `screen:` asserts the final rendered frame after exit:
+For full-screen TUIs, `expect_screen:` waits on the rendered frame while the program runs, and `screen:` asserts the final frame after exit:
 
 ```yaml
       - pty:
@@ -259,13 +233,13 @@ For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during t
             contains: "Summary"
 ```
 
-Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — including control-byte aliases like `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen`/`ctrl-minus` for apps that distinguish the physical `Ctrl+-` key — see [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). A tool that draws its interface on stderr and prints its result on stdout is testable as one step — the UI on the rendered screen, the result in the redirected file: [pty_stdout_split](examples/pty_stdout_split.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only. The `pty`/`pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific, not because the `pty` mechanism is.
+`send: {key: enter}` sends named keys, including control-byte aliases (`ctrl-space`, `ctrl-[`, `ctrl-_`) and modified keys such as `ctrl-hyphen`/`ctrl-minus` for apps that tell the physical `Ctrl+-` key apart. See [pty](examples/pty.atago.yaml), [pty_screen](examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](examples/pty_portable.atago.yaml). A tool that draws its UI on stderr and prints its result on stdout is one step, with the UI on the rendered screen and the result in the redirected file: [pty_stdout_split](examples/pty_stdout_split.atago.yaml).
 
-On Windows, ConPTY does not report whether it echoes input. If output after a `send` starts with the text sent, atago treats that first copy as possible terminal echo even when it arrives late; write the following `expect` against the program's response instead of the typed text alone.
+`pty` steps and `atago record --pty` run on Linux, macOS, and Windows (through a ConPTY pseudo-console); only `signal:` is POSIX-only. The `pty` and `pty_screen` examples skip on Windows because their inner commands (`[ -t 0 ]`, `cat -v`, a SIGINT trap) are POSIX-specific. ConPTY also does not report whether it echoes input: if output after a `send` starts with the sent text, atago treats that copy as possible echo even when it arrives late, so write the next `expect` against the program's response.
 
 ### When your CLI talks to a server
 
-The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers — as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:
+The same YAML drives HTTP, database, SSH, gRPC, headless browser, and offline mock server peers as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:
 
 ```shell
 $ atago init --list-templates
@@ -283,13 +257,18 @@ Scaffold one with: atago init --template <name>
 
 ## Examples
 
-Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The [cookbook](https://nao1215.github.io/atago/cookbook/) collects 50+ copyable recipes for common jobs — converting images, driving prompts and TUIs, simulating API failures offline, proving idempotency — and indexes every spec by task and by feature.
+Every feature has a commented, runnable spec under [examples/](examples/), tested in CI on Linux, macOS, and Windows. The [cookbook](https://nao1215.github.io/atago/cookbook/) has 50+ copyable recipes, such as converting images, driving prompts and TUIs, simulating API failures offline, and proving idempotency, and indexes every spec by task and by feature.
 
-Selection flags compose with any spec: `--filter NAME` (repeatable, and comma-separated for OR — `--filter a,b` or `--filter a --filter b` runs scenarios whose name contains `a` or `b`), `--tag T` and `--skip-tag T` (tags match exactly, not by substring — `atago list` shows the available tags), `--parallel N`, `--fail-fast` (stops at the first outcome that fails the run), and `--rerun-failed`. Flags may be written before, after, or between the paths. While authoring, `--verbose` traces every command, capture, and assertion verdict — for passing scenarios too.
+These selection flags work with any spec, before, after, or between the paths:
+
+- `--filter NAME` selects scenarios whose name contains NAME. Repeat it or separate names with commas for OR: `--filter a,b` and `--filter a --filter b` both run scenarios whose name contains `a` or `b`.
+- `--tag T` and `--skip-tag T` match tags exactly, not as substrings. `atago list` shows the available tags.
+- `--fail-fast` stops at the first outcome that fails the run. `--parallel N` and `--rerun-failed` also apply.
+- `--verbose` traces every command, capture, and assertion verdict, for passing scenarios too.
 
 ## Use it in CI
 
-Real E2E suites flake (timing, ports, external tools). `--retry-failed N` re-runs failed scenarios in a fresh workdir and reports recovered ones as flaky, loud in every report format; silent retries are explicitly a non-goal. A flaky scenario still fails the run, because one whose answer depends on how many times it ran has not been shown to work — pass `--allow-flaky` for a suite whose instability you already know about and accept. `--repeat N` does the opposite job: run each scenario N times to detect flakiness before it reaches CI.
+Real E2E suites flake on timing, ports, and external tools. `--retry-failed N` runs a failed scenario again in a fresh workdir and reports a recovered one as flaky in every report format; atago does not retry silently. A flaky scenario still fails the run, because a result that depends on how many times it ran proves nothing. Pass `--allow-flaky` for a suite whose instability you accept. `--repeat N` runs each scenario N times to find flakiness before it reaches CI.
 
 ```shell
 atago run --ci --retry-failed 2 ./specs          # retry, report instability loudly, still fail
@@ -311,9 +290,7 @@ jobs:
       - run: atago run --ci --report gha ./specs
 ```
 
-On GitLab CI (or any CI that starts from a container image), use the published
-GHCR image. Its entrypoint is `atago` itself, so clear it for the CI runner to start
-its shell:
+On GitLab CI, or any CI that starts from a container image, use the GHCR image. Its entrypoint is `atago`, so clear it to let the runner start its shell:
 
 ```yaml
 image:
@@ -332,18 +309,16 @@ behavior-specs:
       junit: junit.xml
 ```
 
-The image contains `atago` and `ca-certificates`; if your scenarios drive `git`,
-`jq`, a browser, or your own CLI binary, build FROM `ghcr.io/nao1215/atago:latest`
-and layer those tools on top.
+The image has only `atago` and `ca-certificates`. If your scenarios use `git`, `jq`, a browser, or your own CLI binary, build FROM `ghcr.io/nao1215/atago:latest` and add them.
 
-- `--report json|junit|gha|tap` picks the report format; the JSON shape is stable and versioned.
-- `--ci` enables deterministic, color-free output. It also turns an empty selection into a hard error: a `--filter`/`--tag`/`--skip-tag` that matches no scenario fails the run (exit 3) instead of passing an empty suite, so a typo cannot silently disable your specs. Without `--ci` the same case is a warning that still exits 0.
-- `--artifacts-dir DIR` persists the exact payloads a failed assertion compared — plus, for a failed scenario, its background services' logs and each mock server's recorded requests — so a failure stays reviewable after the job ends.
-- Environment variable names listed under `secrets:` are masked as `***` in all reports and snapshots.
+- `--report json|junit|gha|tap` picks the report format. The JSON shape is stable and versioned.
+- `--ci` makes output deterministic and color-free. It also fails the run (exit 3) when a `--filter`, `--tag`, or `--skip-tag` matches no scenario, so a typo cannot disable your specs. Without `--ci` this is a warning and the run exits 0.
+- `--artifacts-dir DIR` saves the payloads a failed assertion compared, plus a failed scenario's service logs and each mock server's recorded requests, so you can review a failure after the job ends.
+- Environment variables named under `secrets:` are masked as `***` in all reports and snapshots.
 
 ## Review specs without running them
 
-`explain` describes what a spec does, `doc` generates Markdown (with fixtures, expected payloads, and golden files inlined), `manifest` emits a stable JSON summary for tooling, and `list` shows scenarios, tags, and artifacts. All of them load and validate the spec first — exit code 2 on a schema error — so any of them doubles as a lint step in CI:
+`explain` describes what a spec does, `doc` generates Markdown with fixtures, expected payloads, and golden files inlined, `manifest` prints a stable JSON summary for tooling, and `list` shows scenarios, tags, and artifacts. Each loads and validates the spec first and exits 2 on a schema error, so any of them works as a lint step in CI:
 
 ![review](./doc/img/review.gif)
 
@@ -354,17 +329,13 @@ atago manifest ./specs
 atago list ./specs
 ```
 
-A spec error carries a code — `spec.yaml: ATG2201: suite.name is required` — whose first digit is the exit code, so `ATG2xxx` always exits 2. Codes are searchable and stable across rewordings of the message, and the [error reference](https://nao1215.github.io/atago/errors/) says what each one means and what to change. Codes are being assigned one family at a time, and the reference says which families carry them today. Assertion failures carry none by design: exit 1 is a spec doing its job, not atago failing to do its own.
+A spec error has a code, as in `spec.yaml: ATG2201: suite.name is required`. The first digit is the exit code, so `ATG2xxx` always exits 2. Codes are searchable and survive rewording of the message, and the [error reference](https://nao1215.github.io/atago/errors/) explains each one and what to change. Codes are assigned one family at a time; the reference lists which families have them today. Assertion failures have no code, since exit 1 means a spec caught a problem.
 
-Scenario names say what happens; an optional `description:` on the suite and on
-a scenario says why it matters. Both are prose for the reader of the generated
-Markdown — rendered under the matching heading, never expanded, and with no
-effect on the run. Maintenance notes stay in YAML comments, which never appear
-in the generated page.
+Scenario names say what happens. An optional `description:` on the suite or a scenario says why it matters. It is rendered under the matching heading in the generated Markdown, never expanded, and has no effect on the run. Keep maintenance notes in YAML comments, which the generated page leaves out.
 
 ## Let atago pick the inputs
 
-`forall:` states the SHAPE of an input instead of listing values, and expands into one scenario per generated row — property-based testing in a spec file. The opt-in is one line:
+`forall:` describes the shape of an input instead of listing values and expands into one scenario per generated row. This is property-based testing in a spec file:
 
 ```yaml
 scenarios:
@@ -376,13 +347,11 @@ scenarios:
       - assert: {exit_code: {in: [0, 1]}}
 ```
 
-The generators — `int`, `bool`, `digits`, `alpha`, `alphanumeric`, `ascii`, `unicode`, and `one_of` for a fixed set — are seeded from the spec itself rather than from the clock, so this stays a spec and not a lottery: the same file tests the same inputs on every machine, `atago list` shows them before anything runs, and a failing instance carries its input in its name. Boundary values come first, because that is where a CLI breaks.
-
-See [forall](examples/forall.atago.yaml).
+The generators are `int`, `bool`, `digits`, `alpha`, `alphanumeric`, `ascii`, `unicode`, and `one_of` for a fixed set. They are seeded from the spec, not the clock, so the same file tests the same inputs on every machine, `atago list` shows them before anything runs, and a failing instance has its input in its name. Boundary values come first, since that is where a CLI breaks. See [forall](examples/forall.atago.yaml).
 
 ## Snapshot testing
 
-`snapshot` matchers compare output against committed golden files; ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF are normalized so snapshots stay stable across machines. Record or refresh them with:
+`snapshot` matchers compare output against committed golden files, with ANSI colors, temp paths, UUIDs, timestamps, ports, and CRLF normalized so snapshots match across machines. Record or refresh them with:
 
 ![snapshot](./doc/img/snapshot.gif)
 
@@ -390,7 +359,7 @@ See [forall](examples/forall.atago.yaml).
 atago snapshot update spec.atago.yaml
 ```
 
-For volatile patterns the built-ins do not cover — auto-increment IDs, request identifiers, epoch times — declare spec-wide `scrub:` rules that rewrite each regex match to a placeholder before the compare (applied after `secrets:` masking):
+For other volatile values, such as auto-increment IDs, request identifiers, or epoch times, declare spec-wide `scrub:` rules. Each rewrites regex matches to a placeholder before the compare, after `secrets:` masking:
 
 ```yaml
 scrub:
@@ -401,7 +370,7 @@ See [scrub](examples/scrub.atago.yaml).
 
 ## Editor support (JSON Schema)
 
-A JSON Schema lives at [schema/atago.schema.json](schema/atago.schema.json). With the YAML language server you get completion and validation as you type — step types, every matcher, and the `${workdir}` / `${env:NAME}` / `${name}` / `$${...}` expansion rules. `atago init` and `atago record` already emit this header as the first line of every generated spec, so scaffolded specs get completion out of the box. To add it to an existing spec, use the absolute URL (it resolves in any project, unlike a repo-relative path):
+[schema/atago.schema.json](schema/atago.schema.json) is a JSON Schema for specs. With the YAML language server it gives completion and validation for step types, every matcher, and the `${workdir}` / `${env:NAME}` / `${name}` / `$${...}` expansion rules. `atago init` and `atago record` write this header as the first line of every spec they generate. To add it to an existing spec, use the absolute URL, which resolves in any project:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json
@@ -428,15 +397,15 @@ An [Agent Skill](skills/atago/SKILL.md) for Claude Code and Codex is in `skills/
 | `5`  | internal error            |
 | `6`  | security policy violation |
 
-`Ctrl-C`/`SIGTERM` stops the run cleanly: in-flight processes, services, and sessions are torn down, partial results are reported, and the run exits `4`.
+`Ctrl-C` or `SIGTERM` stops the run: atago tears down in-flight processes, services, and sessions, reports partial results, and exits `4`.
 
 ## Real CLIs tested with atago
 
-These suites run real programs of every shape: the author's Go tools (atago tests itself) and unmodified third-party binaries — git and jq, interactive TUIs (fzf, htop, yazi), the python3 REPL, servers driven as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document/media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. The generated [real-world index](https://nao1215.github.io/atago/real-world/) includes deep behavior docs for those binaries, including Yazi file operations, chooser/cwd handoff, tabs, and sort modes.
+These suites run the author's Go tools (atago tests itself) and unmodified third-party binaries: git and jq, TUIs (fzf, htop, yazi), the python3 REPL, servers run as scenario services (redis, gitea, grafana, prometheus), cloud and IaC CLIs tested offline (aws-cli, terraform, ecspresso), crypto tools (openssl, age, sops), and document and media pipelines (pandoc, ffmpeg). Most were migrated from ShellSpec. The generated [real-world index](https://nao1215.github.io/atago/real-world/) has behavior docs for those binaries, such as Yazi file operations, chooser/cwd handoff, tabs, and sort modes.
 
 ## The name
 
-atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity of fire prevention. A test runner should do the same job: catch the sparks so a project never catches fire.
+atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity of fire prevention. A test runner has the same job: catch the sparks before a project catches fire.
 
 ## Testing
 
@@ -454,7 +423,7 @@ atago (愛宕) is named for Mount Atago in Kyoto, whose shrine enshrines a deity
 
 ## Contributing
 
-Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions are not only about code: a GitHub Star also motivates development.
+Issues and pull requests are welcome; see [CONTRIBUTING.md](./CONTRIBUTING.md). A GitHub Star also motivates development.
 
 ## LICENSE
 
