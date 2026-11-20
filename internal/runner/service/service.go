@@ -294,23 +294,48 @@ func (p *Proc) waitReady(ctx context.Context, r *spec.Ready, workdir string) (st
 	}
 }
 
+// readReadyFile reads the ready file. It is a variable so tests can script
+// transient read failures that a real filesystem only produces under a race.
+var readReadyFile = os.ReadFile
+
 // waitFile waits until path exists and is non-empty, then returns its trimmed
 // content when store is set (so the caller can bind a dynamic address).
+//
+// With store set, the read is part of the readiness check and is retried on
+// every poll until timeout: on Windows a reader can hit a sharing violation
+// while the writer renames the file into place or an antivirus scanner holds
+// it open, and any reader can catch a file whose content is not flushed yet.
+// Those are moments of the write, not failures, so a read error or blank
+// content keeps the wait going, and only the timeout (naming the last read
+// error) or the service exiting ends it.
 func (p *Proc) waitFile(ctx context.Context, path, store string, timeout time.Duration) (string, error) {
-	if err := p.poll(ctx, timeout, func() bool {
+	var (
+		captured string
+		lastErr  error
+	)
+	err := p.poll(ctx, timeout, func() bool {
 		fi, err := os.Stat(path)
-		return err == nil && fi.Size() > 0
-	}); err != nil {
+		if err != nil || fi.Size() == 0 {
+			return false
+		}
+		if store == "" {
+			return true
+		}
+		data, err := readReadyFile(path) // #nosec G304 -- path is the user-declared ready file under the scenario workdir
+		if err != nil {
+			lastErr = err
+			return false
+		}
+		captured = strings.TrimSpace(string(data))
+		return captured != ""
+	})
+	if err != nil {
+		if lastErr != nil {
+			return "", fmt.Errorf("%w (last read of ready file %q: %w)", err, path, lastErr)
+		}
 		return "", err
 	}
-	if store == "" {
-		return "", nil
-	}
-	data, err := os.ReadFile(path) // #nosec G304 -- path is the user-declared ready file under the scenario workdir
-	if err != nil {
-		return "", diag.StepFileUnusable.Errorf("read ready file %q: %w", path, err)
-	}
-	return strings.TrimSpace(string(data)), nil
+	return captured, nil
 }
 
 // poll calls check every pollInterval until it returns true, the service exits,
