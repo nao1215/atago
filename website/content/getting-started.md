@@ -1,12 +1,12 @@
 ---
 toc: true
 title: Getting started
-description: Record a real run of your CLI, read the spec atago wrote, and keep it as a test — then assert on files, snapshots, interactive prompts, and server peers.
+description: Record a real run of your CLI, read the spec atago wrote, and keep it as a test. Then assert on files, snapshots, interactive prompts, and server peers.
 ---
 
 ## First run
 
-Before installing anything, prove the loop against a command you already have. If you have Go, paste this — it records a real run and replays it as a test:
+You can try the loop before installing anything. With Go on the machine, this records a real run and replays it as a test:
 
 ```shell
 go run github.com/nao1215/atago@latest record --out demo.atago.yaml -- git --version
@@ -19,11 +19,37 @@ go run github.com/nao1215/atago@latest run demo.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (4ms)
 ```
 
-Open `demo.atago.yaml`: `record` captured the exit code, the version line on stdout, and an empty stderr — a tool that writes a diagnostic there gets that first line anchored instead — so you have a real test to tighten rather than YAML written from scratch. Swap `git --version` for any command you have (`go version`, `jq --version`, `ls -la`). Then [install atago](/install/) and point it at your own tool.
+`record` printed `recorded: exit 0, 1 line of stdout, 0 files created` and wrote this spec:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nao1215/atago/main/schema/atago.schema.json
+version: "1"
+
+# Recorded by `atago record` — a starting point, not a verdict:
+# tighten the matchers to pin the behavior you actually care about.
+suite:
+  name: git
+
+scenarios:
+  - name: git --version # TODO: describe the behavior
+    steps:
+      - run:
+          command: git --version
+      - assert:
+          exit_code: 0
+      - assert:
+          stdout:
+            contains: git version 2.53.0 # first non-empty line, trimmed
+      - assert:
+          stderr:
+            empty: true
+```
+
+A tool that writes a diagnostic to stderr gets that first line anchored instead of `empty: true`. Swap `git --version` for any command you have, then [install atago](/install/) and point it at your own tool.
 
 ## Start from a real run
 
-You don't write the first spec — your tool does. `atago record -- <command>` runs it once and generates a spec from what it observed (exit code, output, created files):
+`atago record -- <command>` runs your command once and writes a spec from what it observed (exit code, output, created files):
 
 ```shell
 $ atago record --out mytool.atago.yaml -- mytool convert input.txt
@@ -35,13 +61,13 @@ $ atago run mytool.atago.yaml
 PASSED  1 scenario: 1 passed, 0 failed, 0 errored, 0 skipped (12ms)
 ```
 
-Interactive tools record too: `atago record --pty -- <command>` runs it in a real terminal, lets you drive one session by hand, and writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY). On POSIX a password prompt (a line-mode read with echo off) becomes an `${env:...}` placeholder automatically; a TUI's raw mode also disables echo, but its keystrokes are recorded literally, so convert a password typed into a TUI's own password field to `${env:...}` by hand. On Windows — where a ConPTY exposes no echo state — every secret send needs the same hand conversion. A `--pty` session is bounded by `--timeout` (default 30s): if the program never exits, atago kills it, writes whatever was captured, and fails instead of hanging forever:
+`atago record --pty -- <command>` records an interactive tool: you drive one session by hand in a real terminal, and atago writes a `pty:` step that replays your keystrokes as expect/send pairs. It works on Linux, macOS, and Windows (a ConPTY). On POSIX, a password prompt (a line-mode read with echo off) becomes an `${env:...}` placeholder automatically. A TUI's own password field is recorded literally, and on Windows, where a ConPTY exposes no echo state, so is every secret, so convert those sends to `${env:...}` by hand. `--timeout` (default 30s) bounds the session: if the program never exits, atago kills it, writes what it captured, and fails.
 
 ```shell
 $ atago record --pty --out wizard.atago.yaml -- mytool init
 ```
 
-Prefer a blank template? `atago init` scaffolds one. Either way, the shape is always the same: declare a command, run it, assert on what it produced.
+`atago init` scaffolds a blank template instead.
 
 ## 1. Check exit code, stdout, and stderr
 
@@ -63,7 +89,7 @@ scenarios:
             empty: true
 ```
 
-`atago run` accepts spec files and directories (searched recursively for `*.atago.yaml`; the `*.atago.yml` spelling is accepted too). Each scenario runs in its own temporary directory, and progress streams as a dot per scenario (`.` pass, `F` fail, `E` error, `s` skip, `f` flaky, `x` XFAIL, `X` XPASS):
+`atago run` takes spec files and directories (searched recursively for `*.atago.yaml`; `*.atago.yml` works too). Each scenario runs in its own temporary directory, and progress prints one character per scenario (`.` pass, `F` fail, `E` error, `s` skip, `f` flaky, `x` XFAIL, `X` XPASS):
 
 ```shell
 $ atago run ./specs
@@ -72,9 +98,9 @@ $ atago run ./specs
 PASSED  12 scenarios: 12 passed, 0 failed, 0 errored, 0 skipped (1.4s)
 ```
 
-Scenarios run concurrently by default (`--parallel N`, defaulting to four per CPU, since a scenario spends most of its time waiting on the program it runs; set `--parallel 1` to serialize). Workdirs are isolated, but the host network is shared — so if two scenarios each start a background `service:`, give them distinct ports, or one scenario's requests can reach the other's server.
+Scenarios run concurrently, four per CPU by default (`--parallel N`; `--parallel 1` serializes). Workdirs are isolated but the host network is shared, so two scenarios that each start a background `service:` need distinct ports.
 
-When a check fails, atago prints exactly what was expected and what happened; multi-line mismatches render a colorized unified diff:
+A failed check prints what was expected and what happened, with a unified diff for multi-line output:
 
 ```text
 FAILED: demo / greeting matches its golden  (demo.atago.yaml)
@@ -102,7 +128,7 @@ FAILED  1 scenario: 0 passed, 1 failed, 0 errored, 0 skipped (3ms)
 
 ## 2. Check generated files and snapshots
 
-`fixture:` writes input files into the isolated workdir; `file:`/`dir:` assertions check what the command produced, and `snapshot:` pins output to a committed golden file (volatile details like temp paths, UUIDs, and timestamps are normalized). A fixture's source is one of `content:` (inline text), `base64:` (inline bytes), `from:` (copy an existing file), or `symlink:` (link to a target):
+`fixture:` writes input files into the workdir, from `content:` (inline text), `base64:` (inline bytes), `from:` (a copy of an existing file), or `symlink:`. `file:` and `dir:` assertions check what the command produced, and `snapshot:` compares output with a committed golden file after normalizing temp paths, UUIDs, and timestamps:
 
 ```yaml
 scenarios:
@@ -120,35 +146,27 @@ scenarios:
             snapshot: snapshots/generate.txt   # record/refresh with `atago snapshot update`
 ```
 
-See [files_and_fixtures](https://github.com/nao1215/atago/blob/main/examples/files_and_fixtures.atago.yaml), [snapshot](https://github.com/nao1215/atago/blob/main/examples/snapshot.atago.yaml), and [dir_tree](https://github.com/nao1215/atago/blob/main/examples/dir_tree.atago.yaml) for whole-tree golden manifests.
+Examples: [files_and_fixtures](https://github.com/nao1215/atago/blob/main/examples/files_and_fixtures.atago.yaml), [snapshot](https://github.com/nao1215/atago/blob/main/examples/snapshot.atago.yaml), and [dir_tree](https://github.com/nao1215/atago/blob/main/examples/dir_tree.atago.yaml) for whole-tree golden manifests.
 
-Some configuration belongs to a *directory* of specs rather than to one file. An `atago.project.yaml` beside (or above) your specs carries it — shared `env:`, shared `defaults:` (a `sandbox_home: true` written once instead of repeated in every file), and `fixtures_dir:`, which exposes a committed corpus to every spec as `${fixtures}`. It is found by walking up to the nearest one, so running a whole tree and re-running a single failing spec inside it resolve the same configuration; a spec file's own values always win, and `atago explain` prints which manifest applied. `${specdir}` is the spec file's own directory, for inputs committed next to it. Both are absolute — a scenario runs in an isolated temp workdir — and both are read-only input: steps write into `${workdir}`.
+### Directory-wide settings
 
-See [project_manifest](https://github.com/nao1215/atago/blob/main/examples/project_manifest.atago.yaml) and the cookbook recipe for [configuring a directory](/cookbook/#configure-a-whole-directory-of-specs-at-once).
+An `atago.project.yaml` beside or above your specs holds settings for the whole directory: shared `env:`, shared `defaults:` (for example `sandbox_home: true` once instead of in every file), and `fixtures_dir:`, which every spec sees as `${fixtures}`. atago uses the nearest one walking up, so running the whole tree and re-running one spec inside it get the same configuration. A spec's own values win, and `atago explain` prints which manifest applied. `${specdir}` is the spec file's directory. Both paths are absolute and read-only; steps write into `${workdir}`. See [project_manifest](https://github.com/nao1215/atago/blob/main/examples/project_manifest.atago.yaml) and [configuring a directory](/cookbook/#configure-a-whole-directory-of-specs-at-once).
 
-A manifest can also declare the binary under test: `subject:` says how to build it and what specs call it, and `atago run` builds it once before any scenario, putting the artifact first on `PATH` so a spec keeps saying `mytool convert ...` rather than an absolute path. `profiles:` are named build variations selected with `--profile` — a coverage-instrumented build, a race build, a different toolchain. It is language-neutral because a build is just a command (`go build`, `cargo build --release`, `make`); coverage in particular is a profile rather than an atago feature, since instrumenting is an alternate build plus some environment in every language, and merging the raw profiles afterwards is a toolchain job that stays in a script.
+The manifest can also build the binary under test. `subject:` says how to build it, and `atago run` builds it once before any scenario and puts it first on `PATH`, so specs keep calling `mytool convert ...`. `profiles:`, selected with `--profile`, are build variations such as a coverage build, a race build, or another toolchain. A build is any command (`go build`, `cargo build --release`, `make`), so coverage is a profile; merging the raw coverage files afterwards stays in a script. See [building the binary under test](/cookbook/#build-the-binary-under-test-before-the-suite-runs).
 
-See the cookbook recipe for [building the binary under test](/cookbook/#build-the-binary-under-test-before-the-suite-runs).
+### Known bugs, counts, sizes, and determinism
 
-`expect_fail:` keeps a known bug's reproduction inside the suite instead of exiling it to a directory CI never runs. A scenario that declares it and fails is XFAIL — the run stays green, and the reproduction keeps executing on every commit, so it cannot silently stop working. One that PASSES is XPASS and fails the run: the bug is fixed, and the scenario has to be promoted into the guarded suite (`--allow-xpass` keeps the run green while you do). An execution error is still an error, which is what makes this safe in CI: `expect_fail` says the program gives the wrong answer, not that the spec cannot run. TAP renders both with its `# TODO` directive, JUnit as `<skipped>` / `<failure>`, and GitHub Actions as a notice / an error annotation.
+`expect_fail:` keeps a known bug's reproduction in the suite. A scenario that declares it and fails is XFAIL and the run stays green. If it passes, it is XPASS and fails the run, because the bug is fixed and the scenario should move into the guarded suite (`--allow-xpass` keeps the run green meanwhile). An execution error is still an error. TAP renders both with `# TODO`, JUnit as `<skipped>` / `<failure>`, and GitHub Actions as a notice / an error annotation. See [expect_fail](https://github.com/nao1215/atago/blob/main/examples/expect_fail.atago.yaml) and [tracking a known bug](/cookbook/#track-a-known-bug-with-an-expected-failure-spec).
 
-See [expect_fail](https://github.com/nao1215/atago/blob/main/examples/expect_fail.atago.yaml) and the cookbook recipe for [tracking a known bug](/cookbook/#track-a-known-bug-with-an-expected-failure-spec).
+`count:`, `min_count:`, and `max_count:` say how many times the neighboring `contains` or `matches` matcher occurs, which catches duplicated output without `grep -c`. `size:`, `min_size:`, and `max_size:` check a file's byte count and also work alone: `size: 0` pins a failed run that left an empty file, and `max_size` catches a bundle that grew. Occurrences do not overlap, a failure names the lines each one landed on, and sizes are counted as written, with no CRLF or trailing-newline normalization. See [count_and_size](https://github.com/nao1215/atago/blob/main/examples/count_and_size.atago.yaml), [counting](/cookbook/#assert-an-error-is-printed-exactly-once), and [sizing](/cookbook/#assert-a-failed-run-leaves-no-partial-output).
 
-`count:`, `min_count:`, and `max_count:` attach to the `contains` or `matches` matcher next to them and say how MANY times it occurs — the question a duplicate-output bug passes when you only ask whether the text is present, and one that used to need `grep -c` in a shell step. `size:`, `min_size:`, and `max_size:` do the same for a file's byte count, compose with the content matchers, and can stand alone: `size: 0` is how a spec pins "the failed run created the file but left it empty rather than half-written", and a `max_size` ceiling is the regression shape of a bundling or compression bug. Occurrences are non-overlapping and a failure names the lines each one landed on; sizes are counted as written, with no CRLF or trailing-newline normalization.
+`deterministic: {}` on a `run` step re-runs the command and requires the declared outputs to be byte-identical. That catches iteration order leaking into output (map column order, an unsorted listing, JSON keys that move), which loose matchers and `--repeat` never notice. A mismatch fails with a diff between the runs. Use it on commands that do not change the workdir; if a rerun does, the failure says so. See [deterministic](https://github.com/nao1215/atago/blob/main/examples/deterministic.atago.yaml) and [proving determinism](/cookbook/#prove-the-same-input-gives-the-same-output).
 
-See [count_and_size](https://github.com/nao1215/atago/blob/main/examples/count_and_size.atago.yaml) and the cookbook recipes for [counting](/cookbook/#assert-an-error-is-printed-exactly-once) and [sizing](/cookbook/#assert-a-failed-run-leaves-no-partial-output).
-
-`deterministic: {}` on a `run` step re-runs the command and requires the declared observables to come back byte-identical — the same-input-same-output property that catches iteration order leaking into output (a column order from a map, an unsorted listing, a JSON object whose keys move). Every loose matcher passes such output on every run, so `--repeat` sees no instability; comparing one run's bytes against the next's is the only cheap oracle. A mismatch fails the step with a unified diff between the runs. It is meaningful for an effectively read-only command; when a rerun changes the workdir, the failure says so rather than blaming a bug you do not have.
-
-See [deterministic](https://github.com/nao1215/atago/blob/main/examples/deterministic.atago.yaml) and the cookbook recipe for [proving determinism](/cookbook/#prove-the-same-input-gives-the-same-output).
-
-`suite.env` values may reference variables `suite.setup` captured — a `store` step's value, or the ephemeral address a suite-wide service published through `ready: {store:}` — so a stub registry or proxy can be handed to every scenario as an environment variable without a shell wrapper around `atago run`. A value that cannot resolve is never passed on as the literal text `${name}`: a child process does not fail on that, it uses it, and the resulting error arrives from the tool under test rather than from the spec. A scenario whose env references an undefined name fails before it starts, naming the key, the reference, and the names that are defined.
-
-See [suite_env_from_setup](https://github.com/nao1215/atago/blob/main/examples/suite_env_from_setup.atago.yaml) and the cookbook recipe for [handing a service address to every scenario](/cookbook/#hand-a-suite-wide-services-address-to-every-scenario).
+`suite.env` values can reference what `suite.setup` captured, such as a `store` step's value or the address a suite-wide service published through `ready: {store:}`. That hands a stub registry or proxy to every scenario without wrapping `atago run` in a shell script. An unresolved `${name}` is never passed to the child as literal text: the scenario fails before it starts, naming the key, the reference, and the names that are defined. See [suite_env_from_setup](https://github.com/nao1215/atago/blob/main/examples/suite_env_from_setup.atago.yaml) and [handing a service address to every scenario](/cookbook/#hand-a-suite-wide-services-address-to-every-scenario).
 
 ## 3. Drive interactive prompts and TUIs
 
-A `pty` step runs the command in a real pseudo-terminal and drives it with a declarative expect/send session — wizards, REPLs, and TTY-detection branches, no `expect(1)` scripting:
+A `pty` step runs the command in a real pseudo-terminal and drives it with an expect/send session, for wizards, REPLs, and TTY-detection branches:
 
 ```yaml
 scenarios:
@@ -164,7 +182,7 @@ scenarios:
           exit_code: 0
 ```
 
-For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during the session, and `screen:` asserts the final rendered frame after exit:
+For full-screen TUIs, `expect_screen:` waits on the live rendered frame during the session, and `screen:` asserts the final frame after exit:
 
 ```yaml
       - pty:
@@ -179,25 +197,22 @@ For full-screen TUIs, `expect_screen:` waits on the LIVE rendered frame during t
             contains: "Summary"
 ```
 
-Named keys (`send: {key: enter}`) and rendered-screen checks cover full TUIs — including control-byte aliases like `ctrl-space`, `ctrl-[`, and `ctrl-_`, plus modified key events like `ctrl-hyphen`/`ctrl-minus` for apps that distinguish the physical `Ctrl+-` key — see [pty](https://github.com/nao1215/atago/blob/main/examples/pty.atago.yaml), [pty_screen](https://github.com/nao1215/atago/blob/main/examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](https://github.com/nao1215/atago/blob/main/examples/pty_portable.atago.yaml).
+The session can also send and check the following. Examples: [pty](https://github.com/nao1215/atago/blob/main/examples/pty.atago.yaml), [pty_screen](https://github.com/nao1215/atago/blob/main/examples/pty_screen.atago.yaml), and the cross-platform [pty_portable](https://github.com/nao1215/atago/blob/main/examples/pty_portable.atago.yaml).
 
-The vocabulary covers the chords a real TUI binds, so a session never has to embed a raw `\x1b` escape: `shift-tab` (alias `backtab`) for reverse focus, `alt-a`..`alt-z` plus `alt-enter` and `alt-backspace` for the ESC-prefixed Meta chords readline word operations use, and the arrows with `ctrl-`/`shift-` modifiers (`ctrl-left`, `shift-up`, …) for word-wise and selection movement. A misspelled key is a load-time error that prints the whole accepted list, never a keystroke that silently does nothing. One caveat worth knowing: `alt-backspace` ends in DEL, which a cooked terminal claims as its ERASE character — a program that reads keys in raw mode (every full-screen TUI does) sees the chord intact, while a line-disciplined prompt sees an erase.
+- Named keys, `send: {key: enter}`: control-byte aliases (`ctrl-space`, `ctrl-[`, `ctrl-_`), `ctrl-hyphen`/`ctrl-minus` for apps that read the physical `Ctrl+-` key, `shift-tab` (alias `backtab`), `alt-a`..`alt-z`, `alt-enter`, `alt-backspace`, and arrows with `ctrl-`/`shift-` (`ctrl-left`, `shift-up`, …). A misspelled key fails at load time and prints the accepted list. `alt-backspace` ends in DEL, so a raw-mode TUI sees the chord while a cooked line prompt sees an erase.
+- `attrs:` on `screen:` or `expect_screen:` checks how text is drawn: `- {text: "ERROR", fg: red, bold: true}`, `- {text: "README.md", reverse: true}` for a selected row, or `- {text: "ok", fg: default}` for a `--no-color` contract. An entry passes when at least one occurrence has every cell styled that way; add `row` to pin the position. Colors are ANSI names, 256-palette indices, or `default`, and `bold: false` is checked. Bold text is drawn in the bright variant of its color, so `fg: red` accepts a bold `SGR 31` while `fg: bright-red` stays exact.
+- `send: {mouse: {row: 5, col: 12}}` clicks and scrolls in TUIs that accept a mouse (lazygit, yazi, htop, `fzf --mouse`, bubbletea apps). `row`/`col` are 1-based, `action` defaults to `click` (press and release in one write), and `wheel-up`/`wheel-down` send a single scroll report. Events are SGR (1006) reports, and atago refuses the send if the program has not enabled mouse tracking with SGR encoding.
+- `exec: "..."` runs a host command while the program keeps running, for example a commit made outside a git client or a file another process creates. It blocks until the command exits, so the next `expect_screen` waits on the program noticing the change. It runs in the scenario workdir with the pty child's environment (`sandbox_home` and `clear_env` still apply), and a non-zero exit or timeout ends the step with an error.
+- `resize: {rows: 40, cols: 120}` resizes the terminal (`SIGWINCH` on POSIX, a ConPTY notification on Windows) to test relayout. Each part of the transcript is rendered at the size it was produced under, so settle the screen with `expect_screen` before and after the resize.
+- `send: {paste: "..."}` sends a bracketed paste, which REPLs and editors handle differently from typing. atago refuses the send if the program has not enabled the mode (`ESC [?2004h`), so `expect` the prompt first.
 
-`attrs:` on a `screen:` (or `expect_screen:`) assert checks how text is DRAWN, not only what it says: `- {text: "ERROR", fg: red, bold: true}`, `- {text: "README.md", reverse: true}` for the selected row, or `- {text: "ok", fg: default}` — which is how a `--no-color` contract becomes assertable at all. An entry is position-free by default (it passes when at least one occurrence has every one of its cells styled that way), so a styling claim does not break each time the layout shifts; add `row` when the position is the point. Colors are ANSI names, 256-palette indices, or `default`, and `bold: false` is a real claim rather than the absence of one. One terminal rule to know: bold text is drawn in the bright variant of its color, so `fg: red` accepts what a bold `SGR 31` actually puts on screen while `fg: bright-red` stays exact.
+A tool that draws its UI on stderr and prints its result on stdout fits in one step: the UI on the rendered screen, the result in the redirected file ([pty_stdout_split](https://github.com/nao1215/atago/blob/main/examples/pty_stdout_split.atago.yaml)). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (ConPTY); only `signal:` is POSIX-only.
 
-`send: {mouse: {row: 5, col: 12}}` clicks and scrolls, for the TUIs that accept a mouse — lazygit, yazi, htop, `fzf --mouse`, anything on bubbletea — and for the times a click beats walking to a pane with twenty keystrokes. `row`/`col` are 1-based screen cells, `action` defaults to `click` (the press and its release in one write, the way a real click arrives), and the buttons include `wheel-up`/`wheel-down` — a wheel notch has no release, so `click` on one sends a single scroll report. Events go out as SGR (1006) reports, and atago refuses the send if the program has not enabled mouse tracking together with SGR encoding, naming the request that never came rather than putting bytes on the wire the program would read as garbage.
-
-`exec: "..."` runs one command on the host while the program under test keeps running, so a session can reach the paths no keystroke can: a git client refreshing after a commit made outside it, a file manager showing a file another process created, a log viewer following a file that grows. It blocks until the command exits, which is the point — after it the change exists, so the `expect_screen` that follows is waiting on the program noticing rather than on a race. The command runs in the scenario workdir with the environment the pty child got, so `sandbox_home` and `clear_env` isolation still holds, and a non-zero exit or timeout ends the step with an error rather than leaving the next wait to blame the program for a change nobody made.
-
-`resize: {rows: 40, cols: 120}` changes the terminal size while the program is running, delivered the way a real terminal delivers it — `SIGWINCH` on POSIX, a ConPTY notification on Windows. Relayout is where full-screen TUIs break (a stale right edge, a panel keeping its old width, a crash on a zero-width column), and without it that path is fixed at whatever the step started with. The rendered screen follows: each part of the transcript is drawn at the size it was produced under, so a frame written before the resize keeps the wrapping it was written with. Settle the screen with `expect_screen` on both sides of a resize — output still in flight when it lands is attributed to the old size, exactly as on a real terminal.
-
-`send: {paste: "..."}` delivers text as a bracketed paste rather than as typing. A REPL or editor that enables the mode treats a pasted block as one unit — it must not run line by line, auto-indent, or fire completion — and that is a different code path from typing the same characters. atago refuses the send if the program has not enabled the mode (`ESC [?2004h`), because the markers would otherwise arrive as literal `[200~` text and surface as a puzzling failure much later; wait for the prompt with an `expect` first, since programs turn the mode on during startup. A tool that draws its interface on stderr and prints its result on stdout is testable as one step — the UI on the rendered screen, the result in the redirected file: [pty_stdout_split](https://github.com/nao1215/atago/blob/main/examples/pty_stdout_split.atago.yaml). `pty` steps and `atago record --pty` run on Linux, macOS, and Windows (where they drive a ConPTY pseudo-console); only `signal:` stays POSIX-only.
-
-On Windows, ConPTY does not report whether it echoes input. If output after a `send` starts with the text sent, atago treats that first copy as possible terminal echo even when it arrives late; write the following `expect` against the program's response instead of the typed text alone.
+ConPTY does not report whether it echoes input. If output after a `send` starts with the sent text, atago treats that first copy as possible echo even when it arrives late, so write the next `expect` against the program's response.
 
 ## When your CLI talks to a server
 
-The same YAML also drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers — as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:
+The same YAML drives HTTP, database, SSH, gRPC, headless-browser, and offline mock-server peers as dependencies of the CLI under test. `atago init --template <name>` scaffolds each:
 
 ```shell
 $ atago init --list-templates
@@ -215,4 +230,4 @@ Scaffold one with: atago init --template <name>
 
 ## Next
 
-The [cookbook](/cookbook/) has a copyable spec for most jobs and indexes the runnable example for every feature, and [Use it in CI](/ci/) wires a suite into GitHub Actions.
+The [cookbook](/cookbook/) has a copyable spec for most jobs and links the runnable example for every feature. [Use it in CI](/ci/) wires a suite into GitHub Actions.
