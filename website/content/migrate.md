@@ -84,7 +84,7 @@ In atago, each is a scenario with a `run:` step and asserts
             contains: world
 ```
 
-Bats needs `run --separate-stderr` to see stderr and ShellSpec has `The error`. atago always captures the two streams separately:
+Bats needs `run --separate-stderr` to see stderr and ShellSpec has `The error`. atago captures the two streams of a `run` step separately; a `pty:` step records one terminal transcript as stdout.
 
 ```bash
 @test "stderr contains" {
@@ -367,7 +367,7 @@ without running anything
             contains: ok
 ```
 
-The parity workflow also checks that `bats --filter-tags smoke` and `atago run --tag smoke` select the same test.
+The parity workflow also runs `bats --filter-tags smoke` and `atago run --tag smoke`.
 
 ## Hand-maintained goldens become snapshots
 

@@ -29,7 +29,7 @@ description: atago subcommands, scenario selection flags, snapshot updating and 
 | `--filter NAME` | scenarios whose name contains `NAME`; repeatable, and comma-separated for OR (`--filter a,b` equals `--filter a --filter b`) |
 | `--tag T` / `--skip-tag T` | scenarios with or without tag `T`, matched exactly; comma-separated and repeatable (`atago list` shows the tags) |
 | `--parallel N` | how many scenarios run at once |
-| `--fail-fast` | stop scheduling new scenarios after the first outcome that fails the run |
+| `--fail-fast` | after the first outcome that fails the run, stop scheduling that spec's scenarios and start no new spec (a spec already running in parallel keeps scheduling its own) |
 | `--rerun-failed` | only the scenarios the previous run recorded as failed in `.atago/last-failed.json` |
 | `--verbose` | trace every command, capture, and assertion verdict, for passing scenarios too |
 

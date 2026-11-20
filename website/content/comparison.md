@@ -6,7 +6,7 @@ description: How atago compares with Bats-core v1.14.0, ShellSpec 0.28.1, comman
 
 This page shows which tool fits which layer of testing. Several of these tools shaped how atago approaches testing.
 
-Releases compared, checked against each project's official documentation and release pages (linked under [Sources](#sources)) on 2026-08-14, and TUI Test on 2026-09-12:
+Releases compared. The other projects were checked against their official documentation and release pages (linked under [Sources](#sources)) on 2026-08-14, TUI Test on 2026-09-12, and atago at its v0.23.0 release:
 
 | Tool | Release compared | Released |
 |------|------------------|----------|
@@ -125,7 +125,7 @@ TUI Test can replay a failing session from a trace, which atago cannot, and its 
 
 Versions in this section were checked on 2026-08-14.
 
-- [aruba](https://github.com/cucumber/aruba) (v2.4.1) tests CLIs from the Cucumber family, driven from Cucumber-Ruby, RSpec, or Minitest. You write Gherkin scenarios and implement or reuse Ruby step definitions to run them; atago's YAML runs without glue code. A team that already writes Gherkin will be at home in aruba.
+- [aruba](https://github.com/cucumber/aruba) (v2.4.1) tests CLIs from the Cucumber family, driven from Cucumber-Ruby, RSpec, or Minitest. With Cucumber you write Gherkin scenarios backed by Ruby step definitions, and with RSpec or Minitest you write Ruby directly; atago's YAML runs without code. A team that already writes Ruby tests will be at home in aruba.
 - expect is the classic Tcl tool for scripting interactive programs and the ancestor of every expect/send API, atago's `pty:` included. It is fine for one-off automation; a spec runner adds assertions, isolation, and reporting.
 - [cram](https://github.com/aiiie/cram) and its fork [prysk](https://github.com/prysk/prysk) (0.20.0) snapshot-test command lines in `.t` files and are the closest relatives of atago's `snapshot:`. They pin whole session transcripts, while atago keeps snapshots apart from structured asserts and normalizes volatile output.
 - [testscript](https://github.com/rogpeppe/go-internal) (v1.15.0) is the txtar-based script runner extracted from `cmd/go`'s own tests and the usual way to test Go CLIs inside `go test`. It runs in-process with your Go tests; atago runs any binary from outside, in any language.
@@ -143,7 +143,7 @@ Versions in this section were checked on 2026-08-14.
 
 atago is the youngest project on this page and still pre-1.0. The spec format is versioned and every feature ships with a runnable, CI-tested example, but the other tools have years more production use.
 
-The [migration guide](/migrate/) maps Bats and ShellSpec constructs to atago one-to-one, and every mapping on it runs in CI, originals and migrations both.
+The [migration guide](/migrate/) shows example mappings from Bats and ShellSpec constructs to atago, and CI runs every example, originals and migrations both.
 ## Sources
 
 Feature claims come from each project's official documentation for the
