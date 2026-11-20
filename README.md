@@ -268,7 +268,7 @@ These selection flags work with any spec, before, after, or between the paths:
 
 ## Use it in CI
 
-Real E2E suites flake on timing, ports, and external tools. `--retry-failed N` runs a failed scenario again in a fresh workdir and reports a recovered one as flaky in every report format; atago does not retry silently. A flaky scenario still fails the run, because a result that depends on how many times it ran proves nothing. Pass `--allow-flaky` for a suite whose instability you accept. `--repeat N` runs each scenario N times to find flakiness before it reaches CI.
+Real E2E suites flake on timing, ports, and external tools. `--retry-failed N` runs a failed scenario again in a fresh workdir and reports a recovered one as flaky in every report format; atago does not retry silently. A flaky scenario still fails the run, because a result that depends on how many times it ran proves nothing. Pass `--allow-flaky` for a suite whose instability you accept. `--repeat N` runs each scenario N times to find flakiness before it reaches CI; an `expect_fail:` scenario still runs once.
 
 ```shell
 atago run --ci --retry-failed 2 ./specs          # retry, report instability loudly, still fail
@@ -313,7 +313,7 @@ The image has only `atago` and `ca-certificates`. If your scenarios use `git`, `
 
 - `--report json|junit|gha|tap` picks the report format. The JSON shape is stable and versioned.
 - `--ci` makes output deterministic and color-free. It also fails the run (exit 3) when a `--filter`, `--tag`, or `--skip-tag` matches no scenario, so a typo cannot disable your specs. Without `--ci` this is a warning and the run exits 0.
-- `--artifacts-dir DIR` saves the payloads a failed assertion compared, plus a failed scenario's service logs and each mock server's recorded requests, so you can review a failure after the job ends.
+- `--artifacts-dir DIR` saves the payloads a failed assertion compared, plus a failed scenario's service logs and the requests its own mock servers recorded, so you can review a failure after the job ends.
 - Environment variables named under `secrets:` are masked as `***` in all reports and snapshots.
 
 ## Review specs without running them

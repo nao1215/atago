@@ -47,7 +47,7 @@ The [feature-by-feature comparison](/comparison/) lists the versions compared an
 
 ## Record a run
 
-`atago record -- <command>` runs the tool once and writes a spec from its exit code, output, and created files. `record --pty` does the same for an interactive tool: you drive one session by hand in a real terminal, and the keystrokes become a replayable expect/send script, with password prompts turned into `${env:...}` placeholders.
+`atago record -- <command>` runs the tool once and writes a spec from its exit code, output, and created files. `record --pty` does the same for an interactive tool: you drive one session by hand in a real terminal, and the keystrokes become a replayable expect/send script. On POSIX, a password typed at an echo-off prompt becomes an `${env:...}` placeholder; keystrokes in a TUI and every send on Windows are recorded literally, so replace secrets there by hand.
 
 ## Keep a known bug in CI
 
