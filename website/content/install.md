@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Install atago with go install, Homebrew, the AUR, prebuilt binaries for Linux/macOS/Windows, or the setup-atago GitHub Action — and verify what you download.
+description: Install atago with go install, Homebrew, the AUR, prebuilt binaries for Linux/macOS/Windows, or the setup-atago GitHub Action, and verify what you download.
 ---
 
 ```shell
@@ -32,21 +32,17 @@ aqua i
 mise use -g aqua:nao1215/atago
 ```
 
-If your installed `mise` release does not see `nao1215/atago` yet, update `mise` or enable floating registries with `mise settings registry_floating=true`.
+If your `mise` does not see `nao1215/atago` yet, update `mise` or enable floating registries with `mise settings registry_floating=true`.
 
-The [release page](https://github.com/nao1215/atago/releases) contains prebuilt binary archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Requires Go 1.26.11 or later when building from source.
+The [release page](https://github.com/nao1215/atago/releases) has prebuilt archives for Linux, macOS, and Windows (amd64/arm64; `.tar.gz`, or `.zip` on Windows), plus `.deb`, `.rpm`, and `.apk` packages for Linux. Building from source requires Go 1.26.11 or later.
 
 Runs on Linux, macOS, and Windows (CI tests all three).
 
-In GitHub Actions, [setup-atago](https://github.com/nao1215/setup-atago) installs a released binary — see [Use it in CI](/ci/).
+In GitHub Actions, [setup-atago](https://github.com/nao1215/setup-atago) installs a released binary; see [Use it in CI](/ci/).
 
 ## Verifying release integrity
 
-Every release ships supply-chain metadata so you can verify what you download:
-
-- Signed checksums: `checksums.txt` is signed with [cosign](https://github.com/sigstore/cosign) (keyless), producing `checksums.txt.sigstore.json`.
-- SBOM: an SPDX Software Bill of Materials is attached to each release archive.
-- Build provenance: SLSA build provenance is attested via GitHub OIDC and attached to the release as `multiple.intoto.jsonl`.
+`checksums.txt` is signed keyless with [cosign](https://github.com/sigstore/cosign) into `checksums.txt.sigstore.json`. Each release archive has an SPDX SBOM attached, and SLSA build provenance, attested via GitHub OIDC, is attached to the release as `multiple.intoto.jsonl`.
 
 ```shell
 cosign verify-blob \
